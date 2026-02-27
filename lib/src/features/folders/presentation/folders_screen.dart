@@ -248,6 +248,7 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final foldersAsync = ref.watch(foldersStreamProvider);
     final receipts = ref.watch(receiptsStreamProvider).valueOrNull ?? const <Receipt>[];
 
@@ -265,39 +266,66 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
         }).toList();
 
         return ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           children: [
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     onChanged: (value) => setState(() => _search = value),
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search),
+                    decoration: InputDecoration(
+                      prefixIcon: Icon(
+                        Icons.search_rounded,
+                        color: cs.onSurface.withValues(alpha: 0.4),
+                      ),
                       hintText: 'Search folders...',
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 FilledButton.icon(
                   onPressed: () => _openCreateFolderDialog(receipts),
-                  icon: const Icon(Icons.create_new_folder_outlined),
+                  icon: const Icon(Icons.create_new_folder_outlined, size: 20),
                   label: const Text('New'),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             OutlinedButton.icon(
               onPressed: _syncingAutoFolders ? null : () => _syncAutoFolders(folders, receipts),
-              icon: const Icon(Icons.auto_awesome),
+              icon: const Icon(Icons.auto_awesome_rounded, size: 18),
               label: Text(_syncingAutoFolders ? 'Syncing...' : 'Sync auto folders'),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             if (visibleFolders.isEmpty)
-              const Card(
+              Card(
                 child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Text('No folders yet. Create one and group your receipts.'),
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.folder_outlined,
+                        size: 40,
+                        color: cs.onSurface.withValues(alpha: 0.15),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No folders yet',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Create one to group your receipts',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: cs.onSurface.withValues(alpha: 0.35),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               )
             else
@@ -309,31 +337,80 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
                 final total = receiptsInFolder.fold<double>(0, (sum, r) => sum + (r.totalAmount ?? 0));
 
                 return Card(
-                  child: ListTile(
+                  child: InkWell(
                     onTap: () => context.push('/app/folders/${folder.id}'),
-                    title: Text(folder.name),
-                    subtitle: Text('${folder.receiptIds.length} receipts • ${formatCurrency(total)}'),
-                    trailing: PopupMenuButton<String>(
-                      onSelected: (value) {
-                        switch (value) {
-                          case 'rename':
-                            _renameFolder(folder);
-                            break;
-                          case 'merge':
-                            _mergeFolder(folder, folders);
-                            break;
-                          case 'delete':
-                            _deleteFolder(folder);
-                            break;
-                        }
-                      },
-                      itemBuilder: (context) {
-                        return const [
-                          PopupMenuItem(value: 'rename', child: Text('Rename')),
-                          PopupMenuItem(value: 'merge', child: Text('Merge')),
-                          PopupMenuItem(value: 'delete', child: Text('Delete')),
-                        ];
-                      },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: cs.primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              folder.autoType != null
+                                  ? Icons.auto_awesome_rounded
+                                  : Icons.folder_rounded,
+                              color: cs.primary,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  folder.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  '${folder.receiptIds.length} receipts \u2022 ${formatCurrency(total)}',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: cs.onSurface.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          PopupMenuButton<String>(
+                            icon: Icon(
+                              Icons.more_vert_rounded,
+                              color: cs.onSurface.withValues(alpha: 0.4),
+                              size: 20,
+                            ),
+                            onSelected: (value) {
+                              switch (value) {
+                                case 'rename':
+                                  _renameFolder(folder);
+                                  break;
+                                case 'merge':
+                                  _mergeFolder(folder, folders);
+                                  break;
+                                case 'delete':
+                                  _deleteFolder(folder);
+                                  break;
+                              }
+                            },
+                            itemBuilder: (context) {
+                              return const [
+                                PopupMenuItem(value: 'rename', child: Text('Rename')),
+                                PopupMenuItem(value: 'merge', child: Text('Merge')),
+                                PopupMenuItem(value: 'delete', child: Text('Delete')),
+                              ];
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );

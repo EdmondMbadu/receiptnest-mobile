@@ -296,9 +296,73 @@ class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final history = ref.watch(aiChatHistoryProvider).valueOrNull ?? const [];
     final profile = ref.watch(currentUserProfileProvider).valueOrNull;
     final hasAccess = profile?.isAdmin == true || profile?.isPro == true;
+
+    Widget buildHistorySidebar() {
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+            child: Row(
+              children: [
+                Text(
+                  'History',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: _newChat,
+                  icon: const Icon(Icons.add_rounded, size: 22),
+                  tooltip: 'New chat',
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: ListView.builder(
+              itemCount: history.length,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              itemBuilder: (context, index) {
+                final chat = history[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                  child: ListTile(
+                    dense: true,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    leading: Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      size: 18,
+                      color: cs.onSurface.withValues(alpha: 0.4),
+                    ),
+                    title: Text(
+                      chat.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    subtitle: Text(
+                      '${chat.messageCount} messages',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurface.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    onTap: () => _openChat(chat.id),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -306,12 +370,12 @@ class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
         actions: [
           IconButton(
             onPressed: _newChat,
-            icon: const Icon(Icons.add_comment_outlined),
+            icon: const Icon(Icons.add_comment_outlined, size: 22),
             tooltip: 'New chat',
           ),
           IconButton(
             onPressed: _shareChat,
-            icon: const Icon(Icons.share_outlined),
+            icon: const Icon(Icons.share_outlined, size: 22),
             tooltip: 'Share chat',
           ),
           PopupMenuButton<String>(
@@ -342,62 +406,59 @@ class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
         children: [
           if (MediaQuery.of(context).size.width >= 860)
             SizedBox(
-              width: 300,
+              width: 280,
               child: Card(
-                margin: const EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    ListTile(
-                      title: const Text('Chat history'),
-                      trailing: IconButton(
-                        onPressed: _newChat,
-                        icon: const Icon(Icons.add),
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: history.length,
-                        itemBuilder: (context, index) {
-                          final chat = history[index];
-                          return ListTile(
-                            title: Text(chat.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                            subtitle: Text('${chat.messageCount} messages'),
-                            onTap: () => _openChat(chat.id),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
+                margin: const EdgeInsets.fromLTRB(12, 4, 0, 12),
+                child: buildHistorySidebar(),
               ),
             ),
           Expanded(
             child: Column(
               children: [
                 if (!hasAccess)
-                  MaterialBanner(
-                    content: const Text('AI Insights is available for Pro users and admins.'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => context.push('/app/pricing'),
-                        child: const Text('Upgrade'),
-                      ),
-                    ],
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: cs.primary.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: cs.primary.withValues(alpha: 0.12)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.diamond_outlined, color: cs.primary, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'AI Insights is available for Pro users.',
+                            style: TextStyle(fontSize: 13, color: cs.onSurface),
+                          ),
+                        ),
+                        FilledButton(
+                          onPressed: () => context.push('/app/pricing'),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                            textStyle: const TextStyle(fontSize: 13),
+                          ),
+                          child: const Text('Upgrade'),
+                        ),
+                      ],
+                    ),
                   ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   child: Row(
                     children: [
                       OutlinedButton.icon(
                         onPressed: hasAccess ? _generateInsights : null,
-                        icon: const Icon(Icons.lightbulb_outline),
-                        label: Text(_insightsLoading ? 'Generating...' : 'Generate insights'),
+                        icon: const Icon(Icons.lightbulb_outline, size: 18),
+                        label: Text(_insightsLoading ? 'Generating...' : 'Insights'),
                       ),
                       const SizedBox(width: 8),
                       OutlinedButton.icon(
                         onPressed: hasAccess ? _openUploadInChat : null,
-                        icon: const Icon(Icons.upload_file_outlined),
-                        label: const Text('Upload in chat'),
+                        icon: const Icon(Icons.upload_file_outlined, size: 18),
+                        label: const Text('Upload'),
                       ),
                     ],
                   ),
@@ -407,15 +468,33 @@ class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Card(
                       child: Padding(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Insights', style: Theme.of(context).textTheme.titleMedium),
-                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(Icons.lightbulb_rounded, size: 18, color: Colors.amber.shade600),
+                                const SizedBox(width: 8),
+                                Text('Insights', style: Theme.of(context).textTheme.titleMedium),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
                             ..._insights.map((item) => Padding(
                                   padding: const EdgeInsets.only(bottom: 6),
-                                  child: Text('• $item'),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '\u2022  ',
+                                        style: TextStyle(
+                                          color: cs.primary,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      Expanded(child: Text(item, style: const TextStyle(fontSize: 14))),
+                                    ],
+                                  ),
                                 )),
                           ],
                         ),
@@ -425,79 +504,224 @@ class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.all(12),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(_error!, style: const TextStyle(color: Colors.redAccent)),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: cs.error.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _error!,
+                        style: TextStyle(color: cs.error, fontSize: 13),
+                      ),
                     ),
                   ),
                 Expanded(
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(12),
-                    itemCount: _messages.length,
-                    itemBuilder: (context, index) {
-                      final message = _messages[index];
-                      final userMessage = message.role == 'user';
+                  child: _messages.isEmpty && !_loading
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.auto_awesome_rounded,
+                                size: 48,
+                                color: cs.onSurface.withValues(alpha: 0.12),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Ask about your spending',
+                                style: TextStyle(
+                                  color: cs.onSurface.withValues(alpha: 0.35),
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                          itemCount: _messages.length + (_loading ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            // Typing indicator
+                            if (index == _messages.length) {
+                              return Align(
+                                alignment: Alignment.centerLeft,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(14),
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? Colors.white.withValues(alpha: 0.05)
+                                          : Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: SizedBox(
+                                      width: 40,
+                                      height: 12,
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                        children: List.generate(3, (i) {
+                                          return Container(
+                                            width: 7,
+                                            height: 7,
+                                            decoration: BoxDecoration(
+                                              color: cs.primary.withValues(alpha: 0.4),
+                                              shape: BoxShape.circle,
+                                            ),
+                                          );
+                                        }),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
 
-                      return Align(
-                        alignment: userMessage ? Alignment.centerRight : Alignment.centerLeft,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 620),
-                          child: Card(
-                            color: userMessage ? Theme.of(context).colorScheme.primaryContainer : null,
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: userMessage
-                                  ? Text(message.content)
-                                  : MarkdownBody(data: message.content),
-                            ),
-                          ),
+                            final message = _messages[index];
+                            final userMessage = message.role == 'user';
+
+                            return Align(
+                              alignment: userMessage
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxWidth: MediaQuery.of(context).size.width * 0.82,
+                                ),
+                                child: Container(
+                                  margin: const EdgeInsets.symmetric(vertical: 4),
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: userMessage
+                                        ? cs.primary
+                                        : (isDark
+                                            ? Colors.white.withValues(alpha: 0.05)
+                                            : Colors.grey.shade100),
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: const Radius.circular(18),
+                                      topRight: const Radius.circular(18),
+                                      bottomLeft: Radius.circular(userMessage ? 18 : 4),
+                                      bottomRight: Radius.circular(userMessage ? 4 : 18),
+                                    ),
+                                  ),
+                                  child: userMessage
+                                      ? Text(
+                                          message.content,
+                                          style: TextStyle(
+                                            color: cs.onPrimary,
+                                            fontSize: 14.5,
+                                          ),
+                                        )
+                                      : MarkdownBody(data: message.content),
+                                ),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    children: [
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: ref
-                            .watch(aiSuggestedQuestionsProvider)
-                            .take(3)
-                            .map(
-                              (question) => ActionChip(
-                                label: Text(question),
-                                onPressed: hasAccess ? () => _sendMessage(question) : null,
-                              ),
-                            )
-                            .toList(),
+                // Input area
+                Container(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.06)
+                            : Colors.grey.shade200,
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _messageController,
-                              enabled: !_loading && hasAccess,
-                              minLines: 1,
-                              maxLines: 4,
-                              decoration: const InputDecoration(
-                                hintText: 'Ask about your spending...',
+                    ),
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: Column(
+                      children: [
+                        if (ref.watch(aiSuggestedQuestionsProvider).isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: ref
+                                    .watch(aiSuggestedQuestionsProvider)
+                                    .take(3)
+                                    .map(
+                                      (question) => Padding(
+                                        padding: const EdgeInsets.only(right: 8),
+                                        child: ActionChip(
+                                          label: Text(
+                                            question,
+                                            style: const TextStyle(fontSize: 12.5),
+                                          ),
+                                          onPressed: hasAccess
+                                              ? () => _sendMessage(question)
+                                              : null,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
                               ),
-                              onSubmitted: (_) => _sendMessage(),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          FilledButton(
-                            onPressed: _loading || !hasAccess ? null : _sendMessage,
-                            child: Text(_loading ? 'Sending...' : 'Send'),
-                          ),
-                        ],
-                      ),
-                    ],
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _messageController,
+                                enabled: !_loading && hasAccess,
+                                minLines: 1,
+                                maxLines: 4,
+                                decoration: InputDecoration(
+                                  hintText: 'Ask about your spending...',
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                    borderSide: BorderSide(
+                                      color: isDark
+                                          ? Colors.white.withValues(alpha: 0.10)
+                                          : Colors.grey.shade300,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                    borderSide: BorderSide(
+                                      color: isDark
+                                          ? Colors.white.withValues(alpha: 0.10)
+                                          : Colors.grey.shade300,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                    borderSide: BorderSide(color: cs.primary, width: 1.5),
+                                  ),
+                                ),
+                                onSubmitted: (_) => _sendMessage(),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: cs.primary,
+                                shape: BoxShape.circle,
+                              ),
+                              child: IconButton(
+                                onPressed: _loading || !hasAccess ? null : () => _sendMessage(),
+                                icon: Icon(
+                                  Icons.arrow_upward_rounded,
+                                  color: cs.onPrimary,
+                                  size: 22,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -506,37 +730,7 @@ class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
         ],
       ),
       drawer: MediaQuery.of(context).size.width < 860
-          ? Drawer(
-              child: SafeArea(
-                child: Column(
-                  children: [
-                    ListTile(
-                      title: const Text('Chat history'),
-                      trailing: IconButton(
-                        onPressed: _newChat,
-                        icon: const Icon(Icons.add),
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: history.length,
-                        itemBuilder: (context, index) {
-                          final chat = history[index];
-                          return ListTile(
-                            title: Text(chat.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                            subtitle: Text('${chat.messageCount} messages'),
-                            onTap: () {
-                              Navigator.of(context).pop();
-                              _openChat(chat.id);
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
+          ? Drawer(child: SafeArea(child: buildHistorySidebar()))
           : null,
     );
   }

@@ -136,11 +136,13 @@ class _UploadReceiptSheetState extends State<UploadReceiptSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final selected = _selectedFile;
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -150,87 +152,224 @@ class _UploadReceiptSheetState extends State<UploadReceiptSheet> {
                 'Upload Receipt',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _uploading ? null : _pickFromCamera,
-                      icon: const Icon(Icons.camera_alt_outlined),
-                      label: const Text('Camera'),
+                    child: _SourceButton(
+                      icon: Icons.camera_alt_outlined,
+                      label: 'Camera',
+                      onTap: _uploading ? null : _pickFromCamera,
+                      cs: cs,
+                      isDark: isDark,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _uploading ? null : _pickFromGallery,
-                      icon: const Icon(Icons.photo_library_outlined),
-                      label: const Text('Gallery'),
+                    child: _SourceButton(
+                      icon: Icons.photo_library_outlined,
+                      label: 'Gallery',
+                      onTap: _uploading ? null : _pickFromGallery,
+                      cs: cs,
+                      isDark: isDark,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _uploading ? null : _pickDocument,
-                      icon: const Icon(Icons.description_outlined),
-                      label: const Text('Files'),
+                    child: _SourceButton(
+                      icon: Icons.description_outlined,
+                      label: 'Files',
+                      onTap: _uploading ? null : _pickDocument,
+                      cs: cs,
+                      isDark: isDark,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               if (selected != null)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          selected.name,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 4),
-                        Text('${(selected.sizeBytes / 1024).toStringAsFixed(1)} KB'),
-                        const SizedBox(height: 8),
-                        if (selected.path != null &&
-                            (selected.name.toLowerCase().endsWith('.jpg') ||
-                                selected.name.toLowerCase().endsWith('.jpeg') ||
-                                selected.name.toLowerCase().endsWith('.png') ||
-                                selected.name.toLowerCase().endsWith('.webp')))
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.file(
-                              File(selected.path!),
-                              height: 180,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                            ),
-                          )
-                        else
-                          const ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.insert_drive_file_outlined),
-                            title: Text('Preview unavailable for this file type'),
-                          ),
-                      ],
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: cs.primary.withValues(alpha: 0.15),
                     ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (selected.path != null &&
+                          (selected.name.toLowerCase().endsWith('.jpg') ||
+                              selected.name.toLowerCase().endsWith('.jpeg') ||
+                              selected.name.toLowerCase().endsWith('.png') ||
+                              selected.name.toLowerCase().endsWith('.webp')))
+                        ClipRRect(
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(15),
+                          ),
+                          child: Image.file(
+                            File(selected.path!),
+                            height: 180,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      else
+                        Container(
+                          height: 80,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: cs.primary.withValues(alpha: 0.06),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(15),
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.insert_drive_file_outlined,
+                            size: 36,
+                            color: cs.primary.withValues(alpha: 0.4),
+                          ),
+                        ),
+                      Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    selected.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${(selected.sizeBytes / 1024).toStringAsFixed(1)} KB',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: cs.onSurface.withValues(alpha: 0.5),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (!_uploading)
+                              IconButton(
+                                onPressed: () => setState(() => _selectedFile = null),
+                                icon: Icon(
+                                  Icons.close_rounded,
+                                  size: 20,
+                                  color: cs.onSurface.withValues(alpha: 0.4),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               if (_error != null) ...[
-                const SizedBox(height: 10),
-                Text(_error!, style: const TextStyle(color: Colors.redAccent)),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: cs.error.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(color: cs.error, fontSize: 13),
+                  ),
+                ),
               ],
               if (_uploading) ...[
-                const SizedBox(height: 12),
-                LinearProgressIndicator(value: _progress == 0 ? null : _progress),
+                const SizedBox(height: 16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: _progress == 0 ? null : _progress,
+                    minHeight: 6,
+                  ),
+                ),
                 const SizedBox(height: 6),
-                Text('Uploading ${(100 * _progress).toStringAsFixed(0)}%'),
+                Text(
+                  'Uploading ${(100 * _progress).toStringAsFixed(0)}%',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
               ],
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               FilledButton(
                 onPressed: _uploading || selected == null ? null : _upload,
-                child: Text(_uploading ? 'Uploading...' : 'Upload receipt'),
+                child: _uploading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Upload receipt'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SourceButton extends StatelessWidget {
+  const _SourceButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    required this.cs,
+    required this.isDark,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final ColorScheme cs;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.grey.shade300,
+            ),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: cs.primary, size: 26),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: cs.onSurface.withValues(alpha: 0.7),
+                ),
               ),
             ],
           ),

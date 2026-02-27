@@ -19,6 +19,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   bool _submitting = false;
   bool _sendingReset = false;
+  bool _obscurePassword = true;
   String? _error;
   String? _resetMessage;
 
@@ -97,18 +98,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
+              constraints: const BoxConstraints(maxWidth: 400),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const BrandHeader(subtitle: 'Sign in to your receipt dashboard'),
-                  const SizedBox(height: 24),
+                  const BrandHeader(subtitle: 'Sign in to your account'),
+                  const SizedBox(height: 32),
                   Form(
                     key: _formKey,
                     child: Column(
@@ -116,7 +119,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         TextFormField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(labelText: 'Email'),
+                          textInputAction: TextInputAction.next,
+                          decoration: const InputDecoration(
+                            labelText: 'Email',
+                            prefixIcon: Icon(Icons.mail_outline_rounded, size: 20),
+                          ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
                               return 'Email is required';
@@ -125,11 +132,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             return null;
                           },
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 14),
                         TextFormField(
                           controller: _passwordController,
-                          obscureText: true,
-                          decoration: const InputDecoration(labelText: 'Password'),
+                          obscureText: _obscurePassword,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _submit(),
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                size: 20,
+                              ),
+                              onPressed: () =>
+                                  setState(() => _obscurePassword = !_obscurePassword),
+                            ),
+                          ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Password is required';
@@ -144,31 +166,103 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   if (_error != null) ...[
-                    const SizedBox(height: 12),
-                    Text(_error!, style: const TextStyle(color: Colors.redAccent)),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: cs.error.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _error!,
+                        style: TextStyle(color: cs.error, fontSize: 13),
+                      ),
+                    ),
                   ],
                   if (_resetMessage != null) ...[
-                    const SizedBox(height: 12),
-                    Text(_resetMessage!, style: const TextStyle(color: Colors.green)),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _resetMessage!,
+                        style: const TextStyle(color: Colors.green, fontSize: 13),
+                      ),
+                    ),
                   ],
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   FilledButton(
                     onPressed: _submitting ? null : _submit,
-                    child: Text(_submitting ? 'Signing in...' : 'Sign in'),
+                    child: _submitting
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Sign in'),
                   ),
-                  TextButton(
-                    onPressed: _sendingReset ? null : _sendReset,
-                    child: Text(_sendingReset ? 'Sending reset link...' : 'Forgot password?'),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _sendingReset ? null : _sendReset,
+                      child: Text(
+                        _sendingReset ? 'Sending...' : 'Forgot password?',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ),
                   ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(child: Divider(color: cs.onSurface.withValues(alpha: 0.12))),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'or',
+                          style: TextStyle(
+                            color: cs.onSurface.withValues(alpha: 0.4),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                      Expanded(child: Divider(color: cs.onSurface.withValues(alpha: 0.12))),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                   OutlinedButton.icon(
                     onPressed: _submitting ? null : _googleSignIn,
-                    icon: const Icon(Icons.login),
+                    icon: const Icon(Icons.g_mobiledata_rounded, size: 24),
                     label: const Text('Continue with Google'),
                   ),
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: () => context.go('/register'),
-                    child: const Text('Create account'),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "Don't have an account? ",
+                        style: TextStyle(
+                          color: cs.onSurface.withValues(alpha: 0.6),
+                          fontSize: 14,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => context.go('/register'),
+                        child: Text(
+                          'Create one',
+                          style: TextStyle(
+                            color: cs.primary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

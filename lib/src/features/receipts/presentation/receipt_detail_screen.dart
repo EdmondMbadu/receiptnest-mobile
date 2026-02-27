@@ -113,10 +113,16 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
       builder: (context) {
         return AlertDialog(
           title: const Text('Delete receipt'),
-          content: const Text('Are you sure you want to delete this receipt? This cannot be undone.'),
+          content: const Text('Are you sure? This cannot be undone.'),
           actions: [
             TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Delete')),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+              child: const Text('Delete'),
+            ),
           ],
         );
       },
@@ -147,10 +153,11 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final receiptAsync = ref.watch(receiptFutureProvider(widget.receiptId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Receipt Detail')),
+      appBar: AppBar(title: const Text('Receipt')),
       body: receiptAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Failed to load receipt: $err')),
@@ -162,70 +169,180 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
           _loadForm(receipt);
 
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
+              // File info card
               Card(
-                child: ListTile(
-                  title: Text(receipt.file.originalName),
-                  subtitle: Text('${formatCurrency(receipt.totalAmount)} • ${formatDate(receipt.effectiveDate)}'),
-                  leading: Icon(receipt.isPdf ? Icons.picture_as_pdf_outlined : Icons.image_outlined),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.open_in_new),
-                    onPressed: () => _openFile(receipt),
+                child: InkWell(
+                  onTap: () => _openFile(receipt),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: cs.primary.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            receipt.isPdf
+                                ? Icons.picture_as_pdf_outlined
+                                : Icons.image_outlined,
+                            color: cs.primary,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                receipt.file.originalName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${formatCurrency(receipt.totalAmount)} \u2022 ${formatDate(receipt.effectiveDate)}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: cs.onSurface.withValues(alpha: 0.5),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.open_in_new_rounded,
+                          size: 20,
+                          color: cs.primary,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
+
               const SizedBox(height: 8),
-              TextField(
-                controller: _merchantController,
-                decoration: const InputDecoration(labelText: 'Merchant'),
+
+              // Form card
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Details',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _merchantController,
+                        decoration: const InputDecoration(
+                          labelText: 'Merchant',
+                          prefixIcon: Icon(Icons.store_outlined, size: 20),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _amountController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Amount',
+                          prefixIcon: Icon(Icons.attach_money_rounded, size: 20),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _dateController,
+                        decoration: const InputDecoration(
+                          labelText: 'Date (YYYY-MM-DD)',
+                          prefixIcon: Icon(Icons.calendar_today_outlined, size: 20),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      DropdownButtonFormField<String>(
+                        initialValue: _categoryId,
+                        decoration: const InputDecoration(
+                          labelText: 'Category',
+                          prefixIcon: Icon(Icons.category_outlined, size: 20),
+                        ),
+                        items: defaultCategories
+                            .map((category) => DropdownMenuItem<String>(
+                                  value: category.id,
+                                  child: Text('${category.icon} ${category.name}'),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(() => _categoryId = value);
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _notesController,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'Notes',
+                          prefixIcon: Padding(
+                            padding: EdgeInsets.only(bottom: 40),
+                            child: Icon(Icons.notes_outlined, size: 20),
+                          ),
+                          alignLabelWithHint: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Amount'),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _dateController,
-                decoration: const InputDecoration(labelText: 'Date (YYYY-MM-DD)'),
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                initialValue: _categoryId,
-                decoration: const InputDecoration(labelText: 'Category'),
-                items: defaultCategories
-                    .map((category) => DropdownMenuItem<String>(
-                          value: category.id,
-                          child: Text('${category.icon} ${category.name}'),
-                        ))
-                    .toList(),
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() => _categoryId = value);
-                },
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _notesController,
-                maxLines: 4,
-                decoration: const InputDecoration(labelText: 'Notes'),
-              ),
+
               if (_error != null) ...[
                 const SizedBox(height: 8),
-                Text(_error!, style: const TextStyle(color: Colors.redAccent)),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: cs.error.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(color: cs.error, fontSize: 13),
+                  ),
+                ),
               ],
-              const SizedBox(height: 12),
+
+              const SizedBox(height: 16),
               FilledButton.icon(
                 onPressed: _saving ? null : () => _save(receipt),
-                icon: const Icon(Icons.save_outlined),
+                icon: _saving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.check_rounded, size: 20),
                 label: Text(_saving ? 'Saving...' : 'Save changes'),
               ),
+              const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: _saving ? null : () => _delete(receipt),
-                icon: const Icon(Icons.delete_outline),
-                label: const Text('Delete receipt'),
+                icon: Icon(Icons.delete_outline, size: 20, color: cs.error),
+                label: Text(
+                  'Delete receipt',
+                  style: TextStyle(color: cs.error),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: cs.error.withValues(alpha: 0.3)),
+                ),
               ),
             ],
           );

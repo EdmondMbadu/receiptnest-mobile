@@ -175,6 +175,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final foldersAsync = ref.watch(foldersStreamProvider);
     final receipts = ref.watch(receiptsStreamProvider).valueOrNull ?? const <Receipt>[];
 
@@ -203,63 +204,106 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
           final total = receiptsInFolder.fold<double>(0, (sum, receipt) => sum + (receipt.totalAmount ?? 0));
 
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             children: [
+              // Folder header card
               Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(folder.name, style: Theme.of(context).textTheme.titleLarge),
-                      const SizedBox(height: 4),
-                      Text('${folder.receiptIds.length} receipts • ${formatCurrency(total)}'),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
+                      Row(
                         children: [
-                          OutlinedButton.icon(
-                            onPressed: () => _rename(folder),
-                            icon: const Icon(Icons.edit_outlined),
-                            label: const Text('Rename'),
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: cs.primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.folder_rounded,
+                              color: cs.primary,
+                              size: 24,
+                            ),
                           ),
-                          OutlinedButton.icon(
-                            onPressed: () => _addReceipts(folder, receipts),
-                            icon: const Icon(Icons.add),
-                            label: const Text('Add receipts'),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: _selectedReceiptIds.isEmpty ? null : () => _removeSelected(folder),
-                            icon: const Icon(Icons.remove_circle_outline),
-                            label: Text('Remove selected (${_selectedReceiptIds.length})'),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: () => _exportCsv(folder, receiptsInFolder),
-                            icon: const Icon(Icons.file_download_outlined),
-                            label: const Text('Export CSV'),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: () => _delete(folder),
-                            icon: const Icon(Icons.delete_outline),
-                            label: const Text('Delete folder'),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  folder.name,
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${folder.receiptIds.length} receipts \u2022 ${formatCurrency(total)}',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: cs.onSurface.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 16),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _ActionButton(
+                              icon: Icons.edit_outlined,
+                              label: 'Rename',
+                              onTap: () => _rename(folder),
+                            ),
+                            const SizedBox(width: 8),
+                            _ActionButton(
+                              icon: Icons.add_rounded,
+                              label: 'Add',
+                              onTap: () => _addReceipts(folder, receipts),
+                            ),
+                            const SizedBox(width: 8),
+                            _ActionButton(
+                              icon: Icons.remove_circle_outline,
+                              label: 'Remove (${_selectedReceiptIds.length})',
+                              onTap: _selectedReceiptIds.isEmpty ? null : () => _removeSelected(folder),
+                            ),
+                            const SizedBox(width: 8),
+                            _ActionButton(
+                              icon: Icons.file_download_outlined,
+                              label: 'CSV',
+                              onTap: () => _exportCsv(folder, receiptsInFolder),
+                            ),
+                            const SizedBox(width: 8),
+                            _ActionButton(
+                              icon: Icons.delete_outline,
+                              label: 'Delete',
+                              onTap: () => _delete(folder),
+                              destructive: true,
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              if (folder.mergedSources.isNotEmpty)
+              if (folder.mergedSources.isNotEmpty) ...[
+                const SizedBox(height: 4),
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Merged sources (${folder.mergedSources.length})',
-                            style: Theme.of(context).textTheme.titleMedium),
+                        Text(
+                          'Merged sources (${folder.mergedSources.length})',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
                         const SizedBox(height: 8),
                         ...folder.mergedSources.map((entry) {
                           return ListTile(
@@ -284,12 +328,28 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                     ),
                   ),
                 ),
-              const SizedBox(height: 8),
+              ],
+              const SizedBox(height: 12),
               if (receiptsInFolder.isEmpty)
-                const Card(
+                Card(
                   child: Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Text('No receipts in this folder.'),
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.receipt_long_outlined,
+                          size: 36,
+                          color: cs.onSurface.withValues(alpha: 0.15),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'No receipts in this folder',
+                          style: TextStyle(
+                            color: cs.onSurface.withValues(alpha: 0.5),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 )
               else
@@ -297,28 +357,139 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                   final merchant = receipt.merchant?.canonicalName ??
                       receipt.merchant?.rawName ??
                       receipt.file.originalName;
-                  return CheckboxListTile(
-                    value: _selectedReceiptIds.contains(receipt.id),
-                    title: Text(merchant),
-                    subtitle: Text('${formatDate(receipt.effectiveDate)} • ${formatCurrency(receipt.totalAmount)}'),
-                    onChanged: (value) {
-                      setState(() {
-                        if (value == true) {
-                          _selectedReceiptIds.add(receipt.id);
-                        } else {
-                          _selectedReceiptIds.remove(receipt.id);
-                        }
-                      });
-                    },
-                    secondary: IconButton(
-                      onPressed: () => context.push('/app/receipt/${receipt.id}'),
-                      icon: const Icon(Icons.open_in_new_outlined),
+                  final isSelected = _selectedReceiptIds.contains(receipt.id);
+                  return Card(
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          if (isSelected) {
+                            _selectedReceiptIds.remove(receipt.id);
+                          } else {
+                            _selectedReceiptIds.add(receipt.id);
+                          }
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: Row(
+                          children: [
+                            Checkbox(
+                              value: isSelected,
+                              onChanged: (value) {
+                                setState(() {
+                                  if (value == true) {
+                                    _selectedReceiptIds.add(receipt.id);
+                                  } else {
+                                    _selectedReceiptIds.remove(receipt.id);
+                                  }
+                                });
+                              },
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    merchant,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${formatDate(receipt.effectiveDate)} \u2022 ${formatCurrency(receipt.totalAmount)}',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: cs.onSurface.withValues(alpha: 0.5),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () => context.push('/app/receipt/${receipt.id}'),
+                              icon: Icon(
+                                Icons.open_in_new_outlined,
+                                size: 20,
+                                color: cs.onSurface.withValues(alpha: 0.4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   );
                 }),
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.destructive = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final color = destructive ? cs.error : cs.primary;
+    final isDisabled = onTap == null;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: isDisabled
+                  ? cs.onSurface.withValues(alpha: 0.08)
+                  : color.withValues(alpha: 0.15),
+            ),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isDisabled
+                    ? cs.onSurface.withValues(alpha: 0.25)
+                    : color,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: isDisabled
+                      ? cs.onSurface.withValues(alpha: 0.25)
+                      : color,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
