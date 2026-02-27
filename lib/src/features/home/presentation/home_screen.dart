@@ -28,7 +28,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   bool _loadingForwarding = false;
   String? _forwardingAddress;
-  List<String> _fallbackAddresses = const [];
   String? _forwardingError;
 
   @override
@@ -55,11 +54,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           .generateForwardingAddress();
       setState(() {
         _forwardingAddress = result['emailAddress']?.toString();
-        _fallbackAddresses =
-            (result['fallbackAddresses'] as List<dynamic>? ?? const [])
-                .map((e) => e.toString())
-                .where((e) => e.isNotEmpty)
-                .toList();
       });
     } catch (e) {
       setState(() {
@@ -379,31 +373,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ),
                             ],
                           ),
-                          if (_fallbackAddresses.isNotEmpty) ...[
-                            const SizedBox(height: 12),
-                            Text(
-                              'Fallback addresses',
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: cs.onSurface.withValues(alpha: 0.5),
-                                  ),
-                            ),
-                            const SizedBox(height: 4),
-                            ..._fallbackAddresses.map(
-                              (item) => Padding(
-                                padding: const EdgeInsets.only(bottom: 2),
-                                child: SelectableText(
-                                  item,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontFamily: 'monospace',
-                                    color: cs.onSurface.withValues(alpha: 0.6),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
                         ] else
                           Text(
                             'No forwarding address yet.',
@@ -883,17 +852,17 @@ class _RobinhoodMonthlyChartState extends State<_RobinhoodMonthlyChart> {
                   ? 'Day $visibleMiddleDay'
                   : 'Day $middleDay',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: cs.onSurface.withValues(alpha: 0.7),
-                  ),
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface.withValues(alpha: 0.7),
+              ),
             ),
             Text(
               widget.isCurrentMonth
                   ? 'Today ${visiblePoints.last.day}'
                   : 'Day ${widget.totalDays}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: cs.onSurface.withValues(alpha: 0.4),
-                  ),
+                color: cs.onSurface.withValues(alpha: 0.4),
+              ),
             ),
           ],
         ),
