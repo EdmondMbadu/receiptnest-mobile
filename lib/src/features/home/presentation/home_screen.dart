@@ -23,8 +23,13 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  static const _receiptBatchSize = 20;
+
   final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
   String _searchQuery = '';
+  int _visibleReceiptCount = _receiptBatchSize;
+  int _latestFilteredCount = 0;
 
   bool _loadingForwarding = false;
   String? _forwardingAddress;
@@ -34,12 +39,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
     _loadForwardingAddress();
+    _scrollController.addListener(_handleScroll);
   }
 
   @override
   void dispose() {
+    _scrollController
+      ..removeListener(_handleScroll)
+      ..dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _handleScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.extentAfter > 360) return;
+    if (_visibleReceiptCount >= _latestFilteredCount) return;
+
+    setState(() {
+      _visibleReceiptCount = math.min(
+        _visibleReceiptCount + _receiptBatchSize,
+        _latestFilteredCount,
+      );
+    });
   }
 
   Future<void> _loadForwardingAddress() async {
@@ -64,6 +86,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         setState(() => _loadingForwarding = false);
       }
     }
+  }
+
+  Future<void> _refreshHome() async {
+    await _loadForwardingAddress();
+    if (!mounted) return;
+    setState(() => _visibleReceiptCount = _receiptBatchSize);
   }
 
   void _changeMonth(int delta) {
@@ -201,10 +229,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 date.contains(query) ||
                 amount.contains(query);
           }).toList();
+          _latestFilteredCount = filtered.length;
+          final visibleReceipts = filtered
+              .take(math.min(_visibleReceiptCount, filtered.length))
+              .toList(growable: false);
+          final hasMoreVisible = visibleReceipts.length < filtered.length;
 
           return RefreshIndicator(
-            onRefresh: _loadForwardingAddress,
+            onRefresh: _refreshHome,
             child: ListView(
+              controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
               children: [
                 // ── Spending card ──
@@ -389,7 +423,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 // ── Search ──
                 TextField(
                   controller: _searchController,
-                  onChanged: (value) => setState(() => _searchQuery = value),
+                  onChanged: (value) => setState(() {
+                    _searchQuery = value;
+                    _visibleReceiptCount = _receiptBatchSize;
+                  }),
                   decoration: InputDecoration(
                     hintText: 'Search receipts...',
                     prefixIcon: Icon(
@@ -401,7 +438,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         : IconButton(
                             onPressed: () {
                               _searchController.clear();
-                              setState(() => _searchQuery = '');
+                              setState(() {
+                                _searchQuery = '';
+                                _visibleReceiptCount = _receiptBatchSize;
+                              });
                             },
                             icon: const Icon(Icons.clear_rounded, size: 20),
                           ),
@@ -461,9 +501,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   )
                 else
-                  ...filtered
-                      .take(100)
-                      .map((receipt) => _ReceiptTile(receipt: receipt)),
+                  ...visibleReceipts.map(
+                    (receipt) => _ReceiptTile(receipt: receipt),
+                  ),
+                if (hasMoreVisible)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 12),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
               ],
             ),
           );
@@ -546,7 +591,9 @@ class _ReceiptTile extends ConsumerWidget {
         receipt.extraction?.supplierName?.value?.toString() ??
         'Unknown merchant';
 
-    final repository = ref.read(receiptRepositoryProvider);
+    final urlAsync = ref.watch(
+      receiptFileUrlProvider(receipt.file.storagePath),
+    );
     final badge = _badgeColor(context);
 
     return Card(
@@ -572,26 +619,19 @@ class _ReceiptTile extends ConsumerWidget {
                           Icons.picture_as_pdf_outlined,
                           color: cs.primary.withValues(alpha: 0.5),
                         )
-                      : FutureBuilder<String>(
-                          future: repository.getReceiptFileUrl(
-                            receipt.file.storagePath,
+                      : urlAsync.when(
+                          data: (url) => CachedNetworkImage(
+                            imageUrl: url,
+                            fit: BoxFit.cover,
+                            errorWidget: (context, error, stackTrace) =>
+                                const Icon(Icons.broken_image_outlined),
                           ),
-                          builder: (context, snapshot) {
-                            final url = snapshot.data;
-                            if (url == null) {
-                              return Icon(
-                                Icons.image_outlined,
-                                color: cs.primary.withValues(alpha: 0.5),
-                              );
-                            }
-
-                            return CachedNetworkImage(
-                              imageUrl: url,
-                              fit: BoxFit.cover,
-                              errorWidget: (_, error, stackTrace) =>
-                                  const Icon(Icons.broken_image_outlined),
-                            );
-                          },
+                          loading: () => Icon(
+                            Icons.image_outlined,
+                            color: cs.primary.withValues(alpha: 0.5),
+                          ),
+                          error: (error, stackTrace) =>
+                              const Icon(Icons.broken_image_outlined),
                         ),
                 ),
               ),

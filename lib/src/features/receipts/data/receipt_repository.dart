@@ -55,6 +55,13 @@ final receiptsStreamProvider = StreamProvider<List<Receipt>>((ref) {
   return ref.watch(receiptRepositoryProvider).watchReceipts(uid);
 });
 
+final receiptFileUrlProvider = FutureProvider.family<String, String>((
+  ref,
+  storagePath,
+) {
+  return ref.watch(receiptRepositoryProvider).getReceiptFileUrl(storagePath);
+});
+
 final selectedMonthProvider = StateProvider<int>((ref) => DateTime.now().month);
 final selectedYearProvider = StateProvider<int>((ref) => DateTime.now().year);
 
@@ -78,7 +85,10 @@ final selectedMonthReceiptsProvider = Provider<List<Receipt>>((ref) {
 
 final selectedMonthSpendProvider = Provider<double>((ref) {
   final receipts = ref.watch(selectedMonthReceiptsProvider);
-  return receipts.fold<double>(0, (runningTotal, r) => runningTotal + (r.totalAmount ?? 0));
+  return receipts.fold<double>(
+    0,
+    (runningTotal, r) => runningTotal + (r.totalAmount ?? 0),
+  );
 });
 
 final selectedMonthReceiptCountProvider = Provider<int>((ref) {
@@ -91,11 +101,16 @@ final previousMonthSpendProvider = Provider<double>((ref) {
   final receipts = ref.watch(receiptsStreamProvider).valueOrNull ?? const [];
 
   final previous = DateTime(year, month - 1, 1);
-  return receipts.where((receipt) {
-    final date = receipt.effectiveDate;
-    if (date == null) return false;
-    return date.month == previous.month && date.year == previous.year;
-  }).fold<double>(0, (runningTotal, r) => runningTotal + (r.totalAmount ?? 0));
+  return receipts
+      .where((receipt) {
+        final date = receipt.effectiveDate;
+        if (date == null) return false;
+        return date.month == previous.month && date.year == previous.year;
+      })
+      .fold<double>(
+        0,
+        (runningTotal, r) => runningTotal + (r.totalAmount ?? 0),
+      );
 });
 
 final monthOverMonthChangeProvider = Provider<MonthOverMonthChange?>((ref) {
@@ -146,7 +161,10 @@ final receiptByIdProvider = Provider.family<Receipt?, String>((ref, id) {
   return null;
 });
 
-final receiptFutureProvider = FutureProvider.family<Receipt?, String>((ref, id) async {
+final receiptFutureProvider = FutureProvider.family<Receipt?, String>((
+  ref,
+  id,
+) async {
   final uid = ref.watch(currentUserIdProvider);
   if (uid == null) return null;
 
@@ -205,9 +223,9 @@ class ReceiptRepository {
     required FirebaseFirestore db,
     required FirebaseStorage storage,
     required FirebaseFunctions functions,
-  })  : _db = db,
-        _storage = storage,
-        _functions = functions;
+  }) : _db = db,
+       _storage = storage,
+       _functions = functions;
 
   final FirebaseFirestore _db;
   final FirebaseStorage _storage;
@@ -240,7 +258,8 @@ class ReceiptRepository {
     final ext = file.name.split('.').last.toLowerCase();
     final mime = (file.mimeType ?? '').toLowerCase();
 
-    if (!allowedFileMimeTypes.contains(mime) && !allowedFileExtensions.contains(ext)) {
+    if (!allowedFileMimeTypes.contains(mime) &&
+        !allowedFileExtensions.contains(ext)) {
       return const UploadValidationResult(
         valid: false,
         error: 'Invalid file type. Allowed: images, PDF, DOC, DOCX',
@@ -312,24 +331,26 @@ class ReceiptRepository {
         .doc(userId)
         .collection('receipts')
         .add({
-      'userId': userId,
-      'status': ReceiptStatuses.uploaded,
-      'file': {
-        'storagePath': storagePath,
-        'originalName': file.name,
-        'mimeType': file.mimeType ?? _inferMimeType(file.name),
-        'sizeBytes': file.sizeBytes,
-        'uploadedAt': FieldValue.serverTimestamp(),
-      },
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+          'userId': userId,
+          'status': ReceiptStatuses.uploaded,
+          'file': {
+            'storagePath': storagePath,
+            'originalName': file.name,
+            'mimeType': file.mimeType ?? _inferMimeType(file.name),
+            'sizeBytes': file.sizeBytes,
+            'uploadedAt': FieldValue.serverTimestamp(),
+          },
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
 
     await docRef.update({'id': docRef.id});
 
     final receipt = await getReceipt(userId, docRef.id);
     if (receipt == null) {
-      throw Exception('Upload succeeded but receipt record could not be loaded.');
+      throw Exception(
+        'Upload succeeded but receipt record could not be loaded.',
+      );
     }
     return receipt;
   }
@@ -344,10 +365,7 @@ class ReceiptRepository {
         .doc(userId)
         .collection('receipts')
         .doc(receiptId)
-        .update({
-      ...updates,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+        .update({...updates, 'updatedAt': FieldValue.serverTimestamp()});
   }
 
   Future<void> deleteReceipt(String userId, Receipt receipt) async {
@@ -371,7 +389,10 @@ class ReceiptRepository {
     return _storage.ref(storagePath).getDownloadURL();
   }
 
-  Future<List<MonthlySummary>> getMonthlySummaries(String userId, {int? limit}) async {
+  Future<List<MonthlySummary>> getMonthlySummaries(
+    String userId, {
+    int? limit,
+  }) async {
     Query<Map<String, dynamic>> query = _db
         .collection('users')
         .doc(userId)
@@ -389,7 +410,9 @@ class ReceiptRepository {
   }
 
   Future<Map<String, dynamic>> generateForwardingAddress() async {
-    final callable = _functions.httpsCallable('generateReceiptForwardingAddress');
+    final callable = _functions.httpsCallable(
+      'generateReceiptForwardingAddress',
+    );
     final response = await callable.call(<String, dynamic>{});
     final data = response.data;
     if (data is Map) {
