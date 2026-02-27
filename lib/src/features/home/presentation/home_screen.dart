@@ -169,9 +169,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final receiptsAsync = ref.watch(receiptsStreamProvider);
     final today = DateTime.now();
     final isCurrentMonth = month == today.month && year == today.year;
+    final totalDaysInMonth = DateTime(year, month + 1, 0).day;
     final lastVisibleDay = isCurrentMonth
-        ? math.min(today.day, math.max(1, dailyPoints.length))
-        : math.max(1, dailyPoints.length);
+        ? math.min(today.day, totalDaysInMonth)
+        : totalDaysInMonth;
     final trendColor = monthChange == null
         ? const Color(0xFF00C805)
         : (monthChange.isIncrease
@@ -225,23 +226,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               onPressed: () => _changeMonth(-1),
                               icon: const Icon(Icons.chevron_left_rounded),
                               style: IconButton.styleFrom(
-                                backgroundColor: cs.primary.withValues(alpha: 0.06),
+                                backgroundColor: cs.primary.withValues(
+                                  alpha: 0.06,
+                                ),
                               ),
                             ),
                             Expanded(
                               child: Text(
                                 monthLabel,
                                 textAlign: TextAlign.center,
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
                               ),
                             ),
                             IconButton(
                               onPressed: () => _changeMonth(1),
                               icon: const Icon(Icons.chevron_right_rounded),
                               style: IconButton.styleFrom(
-                                backgroundColor: cs.primary.withValues(alpha: 0.06),
+                                backgroundColor: cs.primary.withValues(
+                                  alpha: 0.06,
+                                ),
                               ),
                             ),
                           ],
@@ -249,18 +253,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         const SizedBox(height: 16),
                         Text(
                           formatCurrency(spend),
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          style: Theme.of(context).textTheme.headlineMedium
+                              ?.copyWith(
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: -0.5,
                               ),
                         ),
                         const SizedBox(height: 4),
-                        _MonthChangeLabel(change: monthChange, color: trendColor),
+                        _MonthChangeLabel(
+                          change: monthChange,
+                          color: trendColor,
+                        ),
                         const SizedBox(height: 16),
                         _RobinhoodMonthlyChart(
                           points: dailyPoints,
                           lineColor: trendColor,
                           visibleDay: lastVisibleDay,
+                          totalDays: totalDaysInMonth,
+                          isCurrentMonth: isCurrentMonth,
                         ),
                         const SizedBox(height: 16),
                         Row(
@@ -273,7 +283,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             const SizedBox(width: 8),
                             OutlinedButton.icon(
                               onPressed: () => context.push('/app/pricing'),
-                              icon: const Icon(Icons.diamond_outlined, size: 18),
+                              icon: const Icon(
+                                Icons.diamond_outlined,
+                                size: 18,
+                              ),
                               label: const Text('Pricing'),
                             ),
                           ],
@@ -317,10 +330,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         else if (_forwardingError != null)
                           Text(
                             _forwardingError!,
-                            style: TextStyle(
-                              color: cs.error,
-                              fontSize: 13,
-                            ),
+                            style: TextStyle(color: cs.error, fontSize: 13),
                           )
                         else if (_forwardingAddress != null) ...[
                           Container(
@@ -350,7 +360,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     ClipboardData(text: _forwardingAddress!),
                                   );
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Copied to clipboard')),
+                                    const SnackBar(
+                                      content: Text('Copied to clipboard'),
+                                    ),
                                   );
                                 },
                                 icon: const Icon(Icons.copy_rounded, size: 16),
@@ -359,7 +371,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               const SizedBox(width: 8),
                               OutlinedButton.icon(
                                 onPressed: _loadForwardingAddress,
-                                icon: const Icon(Icons.refresh_rounded, size: 16),
+                                icon: const Icon(
+                                  Icons.refresh_rounded,
+                                  size: 16,
+                                ),
                                 label: const Text('Refresh'),
                               ),
                             ],
@@ -368,7 +383,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             const SizedBox(height: 12),
                             Text(
                               'Fallback addresses',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
                                     fontWeight: FontWeight.w600,
                                     color: cs.onSurface.withValues(alpha: 0.5),
                                   ),
@@ -433,7 +449,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: cs.primary.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(10),
@@ -498,15 +517,17 @@ class _MonthChangeLabel extends StatelessWidget {
       return Text(
         'No previous month data',
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-            ),
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+        ),
       );
     }
 
     return Row(
       children: [
         Icon(
-          change.isIncrease ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+          change.isIncrease
+              ? Icons.trending_up_rounded
+              : Icons.trending_down_rounded,
           size: 18,
           color: color,
         ),
@@ -630,7 +651,10 @@ class _ReceiptTile extends ConsumerWidget {
                     ),
                     const SizedBox(height: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: badge.withValues(alpha: 0.10),
                         borderRadius: BorderRadius.circular(8),
@@ -660,25 +684,86 @@ class _ReceiptTile extends ConsumerWidget {
 }
 
 // ── Chart ──
-class _RobinhoodMonthlyChart extends StatelessWidget {
+const double _chartHorizontalPadding = 12.0;
+const double _chartTopPadding = 12.0;
+const double _chartBottomPadding = 14.0;
+
+class _RobinhoodMonthlyChart extends StatefulWidget {
   const _RobinhoodMonthlyChart({
     required this.points,
     required this.lineColor,
     required this.visibleDay,
+    required this.totalDays,
+    required this.isCurrentMonth,
   });
 
   final List<DailySpendingPoint> points;
   final Color lineColor;
   final int visibleDay;
+  final int totalDays;
+  final bool isCurrentMonth;
+
+  @override
+  State<_RobinhoodMonthlyChart> createState() => _RobinhoodMonthlyChartState();
+}
+
+class _RobinhoodMonthlyChartState extends State<_RobinhoodMonthlyChart> {
+  int? _selectedIndex;
+
+  @override
+  void didUpdateWidget(covariant _RobinhoodMonthlyChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.visibleDay != widget.visibleDay ||
+        oldWidget.totalDays != widget.totalDays ||
+        oldWidget.points.length != widget.points.length) {
+      _selectedIndex = null;
+    }
+  }
+
+  List<DailySpendingPoint> _normalizedPoints() {
+    final totalDays = math.max(1, widget.totalDays);
+    final amountByDay = <int, double>{};
+    for (final point in widget.points) {
+      if (point.day >= 1 && point.day <= totalDays) {
+        amountByDay[point.day] = point.amount;
+      }
+    }
+
+    var cumulative = 0.0;
+    return List.generate(totalDays, (index) {
+      final day = index + 1;
+      final amount = amountByDay[day] ?? 0;
+      cumulative += amount;
+      return DailySpendingPoint(
+        day: day,
+        amount: amount,
+        cumulative: cumulative,
+      );
+    });
+  }
+
+  int _indexFromDx(double dx, double width, int count) {
+    if (count <= 1) return 0;
+    final chartWidth = math.max(1.0, width - (_chartHorizontalPadding * 2));
+    final normalized = ((dx - _chartHorizontalPadding) / chartWidth).clamp(
+      0.0,
+      1.0,
+    );
+    return (normalized * (count - 1)).round();
+  }
+
+  void _updateSelection(double dx, double width, int count) {
+    final nextIndex = _indexFromDx(dx, width, count);
+    if (nextIndex == _selectedIndex) return;
+    setState(() => _selectedIndex = nextIndex);
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final safePoints = points.isEmpty
-        ? const [DailySpendingPoint(day: 1, amount: 0, cumulative: 0)]
-        : points;
+    final safePoints = _normalizedPoints();
     final clippedVisibleDay = math.min(
-      math.max(1, visibleDay),
+      math.max(1, widget.visibleDay),
       safePoints.length,
     );
     final visiblePoints = safePoints
@@ -696,10 +781,36 @@ class _RobinhoodMonthlyChart extends StatelessWidget {
       0,
       (runningTotal, point) => runningTotal + point.amount,
     );
+    final selectedPoint = _selectedIndex == null
+        ? null
+        : visiblePoints[_selectedIndex!.clamp(0, visiblePoints.length - 1)];
+    final middleDay = ((widget.totalDays + 1) / 2).round();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 120),
+          child: selectedPoint == null
+              ? Text(
+                  widget.isCurrentMonth
+                      ? 'Touch and slide to inspect daily spend'
+                      : 'Touch to inspect a day',
+                  key: const ValueKey('hint'),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: cs.onSurface.withValues(alpha: 0.55),
+                  ),
+                )
+              : Text(
+                  'Day ${selectedPoint.day}: ${formatCurrency(selectedPoint.amount)}',
+                  key: ValueKey<int>(selectedPoint.day),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: widget.lineColor,
+                  ),
+                ),
+        ),
+        const SizedBox(height: 8),
         Container(
           height: 182,
           decoration: BoxDecoration(
@@ -708,19 +819,51 @@ class _RobinhoodMonthlyChart extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                lineColor.withValues(alpha: 0.08),
+                widget.lineColor.withValues(alpha: 0.08),
                 cs.surface.withValues(alpha: 0.95),
               ],
             ),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
-            child: CustomPaint(
-              painter: _RobinhoodChartPainter(
-                points: visiblePoints,
-                lineColor: lineColor,
-              ),
-              child: const SizedBox.expand(),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                return MouseRegion(
+                  onHover: (event) => _updateSelection(
+                    event.localPosition.dx,
+                    width,
+                    visiblePoints.length,
+                  ),
+                  onExit: (_) => setState(() => _selectedIndex = null),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: (details) => _updateSelection(
+                      details.localPosition.dx,
+                      width,
+                      visiblePoints.length,
+                    ),
+                    onPanStart: (details) => _updateSelection(
+                      details.localPosition.dx,
+                      width,
+                      visiblePoints.length,
+                    ),
+                    onPanUpdate: (details) => _updateSelection(
+                      details.localPosition.dx,
+                      width,
+                      visiblePoints.length,
+                    ),
+                    child: CustomPaint(
+                      painter: _RobinhoodChartPainter(
+                        points: visiblePoints,
+                        lineColor: widget.lineColor,
+                        selectedIndex: _selectedIndex,
+                      ),
+                      child: const SizedBox.expand(),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ),
@@ -731,21 +874,23 @@ class _RobinhoodMonthlyChart extends StatelessWidget {
             Text(
               'Day 1',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: cs.onSurface.withValues(alpha: 0.4),
-                  ),
+                color: cs.onSurface.withValues(alpha: 0.4),
+              ),
             ),
             Text(
-              'Day ${visiblePoints.last.day}',
+              widget.isCurrentMonth
+                  ? 'Today ${visiblePoints.last.day}'
+                  : 'Day $middleDay',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: cs.onSurface.withValues(alpha: 0.7),
-                  ),
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface.withValues(alpha: 0.7),
+              ),
             ),
             Text(
-              'Day ${safePoints.length}',
+              'Day ${widget.totalDays}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: cs.onSurface.withValues(alpha: 0.4),
-                  ),
+                color: cs.onSurface.withValues(alpha: 0.4),
+              ),
             ),
           ],
         ),
@@ -755,7 +900,7 @@ class _RobinhoodMonthlyChart extends StatelessWidget {
             _ChartPill(
               label: 'Spent',
               value: formatCurrency(totalSoFar),
-              color: lineColor,
+              color: widget.lineColor,
             ),
             const SizedBox(width: 8),
             _ChartPill(
@@ -815,25 +960,26 @@ class _ChartPill extends StatelessWidget {
 }
 
 class _RobinhoodChartPainter extends CustomPainter {
-  const _RobinhoodChartPainter({required this.points, required this.lineColor});
+  const _RobinhoodChartPainter({
+    required this.points,
+    required this.lineColor,
+    required this.selectedIndex,
+  });
 
   final List<DailySpendingPoint> points;
   final Color lineColor;
+  final int? selectedIndex;
 
   @override
   void paint(Canvas canvas, Size size) {
-    const horizontalPadding = 12.0;
-    const topPadding = 12.0;
-    const bottomPadding = 14.0;
-    const gridLines = 4;
-
     final chartRect = Rect.fromLTWH(
-      horizontalPadding,
-      topPadding,
-      size.width - (horizontalPadding * 2),
-      size.height - topPadding - bottomPadding,
+      _chartHorizontalPadding,
+      _chartTopPadding,
+      size.width - (_chartHorizontalPadding * 2),
+      size.height - _chartTopPadding - _chartBottomPadding,
     );
 
+    const gridLines = 4;
     final gridPaint = Paint()
       ..color = lineColor.withValues(alpha: 0.08)
       ..strokeWidth = 1.0
@@ -909,24 +1055,42 @@ class _RobinhoodChartPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round;
     canvas.drawPath(linePath, linePaint);
 
-    // Marker with glow
+    final markerIndex = selectedIndex == null
+        ? seriesPoints.length - 1
+        : selectedIndex!.clamp(0, seriesPoints.length - 1);
+    final markerPoint = seriesPoints[markerIndex];
+
+    if (selectedIndex != null) {
+      final crosshairPaint = Paint()
+        ..color = lineColor.withValues(alpha: 0.26)
+        ..strokeWidth = 1.2;
+      canvas.drawLine(
+        Offset(markerPoint.dx, chartRect.top),
+        Offset(markerPoint.dx, chartRect.bottom),
+        crosshairPaint,
+      );
+    }
+
     final glowPaint = Paint()
       ..color = lineColor.withValues(alpha: 0.20)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
-    canvas.drawCircle(lastPoint, 6, glowPaint);
+    canvas.drawCircle(markerPoint, 6, glowPaint);
 
     final markerPaint = Paint()..color = lineColor;
     final markerOutline = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5;
-    canvas.drawCircle(lastPoint, 4.5, markerPaint);
-    canvas.drawCircle(lastPoint, 7, markerOutline);
+    canvas.drawCircle(markerPoint, 4.5, markerPaint);
+    canvas.drawCircle(markerPoint, 7, markerOutline);
   }
 
   @override
   bool shouldRepaint(covariant _RobinhoodChartPainter oldDelegate) {
     if (oldDelegate.lineColor != lineColor) {
+      return true;
+    }
+    if (oldDelegate.selectedIndex != selectedIndex) {
       return true;
     }
     if (oldDelegate.points.length != points.length) {
