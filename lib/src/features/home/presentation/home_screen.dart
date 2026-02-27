@@ -785,6 +785,7 @@ class _RobinhoodMonthlyChartState extends State<_RobinhoodMonthlyChart> {
         ? null
         : visiblePoints[_selectedIndex!.clamp(0, visiblePoints.length - 1)];
     final middleDay = ((widget.totalDays + 1) / 2).round();
+    final visibleMiddleDay = ((visiblePoints.last.day + 1) / 2).round();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -879,18 +880,20 @@ class _RobinhoodMonthlyChartState extends State<_RobinhoodMonthlyChart> {
             ),
             Text(
               widget.isCurrentMonth
-                  ? 'Today ${visiblePoints.last.day}'
+                  ? 'Day $visibleMiddleDay'
                   : 'Day $middleDay',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface.withValues(alpha: 0.7),
-              ),
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface.withValues(alpha: 0.7),
+                  ),
             ),
             Text(
-              'Day ${widget.totalDays}',
+              widget.isCurrentMonth
+                  ? 'Today ${visiblePoints.last.day}'
+                  : 'Day ${widget.totalDays}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: cs.onSurface.withValues(alpha: 0.4),
-              ),
+                    color: cs.onSurface.withValues(alpha: 0.4),
+                  ),
             ),
           ],
         ),
