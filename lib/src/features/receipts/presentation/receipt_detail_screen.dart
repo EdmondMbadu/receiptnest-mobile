@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -204,7 +206,10 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
 
   Widget _buildPreviewCard(Receipt receipt) {
     final extension = _fileExtension(receipt);
-    final useGoogleViewer = extension == 'doc' || extension == 'docx';
+    final isPdf =
+        extension == 'pdf' ||
+        receipt.file.mimeType.toLowerCase() == 'application/pdf';
+    final useGoogleViewer = isPdf || extension == 'doc' || extension == 'docx';
 
     return FutureBuilder<String>(
       future: ref
@@ -555,6 +560,7 @@ class _InAppDocumentPreviewState extends State<_InAppDocumentPreview> {
   bool _loading = true;
   bool _usingGoogleViewer = false;
   String? _error;
+  Timer? _loadingTimeout;
 
   Uri _googleViewerUri(String url) {
     return Uri.parse(
@@ -563,6 +569,7 @@ class _InAppDocumentPreviewState extends State<_InAppDocumentPreview> {
   }
 
   Future<void> _loadUrl({required bool useGoogleViewer}) async {
+    _loadingTimeout?.cancel();
     _usingGoogleViewer = useGoogleViewer;
     _error = null;
     setState(() => _loading = true);
@@ -571,6 +578,20 @@ class _InAppDocumentPreviewState extends State<_InAppDocumentPreview> {
         ? _googleViewerUri(widget.fileUrl)
         : Uri.parse(widget.fileUrl);
     await _controller.loadRequest(uri);
+
+    _loadingTimeout = Timer(const Duration(seconds: 10), () {
+      if (!mounted || !_loading) return;
+
+      if (!_usingGoogleViewer) {
+        _loadUrl(useGoogleViewer: true);
+        return;
+      }
+
+      setState(() {
+        _loading = false;
+        _error = 'In-app preview timed out.';
+      });
+    });
   }
 
   @override
@@ -589,10 +610,12 @@ class _InAppDocumentPreviewState extends State<_InAppDocumentPreview> {
             });
           },
           onPageFinished: (_) {
+            _loadingTimeout?.cancel();
             if (!mounted) return;
             setState(() => _loading = false);
           },
           onWebResourceError: (error) {
+            _loadingTimeout?.cancel();
             if (error.isForMainFrame != true) return;
             if (!_usingGoogleViewer) {
               _loadUrl(useGoogleViewer: true);
@@ -608,6 +631,12 @@ class _InAppDocumentPreviewState extends State<_InAppDocumentPreview> {
       );
 
     _loadUrl(useGoogleViewer: widget.startWithGoogleViewer);
+  }
+
+  @override
+  void dispose() {
+    _loadingTimeout?.cancel();
+    super.dispose();
   }
 
   @override
