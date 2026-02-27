@@ -80,6 +80,7 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final profile = ref.watch(currentUserProfileProvider).valueOrNull;
 
     final plan = (profile?.subscriptionPlan ?? 'free').toLowerCase();
@@ -92,36 +93,70 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Pricing')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
+          // ── Current plan banner ──
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16),
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  const Color(0xFF00C805).withValues(alpha: 0.18),
-                  cs.surfaceContainerHighest.withValues(alpha: 0.55),
+                  const Color(0xFF00C805).withValues(alpha: isDark ? 0.12 : 0.10),
+                  isDark
+                      ? const Color(0xFF16161F)
+                      : cs.surface,
                 ],
+              ),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.grey.shade200,
               ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Plan & Pricing',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'You are on the ${isPro ? 'Pro' : 'Free'} plan.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: cs.onSurface.withValues(alpha: 0.75),
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00C805).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        isPro ? Icons.diamond_rounded : Icons.diamond_outlined,
+                        color: const Color(0xFF00C805),
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Plan & Pricing',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'You are on the ${isPro ? 'Pro' : 'Free'} plan.',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: cs.onSurface.withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 14),
                 Wrap(
@@ -147,7 +182,9 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
+
+          // ── Interval toggle ──
           SegmentedButton<String>(
             segments: const [
               ButtonSegment(value: 'monthly', label: Text('Monthly')),
@@ -157,11 +194,18 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
             onSelectionChanged: (value) {
               setState(() => _interval = value.first);
             },
+            style: SegmentedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
+
+          // ── Free plan ──
           _PlanCard(
             title: 'Free',
-            subtitle: 'Current plan',
+            subtitle: 'Get started',
             price: '\$0',
             cadence: '/month',
             active: !isPro,
@@ -178,6 +222,8 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
             onAction: isPro ? _openPortal : null,
           ),
           const SizedBox(height: 12),
+
+          // ── Pro plan ──
           _PlanCard(
             title: 'Pro',
             subtitle: 'Best value',
@@ -195,24 +241,48 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
                 ? 'You are on Pro'
                 : (_processingCheckout ? 'Redirecting...' : 'Switch to Pro'),
             onAction: isPro || _processingCheckout ? null : _startCheckout,
+            isProcessing: _processingCheckout,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
+
+          // ── Manage billing ──
           OutlinedButton.icon(
             onPressed: _processingPortal ? null : _openPortal,
-            icon: const Icon(Icons.manage_accounts_outlined),
+            icon: _processingPortal
+                ? SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: cs.primary,
+                    ),
+                  )
+                : const Icon(Icons.manage_accounts_outlined, size: 20),
             label: Text(
               _processingPortal ? 'Opening portal...' : 'Manage billing',
             ),
           ),
+
           if (_error != null) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: cs.error.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(_error!, style: TextStyle(color: cs.error)),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline_rounded, size: 18, color: cs.error),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _error!,
+                      style: TextStyle(color: cs.error, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ],
@@ -232,6 +302,7 @@ class _PlanCard extends StatelessWidget {
     required this.features,
     required this.actionLabel,
     required this.onAction,
+    this.isProcessing = false,
   });
 
   final String title;
@@ -243,23 +314,28 @@ class _PlanCard extends StatelessWidget {
   final List<String> features;
   final String actionLabel;
   final VoidCallback? onAction;
+  final bool isProcessing;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Card(
-      elevation: active ? 1 : 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
           color: active
-              ? accentColor.withValues(alpha: 0.55)
-              : cs.outlineVariant,
-          width: active ? 1.8 : 1,
+              ? accentColor.withValues(alpha: 0.50)
+              : (isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.grey.shade200),
+          width: active ? 1.5 : 1,
         ),
+        color: isDark ? const Color(0xFF16161F) : Colors.white,
       ),
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -267,9 +343,10 @@ class _PlanCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(width: 8),
                 if (active)
@@ -279,11 +356,31 @@ class _PlanCard extends StatelessWidget {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(999),
-                      color: accentColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      color: accentColor.withValues(alpha: 0.12),
                     ),
                     child: Text(
                       'Active',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: accentColor,
+                      ),
+                    ),
+                  ),
+                const Spacer(),
+                if (!active && title == 'Pro')
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: accentColor.withValues(alpha: 0.12),
+                    ),
+                    child: Text(
+                      'Recommended',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -296,46 +393,69 @@ class _PlanCard extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               subtitle,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: cs.onSurface.withValues(alpha: 0.6),
+              style: TextStyle(
+                fontSize: 13,
+                color: cs.onSurface.withValues(alpha: 0.5),
               ),
             ),
-            const SizedBox(height: 10),
-            RichText(
-              text: TextSpan(
-                style: Theme.of(context).textTheme.bodyMedium,
-                children: [
-                  TextSpan(
-                    text: price,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: cs.onSurface,
-                    ),
+            const SizedBox(height: 14),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  price,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
+                ),
+                const SizedBox(width: 2),
+                Text(
+                  cadence,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: cs.onSurface.withValues(alpha: 0.5),
                   ),
-                  TextSpan(
-                    text: ' $cadence',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: cs.onSurface.withValues(alpha: 0.6),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
             ...features.map(
               (feature) => Padding(
-                padding: const EdgeInsets.only(bottom: 7),
+                padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.check_rounded, size: 18, color: accentColor),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(feature)),
+                    Container(
+                      margin: const EdgeInsets.only(top: 2),
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: accentColor.withValues(alpha: 0.10),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.check_rounded,
+                        size: 12,
+                        color: accentColor,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        feature,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: cs.onSurface.withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
@@ -345,8 +465,18 @@ class _PlanCard extends StatelessWidget {
                       ? cs.surfaceContainerHighest
                       : accentColor,
                   foregroundColor: active ? cs.onSurface : Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                child: Text(actionLabel),
+                child: isProcessing
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(actionLabel),
               ),
             ),
           ],
@@ -365,10 +495,10 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        color: color.withValues(alpha: 0.10),
       ),
       child: Text(
         label,
