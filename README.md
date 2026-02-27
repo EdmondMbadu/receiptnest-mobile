@@ -1,18 +1,33 @@
-# receiptnest_mobile
+# ReceiptNest Mobile
 
-A new Flutter project.
+Flutter mobile app for ReceiptNest.
 
-## Getting Started
+## Local Setup
 
-This project is a starting point for a Flutter application.
+1. Install dependencies:
+```bash
+flutter pub get
+```
+2. Generate Firebase config (required, files are intentionally gitignored):
+```bash
+dart pub global activate flutterfire_cli
+flutterfire configure --project=receipt-nest
+```
+3. iOS only:
+```bash
+cd ios && pod install --repo-update && cd ..
+```
+4. Run:
+```bash
+flutter run
+```
 
-A few resources to get you started if this is your first Flutter project:
+## Security Note
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
-# receiptnest-mobile
+This repo ignores local/secret config files including:
+- `lib/firebase_options.dart`
+- `android/app/google-services.json`
+- `ios/Runner/GoogleService-Info.plist`
+- `macos/Runner/GoogleService-Info.plist`
+- `.env*`
+- Android signing keys / keystore files
