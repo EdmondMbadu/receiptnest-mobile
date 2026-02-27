@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -48,13 +50,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
 
     try {
-      final result = await ref.read(receiptRepositoryProvider).generateForwardingAddress();
+      final result = await ref
+          .read(receiptRepositoryProvider)
+          .generateForwardingAddress();
       setState(() {
         _forwardingAddress = result['emailAddress']?.toString();
-        _fallbackAddresses = (result['fallbackAddresses'] as List<dynamic>? ?? const [])
-            .map((e) => e.toString())
-            .where((e) => e.isNotEmpty)
-            .toList();
+        _fallbackAddresses =
+            (result['fallbackAddresses'] as List<dynamic>? ?? const [])
+                .map((e) => e.toString())
+                .where((e) => e.isNotEmpty)
+                .toList();
       });
     } catch (e) {
       setState(() {
@@ -95,18 +100,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     try {
-      final share = await ref.read(shareRepositoryProvider).createGraphShare(
+      final share = await ref
+          .read(shareRepositoryProvider)
+          .createGraphShare(
             userId: uid,
             month: month,
             year: year,
             monthLabel: monthLabel,
             totalSpend: spend,
             dailyData: points
-                .map((point) => GraphSharePoint(
-                      day: point.day,
-                      amount: point.amount,
-                      cumulative: point.cumulative,
-                    ))
+                .map(
+                  (point) => GraphSharePoint(
+                    day: point.day,
+                    amount: point.amount,
+                    cumulative: point.cumulative,
+                  ),
+                )
                 .toList(),
             includeName: true,
             includeEmail: true,
@@ -118,9 +127,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       await SharePlus.instance.share(ShareParams(text: link));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to share graph: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to share graph: $e')));
     }
   }
 
@@ -137,7 +146,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           repository: ref.read(receiptRepositoryProvider),
           onUploaded: (_) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Receipt uploaded. Processing started.')),
+              const SnackBar(
+                content: Text('Receipt uploaded. Processing started.'),
+              ),
             );
           },
         );
@@ -150,7 +161,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final monthLabel = ref.watch(selectedMonthLabelProvider);
     final spend = ref.watch(selectedMonthSpendProvider);
     final monthChange = ref.watch(monthOverMonthChangeProvider);
+    final dailyPoints = ref.watch(dailySpendingDataProvider);
+    final month = ref.watch(selectedMonthProvider);
+    final year = ref.watch(selectedYearProvider);
     final receiptsAsync = ref.watch(receiptsStreamProvider);
+    final today = DateTime.now();
+    final isCurrentMonth = month == today.month && year == today.year;
+    final lastVisibleDay = isCurrentMonth
+        ? math.min(today.day, math.max(1, dailyPoints.length))
+        : math.max(1, dailyPoints.length);
+    final trendColor = monthChange == null
+        ? const Color(0xFF00C805)
+        : (monthChange.isIncrease
+              ? const Color(0xFFE53935)
+              : const Color(0xFF00C805));
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
@@ -166,7 +190,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             final query = _searchQuery.trim().toLowerCase();
             if (query.isEmpty) return true;
 
-            final merchant = (receipt.merchant?.canonicalName ?? receipt.merchant?.rawName ?? '').toLowerCase();
+            final merchant =
+                (receipt.merchant?.canonicalName ??
+                        receipt.merchant?.rawName ??
+                        '')
+                    .toLowerCase();
             final fileName = receipt.file.originalName.toLowerCase();
             final date = receipt.date?.toLowerCase() ?? '';
             final amount = receipt.totalAmount?.toString() ?? '';
@@ -210,13 +238,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         const SizedBox(height: 8),
                         Text(
                           formatCurrency(spend),
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           monthChange == null
                               ? 'No previous month data'
                               : '${monthChange.isIncrease ? 'Up' : 'Down'} ${monthChange.percent}% vs previous month',
+                        ),
+                        const SizedBox(height: 12),
+                        _RobinhoodMonthlyChart(
+                          points: dailyPoints,
+                          lineColor: trendColor,
+                          visibleDay: lastVisibleDay,
                         ),
                         const SizedBox(height: 12),
                         Wrap(
@@ -230,7 +265,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             ),
                             OutlinedButton.icon(
                               onPressed: () => context.push('/app/pricing'),
-                              icon: const Icon(Icons.currency_exchange_outlined),
+                              icon: const Icon(
+                                Icons.currency_exchange_outlined,
+                              ),
                               label: const Text('Pricing'),
                             ),
                           ],
@@ -254,7 +291,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         if (_loadingForwarding)
                           const LinearProgressIndicator()
                         else if (_forwardingError != null)
-                          Text(_forwardingError!, style: const TextStyle(color: Colors.redAccent))
+                          Text(
+                            _forwardingError!,
+                            style: const TextStyle(color: Colors.redAccent),
+                          )
                         else if (_forwardingAddress != null) ...[
                           SelectableText(_forwardingAddress!),
                           const SizedBox(height: 8),
@@ -262,7 +302,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             spacing: 8,
                             children: [
                               OutlinedButton(
-                                onPressed: () => Clipboard.setData(ClipboardData(text: _forwardingAddress!)),
+                                onPressed: () => Clipboard.setData(
+                                  ClipboardData(text: _forwardingAddress!),
+                                ),
                                 child: const Text('Copy primary'),
                               ),
                               OutlinedButton(
@@ -274,7 +316,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           if (_fallbackAddresses.isNotEmpty) ...[
                             const SizedBox(height: 8),
                             const Text('Fallback addresses'),
-                            ..._fallbackAddresses.map((item) => SelectableText(item)),
+                            ..._fallbackAddresses.map(
+                              (item) => SelectableText(item),
+                            ),
                           ],
                         ] else
                           const Text('No forwarding address yet.'),
@@ -287,7 +331,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   controller: _searchController,
                   onChanged: (value) => setState(() => _searchQuery = value),
                   decoration: InputDecoration(
-                    hintText: 'Search receipts by merchant, amount, date, file name',
+                    hintText:
+                        'Search receipts by merchant, amount, date, file name',
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchController.text.isEmpty
                         ? null
@@ -314,7 +359,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   )
                 else
-                  ...filtered.take(100).map((receipt) => _ReceiptTile(receipt: receipt)),
+                  ...filtered
+                      .take(100)
+                      .map((receipt) => _ReceiptTile(receipt: receipt)),
               ],
             ),
           );
@@ -348,7 +395,8 @@ class _ReceiptTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final merchant = receipt.merchant?.canonicalName ??
+    final merchant =
+        receipt.merchant?.canonicalName ??
         receipt.merchant?.rawName ??
         receipt.extraction?.supplierName?.value?.toString() ??
         'Unknown merchant';
@@ -369,7 +417,9 @@ class _ReceiptTile extends ConsumerWidget {
                     child: Icon(Icons.picture_as_pdf_outlined),
                   )
                 : FutureBuilder<String>(
-                    future: repository.getReceiptFileUrl(receipt.file.storagePath),
+                    future: repository.getReceiptFileUrl(
+                      receipt.file.storagePath,
+                    ),
                     builder: (context, snapshot) {
                       final url = snapshot.data;
                       if (url == null) {
@@ -382,7 +432,8 @@ class _ReceiptTile extends ConsumerWidget {
                       return CachedNetworkImage(
                         imageUrl: url,
                         fit: BoxFit.cover,
-                        errorWidget: (_, error, stackTrace) => const Icon(Icons.broken_image_outlined),
+                        errorWidget: (_, error, stackTrace) =>
+                            const Icon(Icons.broken_image_outlined),
                       );
                     },
                   ),
@@ -392,7 +443,9 @@ class _ReceiptTile extends ConsumerWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${formatDate(receipt.effectiveDate, pattern: 'MMM d')} • ${formatCurrency(receipt.totalAmount)}'),
+            Text(
+              '${formatDate(receipt.effectiveDate, pattern: 'MMM d')} • ${formatCurrency(receipt.totalAmount)}',
+            ),
             const SizedBox(height: 4),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -410,5 +463,263 @@ class _ReceiptTile extends ConsumerWidget {
         trailing: const Icon(Icons.chevron_right),
       ),
     );
+  }
+}
+
+class _RobinhoodMonthlyChart extends StatelessWidget {
+  const _RobinhoodMonthlyChart({
+    required this.points,
+    required this.lineColor,
+    required this.visibleDay,
+  });
+
+  final List<DailySpendingPoint> points;
+  final Color lineColor;
+  final int visibleDay;
+
+  @override
+  Widget build(BuildContext context) {
+    final safePoints = points.isEmpty
+        ? const [DailySpendingPoint(day: 1, amount: 0, cumulative: 0)]
+        : points;
+    final clippedVisibleDay = math.min(
+      math.max(1, visibleDay),
+      safePoints.length,
+    );
+    final visiblePoints = safePoints
+        .take(clippedVisibleDay)
+        .toList(growable: false);
+
+    var peak = visiblePoints.first;
+    for (final point in visiblePoints) {
+      if (point.amount > peak.amount) {
+        peak = point;
+      }
+    }
+
+    final totalSoFar = visiblePoints.fold<double>(
+      0,
+      (runningTotal, point) => runningTotal + point.amount,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: 182,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                lineColor.withValues(alpha: 0.10),
+                Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
+              ],
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: CustomPaint(
+              painter: _RobinhoodChartPainter(
+                points: visiblePoints,
+                lineColor: lineColor,
+              ),
+              child: const SizedBox.expand(),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Day 1', style: Theme.of(context).textTheme.bodySmall),
+            Text(
+              'Day ${visiblePoints.last.day}',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            Text(
+              'Day ${safePoints.length}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _ChartPill(
+              label: 'Spent so far',
+              value: formatCurrency(totalSoFar),
+              color: lineColor,
+            ),
+            _ChartPill(
+              label: 'Peak day',
+              value: 'Day ${peak.day}: ${formatCurrency(peak.amount)}',
+              color: Theme.of(context).colorScheme.secondary,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ChartPill extends StatelessWidget {
+  const _ChartPill({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.11),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: RichText(
+        text: TextSpan(
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+          children: [
+            TextSpan(
+              text: '$label: ',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            TextSpan(text: value),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RobinhoodChartPainter extends CustomPainter {
+  const _RobinhoodChartPainter({required this.points, required this.lineColor});
+
+  final List<DailySpendingPoint> points;
+  final Color lineColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const horizontalPadding = 10.0;
+    const topPadding = 10.0;
+    const bottomPadding = 14.0;
+    const gridLines = 4;
+
+    final chartRect = Rect.fromLTWH(
+      horizontalPadding,
+      topPadding,
+      size.width - (horizontalPadding * 2),
+      size.height - topPadding - bottomPadding,
+    );
+
+    final gridPaint = Paint()
+      ..color = lineColor.withValues(alpha: 0.12)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    for (var i = 0; i <= gridLines; i++) {
+      final y = chartRect.top + (chartRect.height / gridLines) * i;
+      canvas.drawLine(
+        Offset(chartRect.left, y),
+        Offset(chartRect.right, y),
+        gridPaint,
+      );
+    }
+
+    if (points.isEmpty) {
+      return;
+    }
+
+    final maxAmount = math.max(
+      points.fold<double>(
+        0,
+        (maxValue, point) => math.max(maxValue, point.amount),
+      ),
+      1.0,
+    );
+
+    Offset pointAt(int index) {
+      final xFactor = points.length == 1 ? 1.0 : index / (points.length - 1);
+      final x = chartRect.left + (chartRect.width * xFactor);
+      final yFactor = points[index].amount / maxAmount;
+      final y = chartRect.bottom - (chartRect.height * yFactor);
+      return Offset(x, y);
+    }
+
+    final seriesPoints = List<Offset>.generate(points.length, pointAt);
+    final linePath = Path();
+    final firstPoint = seriesPoints.first;
+    linePath.moveTo(firstPoint.dx, firstPoint.dy);
+    if (seriesPoints.length == 1) {
+      linePath.lineTo(firstPoint.dx, firstPoint.dy);
+    } else {
+      for (var i = 0; i < seriesPoints.length - 1; i++) {
+        final current = seriesPoints[i];
+        final next = seriesPoints[i + 1];
+        final midX = (current.dx + next.dx) / 2;
+        linePath.cubicTo(midX, current.dy, midX, next.dy, next.dx, next.dy);
+      }
+    }
+
+    final lastPoint = seriesPoints.last;
+    final fillPath = Path.from(linePath)
+      ..lineTo(lastPoint.dx, chartRect.bottom)
+      ..lineTo(firstPoint.dx, chartRect.bottom)
+      ..close();
+
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          lineColor.withValues(alpha: 0.34),
+          lineColor.withValues(alpha: 0.03),
+        ],
+      ).createShader(chartRect)
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(fillPath, fillPaint);
+
+    final linePaint = Paint()
+      ..color = lineColor
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(linePath, linePaint);
+
+    final markerPaint = Paint()..color = lineColor;
+    final markerOutline = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2;
+    canvas.drawCircle(lastPoint, 4.8, markerPaint);
+    canvas.drawCircle(lastPoint, 8.2, markerOutline);
+  }
+
+  @override
+  bool shouldRepaint(covariant _RobinhoodChartPainter oldDelegate) {
+    if (oldDelegate.lineColor != lineColor) {
+      return true;
+    }
+    if (oldDelegate.points.length != points.length) {
+      return true;
+    }
+    if (points.isEmpty) {
+      return false;
+    }
+    return oldDelegate.points.last.amount != points.last.amount;
   }
 }
