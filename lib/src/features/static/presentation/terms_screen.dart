@@ -11,11 +11,11 @@ class TermsScreen extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         children: const [
           Text(
-            'ReceiptNest Terms',
+            'ReceiptNest AI Terms',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           SizedBox(height: 12),
-          Text('By using ReceiptNest, you agree to process only receipts you are authorized to store and analyze.'),
+          Text('By using ReceiptNest AI, you agree to process only receipts you are authorized to store and analyze.'),
           SizedBox(height: 8),
           Text('Subscription billing is managed by Stripe and renews according to your selected plan.'),
           SizedBox(height: 8),

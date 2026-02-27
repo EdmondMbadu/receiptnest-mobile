@@ -52,7 +52,7 @@ class _ShareViewScreenState extends ConsumerState<ShareViewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Shared ReceiptNest View')),
+      appBar: AppBar(title: const Text('Shared ReceiptNest AI View')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null

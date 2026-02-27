@@ -42,7 +42,7 @@ class AppShellScreen extends ConsumerWidget {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(profile?.displayName ?? 'ReceiptNest'),
+          title: Text(profile?.displayName ?? 'ReceiptNest AI'),
           actions: [
             IconButton(
               icon: Icon(
@@ -151,7 +151,7 @@ class AppShellScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      profile?.displayName ?? 'ReceiptNest',
+                      profile?.displayName ?? 'ReceiptNest AI',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     if (profile != null && profile.email.isNotEmpty) ...[
@@ -192,7 +192,7 @@ class AppShellScreen extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  'ReceiptNest',
+                  'ReceiptNest AI',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: cs.onSurface.withValues(alpha: 0.3),
                         fontWeight: FontWeight.w600,

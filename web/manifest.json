@@ -1,6 +1,6 @@
 {
-    "name": "receiptnest_mobile",
-    "short_name": "receiptnest_mobile",
+    "name": "ReceiptNest AI",
+    "short_name": "ReceiptNest AI",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

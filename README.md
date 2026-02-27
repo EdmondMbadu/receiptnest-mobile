@@ -1,6 +1,6 @@
-# ReceiptNest Mobile
+# ReceiptNest AI Mobile
 
-Flutter mobile app for ReceiptNest.
+Flutter mobile app for ReceiptNest AI.
 
 ## Local Setup
 

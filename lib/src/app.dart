@@ -14,7 +14,7 @@ class ReceiptNestApp extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
-      title: 'ReceiptNest',
+      title: 'ReceiptNest AI',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,

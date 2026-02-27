@@ -14,7 +14,7 @@ class AdminScreen extends ConsumerStatefulWidget {
 class _AdminScreenState extends ConsumerState<AdminScreen> {
   final _toController = TextEditingController();
   final _subjectController = TextEditingController(text: 'Test Email');
-  final _messageController = TextEditingController(text: 'This is a test email from ReceiptNest.');
+  final _messageController = TextEditingController(text: 'This is a test email from ReceiptNest AI.');
 
   bool _sending = false;
   String? _error;

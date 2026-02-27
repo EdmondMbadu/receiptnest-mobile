@@ -40,7 +40,7 @@ class BrandHeader extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Text(
-          'ReceiptNest',
+          'ReceiptNest AI',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w800,
                 letterSpacing: -0.5,
