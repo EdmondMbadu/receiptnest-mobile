@@ -26,6 +26,12 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>ReceiptNest AI uses the camera to scan and upload your receipts.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>ReceiptNest AI needs photo library access so you can select receipt images.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>ReceiptNest AI can save edited receipt captures to your photo library when needed.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

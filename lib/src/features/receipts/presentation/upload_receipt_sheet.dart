@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../data/receipt_repository.dart';
@@ -24,73 +25,166 @@ class UploadReceiptSheet extends StatefulWidget {
 }
 
 class _UploadReceiptSheetState extends State<UploadReceiptSheet> {
+  static const Set<String> _previewableImageExtensions = {
+    'jpg',
+    'jpeg',
+    'png',
+    'webp',
+  };
+
   UploadFileData? _selectedFile;
   bool _uploading = false;
   double _progress = 0;
   String? _error;
 
+  String _fileExtension(String fileName) {
+    final dot = fileName.lastIndexOf('.');
+    if (dot < 0 || dot == fileName.length - 1) return '';
+    return fileName.substring(dot + 1).toLowerCase();
+  }
+
+  String _mimeTypeFromFileName(String fileName, {required String fallback}) {
+    switch (_fileExtension(fileName)) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'heic':
+        return 'image/heic';
+      case 'heif':
+        return 'image/heif';
+      default:
+        return fallback;
+    }
+  }
+
+  bool _isPreviewableImage(UploadFileData file) {
+    return file.path != null && _previewableImageExtensions.contains(_fileExtension(file.name));
+  }
+
+  String _friendlyPickerError(
+    Object error, {
+    required bool isCamera,
+  }) {
+    if (error is PlatformException) {
+      switch (error.code) {
+        case 'camera_access_denied':
+        case 'camera_access_denied_without_prompt':
+          return 'Camera access is denied. Enable it in Settings to scan receipts.';
+        case 'photo_access_denied':
+        case 'photo_access_denied_without_prompt':
+          return 'Photo access is denied. Enable it in Settings to choose images.';
+        case 'invalid_image':
+          return 'The selected image could not be read. Please try another file.';
+        default:
+          break;
+      }
+    }
+
+    return isCamera
+        ? 'Could not open camera. Please check camera permissions and try again.'
+        : 'Could not open photo library. Please check permissions and try again.';
+  }
+
   Future<void> _pickFromCamera() async {
-    final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.camera, imageQuality: 92);
-    if (image == null) return;
-
-    final bytes = await image.readAsBytes();
-    if (!mounted) return;
-
-    setState(() {
-      _selectedFile = UploadFileData(
-        name: image.name,
-        path: image.path,
-        bytes: bytes,
-        sizeBytes: bytes.length,
-        mimeType: 'image/jpeg',
+    try {
+      final picker = ImagePicker();
+      final image = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 92,
+        preferredCameraDevice: CameraDevice.rear,
       );
-      _error = null;
-    });
+      if (image == null) return;
+
+      final bytes = await image.readAsBytes();
+      if (!mounted) return;
+
+      setState(() {
+        _selectedFile = UploadFileData(
+          name: image.name,
+          path: image.path,
+          bytes: bytes,
+          sizeBytes: bytes.length,
+          mimeType: _mimeTypeFromFileName(
+            image.name,
+            fallback: 'image/jpeg',
+          ),
+        );
+        _error = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = _friendlyPickerError(error, isCamera: true);
+      });
+    }
   }
 
   Future<void> _pickFromGallery() async {
-    final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 92);
-    if (image == null) return;
-
-    final bytes = await image.readAsBytes();
-    if (!mounted) return;
-
-    setState(() {
-      _selectedFile = UploadFileData(
-        name: image.name,
-        path: image.path,
-        bytes: bytes,
-        sizeBytes: bytes.length,
-        mimeType: 'image/jpeg',
+    try {
+      final picker = ImagePicker();
+      final image = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 92,
       );
-      _error = null;
-    });
+      if (image == null) return;
+
+      final bytes = await image.readAsBytes();
+      if (!mounted) return;
+
+      setState(() {
+        _selectedFile = UploadFileData(
+          name: image.name,
+          path: image.path,
+          bytes: bytes,
+          sizeBytes: bytes.length,
+          mimeType: _mimeTypeFromFileName(
+            image.name,
+            fallback: 'image/jpeg',
+          ),
+        );
+        _error = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = _friendlyPickerError(error, isCamera: false);
+      });
+    }
   }
 
   Future<void> _pickDocument() async {
-    final result = await FilePicker.platform.pickFiles(
-      withData: true,
-      type: FileType.custom,
-      allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'pdf', 'doc', 'docx'],
-    );
-
-    if (result == null || result.files.isEmpty) return;
-
-    final file = result.files.first;
-    if (!mounted) return;
-
-    setState(() {
-      _selectedFile = UploadFileData(
-        name: file.name,
-        path: file.path,
-        bytes: file.bytes,
-        sizeBytes: file.size,
-        mimeType: null,
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        withData: true,
+        type: FileType.custom,
+        allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'pdf', 'doc', 'docx'],
       );
-      _error = null;
-    });
+
+      if (result == null || result.files.isEmpty) return;
+
+      final file = result.files.first;
+      if (!mounted) return;
+
+      setState(() {
+        _selectedFile = UploadFileData(
+          name: file.name,
+          path: file.path,
+          bytes: file.bytes,
+          sizeBytes: file.size,
+          mimeType: null,
+        );
+        _error = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Could not open file picker. Please try again.';
+      });
+    }
   }
 
   Future<void> _upload() async {
@@ -198,11 +292,7 @@ class _UploadReceiptSheetState extends State<UploadReceiptSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (selected.path != null &&
-                          (selected.name.toLowerCase().endsWith('.jpg') ||
-                              selected.name.toLowerCase().endsWith('.jpeg') ||
-                              selected.name.toLowerCase().endsWith('.png') ||
-                              selected.name.toLowerCase().endsWith('.webp')))
+                      if (_isPreviewableImage(selected))
                         ClipRRect(
                           borderRadius: const BorderRadius.vertical(
                             top: Radius.circular(15),
