@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/utils/formatters.dart';
@@ -923,6 +924,13 @@ class _HistogramMonthPoint {
   final double amount;
 }
 
+class _HistogramYAxisTick {
+  const _HistogramYAxisTick({required this.fraction, required this.label});
+
+  final double fraction;
+  final String label;
+}
+
 class _RobinhoodMonthlyChart extends StatefulWidget {
   const _RobinhoodMonthlyChart({
     required this.points,
@@ -1168,6 +1176,15 @@ class _HistogramSpendingChart extends StatefulWidget {
 }
 
 class _HistogramSpendingChartState extends State<_HistogramSpendingChart> {
+  static final _axisSmallFormatter = NumberFormat.currency(
+    symbol: r'$',
+    decimalDigits: 0,
+  );
+  static final _axisCompactFormatter = NumberFormat.compactCurrency(
+    symbol: r'$',
+    decimalDigits: 1,
+  );
+
   int? _selectedIndex;
 
   @override
@@ -1216,6 +1233,26 @@ class _HistogramSpendingChartState extends State<_HistogramSpendingChart> {
     return indexes.map((index) => widget.points[index]).toList(growable: false);
   }
 
+  String _formatAxisAmount(double amount) {
+    if (amount == 0) return r'$0';
+    if (amount.abs() < 1000) return _axisSmallFormatter.format(amount);
+    return _axisCompactFormatter.format(amount);
+  }
+
+  List<_HistogramYAxisTick> _yAxisTicks(double maxAmount) {
+    if (maxAmount <= 0) {
+      return const [_HistogramYAxisTick(fraction: 0, label: r'$0')];
+    }
+    return [1.0, 0.75, 0.5, 0.25, 0.0]
+        .map(
+          (fraction) => _HistogramYAxisTick(
+            fraction: fraction,
+            label: _formatAxisAmount(maxAmount * fraction),
+          ),
+        )
+        .toList(growable: false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -1247,6 +1284,7 @@ class _HistogramSpendingChartState extends State<_HistogramSpendingChart> {
         ? null
         : widget.points[_selectedIndex!.clamp(0, widget.points.length - 1)];
     final labels = _axisLabelPoints();
+    final yAxisTicks = _yAxisTicks(maxAmount);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1271,76 +1309,124 @@ class _HistogramSpendingChartState extends State<_HistogramSpendingChart> {
                 ),
         ),
         const SizedBox(height: 8),
-        Container(
+        SizedBox(
           height: 182,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                widget.lineColor.withValues(alpha: 0.08),
-                cs.surface.withValues(alpha: 0.95),
-              ],
-            ),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final width = constraints.maxWidth;
-                return MouseRegion(
-                  onHover: (event) => _updateSelection(
-                    event.localPosition.dx,
-                    width,
-                    widget.points.length,
+          child: Row(
+            children: [
+              SizedBox(
+                width: 44,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final chartHeight = math.max(
+                      1.0,
+                      constraints.maxHeight -
+                          _chartTopPadding -
+                          _chartBottomPadding,
+                    );
+                    return Stack(
+                      children: yAxisTicks
+                          .map((tick) {
+                            final y =
+                                _chartTopPadding +
+                                (chartHeight * (1 - tick.fraction));
+                            return Positioned(
+                              top: y - 7,
+                              right: 0,
+                              child: Text(
+                                tick.label,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      fontSize: 10,
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.45,
+                                      ),
+                                    ),
+                              ),
+                            );
+                          })
+                          .toList(growable: false),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        widget.lineColor.withValues(alpha: 0.08),
+                        cs.surface.withValues(alpha: 0.95),
+                      ],
+                    ),
                   ),
-                  onExit: (_) => setState(() => _selectedIndex = null),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTapDown: (details) => _updateSelection(
-                      details.localPosition.dx,
-                      width,
-                      widget.points.length,
-                    ),
-                    onPanStart: (details) => _updateSelection(
-                      details.localPosition.dx,
-                      width,
-                      widget.points.length,
-                    ),
-                    onPanUpdate: (details) => _updateSelection(
-                      details.localPosition.dx,
-                      width,
-                      widget.points.length,
-                    ),
-                    child: CustomPaint(
-                      painter: _HistogramChartPainter(
-                        points: widget.points,
-                        maxAmount: maxAmount,
-                        lineColor: widget.lineColor,
-                        selectedIndex: _selectedIndex,
-                      ),
-                      child: const SizedBox.expand(),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final width = constraints.maxWidth;
+                        return MouseRegion(
+                          onHover: (event) => _updateSelection(
+                            event.localPosition.dx,
+                            width,
+                            widget.points.length,
+                          ),
+                          onExit: (_) => setState(() => _selectedIndex = null),
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTapDown: (details) => _updateSelection(
+                              details.localPosition.dx,
+                              width,
+                              widget.points.length,
+                            ),
+                            onPanStart: (details) => _updateSelection(
+                              details.localPosition.dx,
+                              width,
+                              widget.points.length,
+                            ),
+                            onPanUpdate: (details) => _updateSelection(
+                              details.localPosition.dx,
+                              width,
+                              widget.points.length,
+                            ),
+                            child: CustomPaint(
+                              painter: _HistogramChartPainter(
+                                points: widget.points,
+                                maxAmount: maxAmount,
+                                lineColor: widget.lineColor,
+                                selectedIndex: _selectedIndex,
+                              ),
+                              child: const SizedBox.expand(),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
-                );
-              },
-            ),
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: labels
-              .map(
-                (point) => Text(
-                  point.label,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: cs.onSurface.withValues(alpha: 0.45),
+        Padding(
+          padding: const EdgeInsets.only(left: 50),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: labels
+                .map(
+                  (point) => Text(
+                    point.label,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: cs.onSurface.withValues(alpha: 0.45),
+                    ),
                   ),
-                ),
-              )
-              .toList(growable: false),
+                )
+                .toList(growable: false),
+          ),
         ),
         const SizedBox(height: 10),
         Row(
