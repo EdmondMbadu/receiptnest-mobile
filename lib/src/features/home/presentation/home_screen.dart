@@ -15,6 +15,10 @@ import '../../receipts/presentation/upload_receipt_sheet.dart';
 import '../../share/data/share_repository.dart';
 import '../../share/models/share_models.dart';
 
+enum _GraphViewMode { month, histogram }
+
+enum _HistogramRange { thisYear, fiveYears, all }
+
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -30,6 +34,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _searchQuery = '';
   int _visibleReceiptCount = _receiptBatchSize;
   int _latestFilteredCount = 0;
+  _GraphViewMode _graphViewMode = _GraphViewMode.month;
+  _HistogramRange _histogramRange = _HistogramRange.thisYear;
 
   bool _loadingForwarding = false;
   String? _forwardingAddress;
@@ -101,6 +107,124 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final next = DateTime(current.year, current.month + delta, 1);
     ref.read(selectedMonthProvider.notifier).state = next.month;
     ref.read(selectedYearProvider.notifier).state = next.year;
+  }
+
+  void _setGraphViewMode(_GraphViewMode mode) {
+    if (_graphViewMode == mode) return;
+    setState(() => _graphViewMode = mode);
+  }
+
+  void _setHistogramRange(_HistogramRange range) {
+    if (_histogramRange == range) return;
+    setState(() => _histogramRange = range);
+  }
+
+  static const _shortMonthLabels = <String>[
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
+  static const _longMonthLabels = <String>[
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+
+  String _histogramRangeTitle(_HistogramRange range) {
+    switch (range) {
+      case _HistogramRange.thisYear:
+        return 'This year';
+      case _HistogramRange.fiveYears:
+        return 'Last 5 years';
+      case _HistogramRange.all:
+        return 'All time';
+    }
+  }
+
+  String _monthKey(int year, int month) {
+    return '${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}';
+  }
+
+  List<_HistogramMonthPoint> _buildHistogramMonthlyData(
+    List<Receipt> receipts,
+  ) {
+    final now = DateTime.now();
+    final endMonth = DateTime(now.year, now.month, 1);
+    final monthlyTotals = <String, double>{};
+    DateTime? earliestMonth;
+
+    for (final receipt in receipts) {
+      final amount = receipt.totalAmount;
+      final date = receipt.effectiveDate;
+      if (amount == null || date == null) continue;
+
+      final monthDate = DateTime(date.year, date.month, 1);
+      if (earliestMonth == null || monthDate.isBefore(earliestMonth)) {
+        earliestMonth = monthDate;
+      }
+
+      final key = _monthKey(monthDate.year, monthDate.month);
+      monthlyTotals[key] = (monthlyTotals[key] ?? 0) + amount;
+    }
+
+    var startMonth = DateTime(now.year, 1, 1);
+    if (_histogramRange == _HistogramRange.fiveYears) {
+      startMonth = DateTime(endMonth.year, endMonth.month - 59, 1);
+    } else if (_histogramRange == _HistogramRange.all) {
+      startMonth = earliestMonth ?? endMonth;
+    }
+
+    if (startMonth.isAfter(endMonth)) {
+      startMonth = endMonth;
+    }
+
+    final data = <_HistogramMonthPoint>[];
+    var cursor = DateTime(startMonth.year, startMonth.month, 1);
+
+    while (!cursor.isAfter(endMonth)) {
+      final key = _monthKey(cursor.year, cursor.month);
+      final short = _shortMonthLabels[cursor.month - 1];
+      final long = _longMonthLabels[cursor.month - 1];
+      final shortYear = (cursor.year % 100).toString().padLeft(2, '0');
+      final label = _histogramRange == _HistogramRange.thisYear
+          ? short
+          : '$short $shortYear';
+      final fullLabel = '$long ${cursor.year}';
+
+      data.add(
+        _HistogramMonthPoint(
+          monthKey: key,
+          month: cursor.month,
+          year: cursor.year,
+          label: label,
+          fullLabel: fullLabel,
+          amount: monthlyTotals[key] ?? 0,
+        ),
+      );
+
+      cursor = DateTime(cursor.year, cursor.month + 1, 1);
+    }
+
+    return data;
   }
 
   Future<void> _shareGraph() async {
@@ -200,6 +324,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         : (monthChange.isIncrease
               ? const Color(0xFFE53935)
               : const Color(0xFF00C805));
+    const histogramColor = Color(0xFF00C805);
 
     return Scaffold(
       floatingActionButton: FloatingActionButton(
@@ -211,6 +336,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Failed to load receipts: $err')),
         data: (receipts) {
+          final histogramMonthlyData = _buildHistogramMonthlyData(receipts);
+          final histogramTotalSpend = histogramMonthlyData.fold<double>(
+            0,
+            (sum, point) => sum + point.amount,
+          );
           final filtered = receipts.where((receipt) {
             final query = _searchQuery.trim().toLowerCase();
             if (query.isEmpty) return true;
@@ -250,37 +380,96 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       children: [
                         Row(
                           children: [
-                            IconButton(
-                              onPressed: () => _changeMonth(-1),
-                              icon: const Icon(Icons.chevron_left_rounded),
-                              style: IconButton.styleFrom(
-                                backgroundColor: cs.primary.withValues(
-                                  alpha: 0.06,
-                                ),
-                              ),
-                            ),
                             Expanded(
-                              child: Text(
-                                monthLabel,
-                                textAlign: TextAlign.center,
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: () => _changeMonth(1),
-                              icon: const Icon(Icons.chevron_right_rounded),
-                              style: IconButton.styleFrom(
-                                backgroundColor: cs.primary.withValues(
-                                  alpha: 0.06,
-                                ),
+                              child: SegmentedButton<_GraphViewMode>(
+                                segments: const [
+                                  ButtonSegment<_GraphViewMode>(
+                                    value: _GraphViewMode.month,
+                                    label: Text('Month'),
+                                  ),
+                                  ButtonSegment<_GraphViewMode>(
+                                    value: _GraphViewMode.histogram,
+                                    label: Text('Histogram'),
+                                  ),
+                                ],
+                                selected: {_graphViewMode},
+                                onSelectionChanged: (value) {
+                                  _setGraphViewMode(value.first);
+                                },
+                                showSelectedIcon: false,
                               ),
                             ),
                           ],
                         ),
+                        if (_graphViewMode == _GraphViewMode.histogram) ...[
+                          const SizedBox(height: 8),
+                          SegmentedButton<_HistogramRange>(
+                            segments: const [
+                              ButtonSegment<_HistogramRange>(
+                                value: _HistogramRange.thisYear,
+                                label: Text('This Year'),
+                              ),
+                              ButtonSegment<_HistogramRange>(
+                                value: _HistogramRange.fiveYears,
+                                label: Text('5Y'),
+                              ),
+                              ButtonSegment<_HistogramRange>(
+                                value: _HistogramRange.all,
+                                label: Text('All'),
+                              ),
+                            ],
+                            selected: {_histogramRange},
+                            onSelectionChanged: (value) {
+                              _setHistogramRange(value.first);
+                            },
+                            showSelectedIcon: false,
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        if (_graphViewMode == _GraphViewMode.month)
+                          Row(
+                            children: [
+                              IconButton(
+                                onPressed: () => _changeMonth(-1),
+                                icon: const Icon(Icons.chevron_left_rounded),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: cs.primary.withValues(
+                                    alpha: 0.06,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  monthLabel,
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () => _changeMonth(1),
+                                icon: const Icon(Icons.chevron_right_rounded),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: cs.primary.withValues(
+                                    alpha: 0.06,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        else
+                          Text(
+                            _histogramRangeTitle(_histogramRange),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
                         const SizedBox(height: 16),
                         Text(
-                          formatCurrency(spend),
+                          formatCurrency(
+                            _graphViewMode == _GraphViewMode.month
+                                ? spend
+                                : histogramTotalSpend,
+                          ),
                           style: Theme.of(context).textTheme.headlineMedium
                               ?.copyWith(
                                 fontWeight: FontWeight.w800,
@@ -288,27 +477,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ),
                         ),
                         const SizedBox(height: 4),
-                        _MonthChangeLabel(
-                          change: monthChange,
-                          color: trendColor,
-                        ),
+                        if (_graphViewMode == _GraphViewMode.month)
+                          _MonthChangeLabel(
+                            change: monthChange,
+                            color: trendColor,
+                          )
+                        else
+                          Text(
+                            'Monthly spending trend for ${_histogramRangeTitle(_histogramRange).toLowerCase()}',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: cs.onSurface.withValues(alpha: 0.55),
+                                ),
+                          ),
                         const SizedBox(height: 16),
-                        _RobinhoodMonthlyChart(
-                          points: dailyPoints,
-                          lineColor: trendColor,
-                          visibleDay: lastVisibleDay,
-                          totalDays: totalDaysInMonth,
-                          isCurrentMonth: isCurrentMonth,
-                        ),
+                        if (_graphViewMode == _GraphViewMode.month)
+                          _RobinhoodMonthlyChart(
+                            points: dailyPoints,
+                            lineColor: trendColor,
+                            visibleDay: lastVisibleDay,
+                            totalDays: totalDaysInMonth,
+                            isCurrentMonth: isCurrentMonth,
+                          )
+                        else
+                          _HistogramSpendingChart(
+                            points: histogramMonthlyData,
+                            lineColor: histogramColor,
+                          ),
                         const SizedBox(height: 16),
-                        Row(
+                        Wrap(
+                          spacing: 8,
                           children: [
-                            FilledButton.tonalIcon(
-                              onPressed: _shareGraph,
-                              icon: const Icon(Icons.share_outlined, size: 18),
-                              label: const Text('Share'),
-                            ),
-                            const SizedBox(width: 8),
+                            if (_graphViewMode == _GraphViewMode.month)
+                              FilledButton.tonalIcon(
+                                onPressed: _shareGraph,
+                                icon: const Icon(
+                                  Icons.share_outlined,
+                                  size: 18,
+                                ),
+                                label: const Text('Share'),
+                              ),
                             OutlinedButton.icon(
                               onPressed: () => context.push('/app/pricing'),
                               icon: const Icon(
@@ -697,6 +905,24 @@ const double _chartHorizontalPadding = 12.0;
 const double _chartTopPadding = 12.0;
 const double _chartBottomPadding = 14.0;
 
+class _HistogramMonthPoint {
+  const _HistogramMonthPoint({
+    required this.monthKey,
+    required this.month,
+    required this.year,
+    required this.label,
+    required this.fullLabel,
+    required this.amount,
+  });
+
+  final String monthKey;
+  final int month;
+  final int year;
+  final String label;
+  final String fullLabel;
+  final double amount;
+}
+
 class _RobinhoodMonthlyChart extends StatefulWidget {
   const _RobinhoodMonthlyChart({
     required this.points,
@@ -927,6 +1153,216 @@ class _RobinhoodMonthlyChartState extends State<_RobinhoodMonthlyChart> {
   }
 }
 
+class _HistogramSpendingChart extends StatefulWidget {
+  const _HistogramSpendingChart({
+    required this.points,
+    required this.lineColor,
+  });
+
+  final List<_HistogramMonthPoint> points;
+  final Color lineColor;
+
+  @override
+  State<_HistogramSpendingChart> createState() =>
+      _HistogramSpendingChartState();
+}
+
+class _HistogramSpendingChartState extends State<_HistogramSpendingChart> {
+  int? _selectedIndex;
+
+  @override
+  void didUpdateWidget(covariant _HistogramSpendingChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final dataChanged =
+        oldWidget.points.length != widget.points.length ||
+        (oldWidget.points.isNotEmpty &&
+            widget.points.isNotEmpty &&
+            oldWidget.points.first.monthKey != widget.points.first.monthKey) ||
+        (oldWidget.points.isNotEmpty &&
+            widget.points.isNotEmpty &&
+            oldWidget.points.last.monthKey != widget.points.last.monthKey);
+    if (dataChanged) {
+      _selectedIndex = null;
+    }
+  }
+
+  int _indexFromDx(double dx, double width, int count) {
+    if (count <= 1) return 0;
+    final chartWidth = math.max(1.0, width - (_chartHorizontalPadding * 2));
+    final normalized = ((dx - _chartHorizontalPadding) / chartWidth).clamp(
+      0.0,
+      1.0,
+    );
+    return (normalized * (count - 1)).round();
+  }
+
+  void _updateSelection(double dx, double width, int count) {
+    final nextIndex = _indexFromDx(dx, width, count);
+    if (nextIndex == _selectedIndex) return;
+    setState(() => _selectedIndex = nextIndex);
+  }
+
+  List<_HistogramMonthPoint> _axisLabelPoints() {
+    if (widget.points.isEmpty) return const [];
+    final lastIndex = widget.points.length - 1;
+    final indexes = {
+      0,
+      (lastIndex * 0.25).floor(),
+      (lastIndex * 0.5).floor(),
+      (lastIndex * 0.75).floor(),
+      lastIndex,
+    }.toList()..sort();
+
+    return indexes.map((index) => widget.points[index]).toList(growable: false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    if (widget.points.isEmpty) {
+      return Text(
+        'No data available.',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: cs.onSurface.withValues(alpha: 0.55),
+        ),
+      );
+    }
+
+    final maxAmount = widget.points.fold<double>(
+      0,
+      (maxValue, point) => math.max(maxValue, point.amount),
+    );
+    final totalSpend = widget.points.fold<double>(
+      0,
+      (sum, point) => sum + point.amount,
+    );
+    var peak = widget.points.first;
+    for (final point in widget.points) {
+      if (point.amount > peak.amount) {
+        peak = point;
+      }
+    }
+
+    final selectedPoint = _selectedIndex == null
+        ? null
+        : widget.points[_selectedIndex!.clamp(0, widget.points.length - 1)];
+    final labels = _axisLabelPoints();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 120),
+          child: selectedPoint == null
+              ? Text(
+                  'Touch and slide to inspect monthly spend',
+                  key: const ValueKey('hint-histogram'),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: cs.onSurface.withValues(alpha: 0.55),
+                  ),
+                )
+              : Text(
+                  '${selectedPoint.fullLabel}: ${formatCurrency(selectedPoint.amount)}',
+                  key: ValueKey<String>(selectedPoint.monthKey),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: widget.lineColor,
+                  ),
+                ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: 182,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                widget.lineColor.withValues(alpha: 0.08),
+                cs.surface.withValues(alpha: 0.95),
+              ],
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                return MouseRegion(
+                  onHover: (event) => _updateSelection(
+                    event.localPosition.dx,
+                    width,
+                    widget.points.length,
+                  ),
+                  onExit: (_) => setState(() => _selectedIndex = null),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: (details) => _updateSelection(
+                      details.localPosition.dx,
+                      width,
+                      widget.points.length,
+                    ),
+                    onPanStart: (details) => _updateSelection(
+                      details.localPosition.dx,
+                      width,
+                      widget.points.length,
+                    ),
+                    onPanUpdate: (details) => _updateSelection(
+                      details.localPosition.dx,
+                      width,
+                      widget.points.length,
+                    ),
+                    child: CustomPaint(
+                      painter: _HistogramChartPainter(
+                        points: widget.points,
+                        maxAmount: maxAmount,
+                        lineColor: widget.lineColor,
+                        selectedIndex: _selectedIndex,
+                      ),
+                      child: const SizedBox.expand(),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: labels
+              .map(
+                (point) => Text(
+                  point.label,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: cs.onSurface.withValues(alpha: 0.45),
+                  ),
+                ),
+              )
+              .toList(growable: false),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            _ChartPill(
+              label: 'Total',
+              value: formatCurrency(totalSpend),
+              color: widget.lineColor,
+            ),
+            const SizedBox(width: 8),
+            _ChartPill(
+              label: 'Peak',
+              value: '${peak.label}: ${formatCurrency(peak.amount)}',
+              color: cs.secondary,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class _ChartPill extends StatelessWidget {
   const _ChartPill({
     required this.label,
@@ -968,6 +1404,83 @@ class _ChartPill extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _HistogramChartPainter extends CustomPainter {
+  const _HistogramChartPainter({
+    required this.points,
+    required this.maxAmount,
+    required this.lineColor,
+    required this.selectedIndex,
+  });
+
+  final List<_HistogramMonthPoint> points;
+  final double maxAmount;
+  final Color lineColor;
+  final int? selectedIndex;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final chartRect = Rect.fromLTWH(
+      _chartHorizontalPadding,
+      _chartTopPadding,
+      size.width - (_chartHorizontalPadding * 2),
+      size.height - _chartTopPadding - _chartBottomPadding,
+    );
+
+    const gridLines = 4;
+    final gridPaint = Paint()
+      ..color = lineColor.withValues(alpha: 0.08)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    for (var i = 0; i <= gridLines; i++) {
+      final y = chartRect.top + (chartRect.height / gridLines) * i;
+      canvas.drawLine(
+        Offset(chartRect.left, y),
+        Offset(chartRect.right, y),
+        gridPaint,
+      );
+    }
+
+    if (points.isEmpty) {
+      return;
+    }
+
+    final safeMax = math.max(maxAmount, 1.0);
+    final barWidth = chartRect.width / points.length;
+    final barInset = math.min(1.2, barWidth * 0.35);
+
+    for (var i = 0; i < points.length; i++) {
+      final point = points[i];
+      final normalized = (point.amount / safeMax).clamp(0.0, 1.0);
+      final left = chartRect.left + (barWidth * i) + barInset;
+      final right = chartRect.left + (barWidth * (i + 1)) - barInset;
+      final top = chartRect.bottom - (chartRect.height * normalized);
+      final rect = Rect.fromLTRB(left, top, right, chartRect.bottom);
+      final radius = Radius.circular(math.min(4, math.max(1, barWidth / 3)));
+      final isSelected = i == selectedIndex;
+      final barPaint = Paint()
+        ..color = isSelected
+            ? lineColor
+            : lineColor.withValues(alpha: normalized == 0 ? 0.10 : 0.28);
+      canvas.drawRRect(RRect.fromRectAndRadius(rect, radius), barPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _HistogramChartPainter oldDelegate) {
+    if (oldDelegate.lineColor != lineColor ||
+        oldDelegate.selectedIndex != selectedIndex ||
+        oldDelegate.maxAmount != maxAmount ||
+        oldDelegate.points.length != points.length) {
+      return true;
+    }
+    if (points.isEmpty) {
+      return false;
+    }
+    return oldDelegate.points.last.amount != points.last.amount;
   }
 }
 
