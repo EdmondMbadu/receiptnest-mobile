@@ -18,6 +18,7 @@ import '../../features/pricing/presentation/pricing_screen.dart';
 import '../../features/receipts/presentation/receipt_detail_screen.dart';
 import '../../features/share/presentation/share_view_screen.dart';
 import '../../features/shell/presentation/app_shell_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/static/presentation/landing_screen.dart';
 import '../../features/static/presentation/support_screen.dart';
 import '../../features/static/presentation/terms_screen.dart';
@@ -42,7 +43,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isAuthRoute = path == '/login' || path == '/register';
       final isVerifyRoute = path == '/verify';
       final isPublicRoute =
-          path == '/' || path == '/support' || path == '/terms' || path.startsWith('/share/');
+          path == '/' ||
+          path == '/support' ||
+          path == '/terms' ||
+          path.startsWith('/share/');
 
       if (!loggedIn && inApp) {
         return '/login';
@@ -56,7 +60,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return '/verify';
       }
 
-      if (loggedIn && verified && (path == '/' || isAuthRoute || isVerifyRoute)) {
+      if (loggedIn &&
+          verified &&
+          (path == '/' || isAuthRoute || isVerifyRoute)) {
         return '/app/home';
       }
 
@@ -67,14 +73,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      GoRoute(
-        path: '/',
-        builder: (context, state) => const LandingScreen(),
-      ),
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      GoRoute(path: '/', builder: (context, state) => const LandingScreen()),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
@@ -87,21 +87,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/support',
         builder: (context, state) => const SupportScreen(),
       ),
-      GoRoute(
-        path: '/terms',
-        builder: (context, state) => const TermsScreen(),
-      ),
+      GoRoute(path: '/terms', builder: (context, state) => const TermsScreen()),
       GoRoute(
         path: '/share/:id',
-        builder: (context, state) => ShareViewScreen(
-          shareId: state.pathParameters['id'] ?? '',
-        ),
+        builder: (context, state) =>
+            ShareViewScreen(shareId: state.pathParameters['id'] ?? ''),
       ),
       ShellRoute(
-        builder: (context, state, child) => AppShellScreen(
-          location: state.uri.path,
-          child: child,
-        ),
+        builder: (context, state, child) =>
+            AppShellScreen(location: state.uri.path, child: child),
         routes: [
           GoRoute(
             path: '/app/home',
@@ -115,19 +109,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: '/app/folders',
             builder: (context, state) => const FoldersScreen(),
           ),
+          GoRoute(
+            path: '/app/settings',
+            builder: (context, state) => const SettingsScreen(),
+          ),
         ],
       ),
       GoRoute(
         path: '/app/receipt/:id',
-        builder: (context, state) => ReceiptDetailScreen(
-          receiptId: state.pathParameters['id'] ?? '',
-        ),
+        builder: (context, state) =>
+            ReceiptDetailScreen(receiptId: state.pathParameters['id'] ?? ''),
       ),
       GoRoute(
         path: '/app/folders/:id',
-        builder: (context, state) => FolderDetailScreen(
-          folderId: state.pathParameters['id'] ?? '',
-        ),
+        builder: (context, state) =>
+            FolderDetailScreen(folderId: state.pathParameters['id'] ?? ''),
       ),
       GoRoute(
         path: '/app/pricing',

@@ -30,6 +30,7 @@ class AppShellScreen extends ConsumerWidget {
 
     Future<void> openFromDrawer(String route) async {
       Navigator.of(context).pop();
+      if (location == route) return;
       context.push(route);
     }
 
@@ -123,14 +124,8 @@ class AppShellScreen extends ConsumerWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: isDark
-                        ? [
-                            cs.primary.withValues(alpha: 0.15),
-                            cs.surface,
-                          ]
-                        : [
-                            cs.primary.withValues(alpha: 0.08),
-                            cs.surface,
-                          ],
+                        ? [cs.primary.withValues(alpha: 0.15), cs.surface]
+                        : [cs.primary.withValues(alpha: 0.08), cs.surface],
                   ),
                 ),
                 child: Column(
@@ -159,8 +154,8 @@ class AppShellScreen extends ConsumerWidget {
                       Text(
                         profile.email,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: cs.onSurface.withValues(alpha: 0.6),
-                            ),
+                          color: cs.onSurface.withValues(alpha: 0.6),
+                        ),
                       ),
                     ],
                   ],
@@ -171,6 +166,11 @@ class AppShellScreen extends ConsumerWidget {
                 icon: Icons.diamond_outlined,
                 label: 'Pricing',
                 onTap: () => openFromDrawer('/app/pricing'),
+              ),
+              _DrawerTile(
+                icon: Icons.settings_outlined,
+                label: 'Settings',
+                onTap: () => openFromDrawer('/app/settings'),
               ),
               if (profile?.isAdmin == true)
                 _DrawerTile(
@@ -194,10 +194,10 @@ class AppShellScreen extends ConsumerWidget {
                 child: Text(
                   'ReceiptNest AI',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: cs.onSurface.withValues(alpha: 0.3),
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.5,
-                      ),
+                    color: cs.onSurface.withValues(alpha: 0.3),
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
             ],
@@ -225,13 +225,8 @@ class _DrawerTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       child: ListTile(
         leading: Icon(icon, size: 22),
-        title: Text(
-          label,
-          style: const TextStyle(fontWeight: FontWeight.w500),
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        title: Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         onTap: onTap,
       ),
     );

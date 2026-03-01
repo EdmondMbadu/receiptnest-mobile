@@ -2,6 +2,58 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../core/utils/firestore_utils.dart';
 
+class NotificationSettings {
+  const NotificationSettings({
+    required this.receiptProcessing,
+    required this.productUpdates,
+    required this.securityAlerts,
+  });
+
+  final bool receiptProcessing;
+  final bool productUpdates;
+  final bool securityAlerts;
+
+  static const defaults = NotificationSettings(
+    receiptProcessing: true,
+    productUpdates: false,
+    securityAlerts: true,
+  );
+
+  NotificationSettings copyWith({
+    bool? receiptProcessing,
+    bool? productUpdates,
+    bool? securityAlerts,
+  }) {
+    return NotificationSettings(
+      receiptProcessing: receiptProcessing ?? this.receiptProcessing,
+      productUpdates: productUpdates ?? this.productUpdates,
+      securityAlerts: securityAlerts ?? this.securityAlerts,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'receiptProcessing': receiptProcessing,
+      'productUpdates': productUpdates,
+      'securityAlerts': securityAlerts,
+    };
+  }
+
+  static NotificationSettings fromMap(dynamic input) {
+    if (input is! Map<String, dynamic>) {
+      return defaults;
+    }
+    return NotificationSettings(
+      receiptProcessing:
+          input['receiptProcessing'] as bool? ?? defaults.receiptProcessing,
+      productUpdates:
+          input['productUpdates'] as bool? ?? defaults.productUpdates,
+      securityAlerts:
+          input['securityAlerts'] as bool? ?? defaults.securityAlerts,
+    );
+  }
+}
+
 class UserProfile {
   const UserProfile({
     required this.id,
@@ -17,6 +69,7 @@ class UserProfile {
     this.telegramChatId,
     this.receiptForwardingAddress,
     this.receiptForwardingFallbackAddresses = const [],
+    this.notificationSettings = NotificationSettings.defaults,
     this.createdAt,
     this.updatedAt,
   });
@@ -34,6 +87,7 @@ class UserProfile {
   final int? telegramChatId;
   final String? receiptForwardingAddress;
   final List<String> receiptForwardingFallbackAddresses;
+  final NotificationSettings notificationSettings;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -56,14 +110,21 @@ class UserProfile {
       subscriptionPlan: (data['subscriptionPlan'] as String?) ?? 'free',
       subscriptionStatus: data['subscriptionStatus'] as String?,
       subscriptionInterval: data['subscriptionInterval'] as String?,
-      subscriptionCurrentPeriodEnd: asDateTime(data['subscriptionCurrentPeriodEnd']),
-      subscriptionCancelAtPeriodEnd: data['subscriptionCancelAtPeriodEnd'] as bool?,
+      subscriptionCurrentPeriodEnd: asDateTime(
+        data['subscriptionCurrentPeriodEnd'],
+      ),
+      subscriptionCancelAtPeriodEnd:
+          data['subscriptionCancelAtPeriodEnd'] as bool?,
       telegramChatId: data['telegramChatId'] as int?,
       receiptForwardingAddress: data['receiptForwardingAddress'] as String?,
       receiptForwardingFallbackAddresses:
-          (data['receiptForwardingFallbackAddresses'] as List<dynamic>? ?? const [])
+          (data['receiptForwardingFallbackAddresses'] as List<dynamic>? ??
+                  const [])
               .whereType<String>()
               .toList(),
+      notificationSettings: NotificationSettings.fromMap(
+        data['notificationSettings'],
+      ),
       createdAt: asDateTime(data['createdAt']),
       updatedAt: asDateTime(data['updatedAt']),
     );
