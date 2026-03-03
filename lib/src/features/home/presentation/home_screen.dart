@@ -18,7 +18,26 @@ import '../../share/models/share_models.dart';
 
 enum _GraphViewMode { month, histogram }
 
+enum _TimeRange { oneDay, oneWeek, oneMonth, threeMonths, oneYear, all }
+
 enum _HistogramRange { thisYear, fiveYears, all }
+
+String _timeRangeLabel(_TimeRange range) {
+  switch (range) {
+    case _TimeRange.oneDay:
+      return '1D';
+    case _TimeRange.oneWeek:
+      return '1W';
+    case _TimeRange.oneMonth:
+      return '1M';
+    case _TimeRange.threeMonths:
+      return '3M';
+    case _TimeRange.oneYear:
+      return '1Y';
+    case _TimeRange.all:
+      return 'All';
+  }
+}
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -36,6 +55,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _visibleReceiptCount = _receiptBatchSize;
   int _latestFilteredCount = 0;
   _GraphViewMode _graphViewMode = _GraphViewMode.month;
+  _TimeRange _timeRange = _TimeRange.oneMonth;
   _HistogramRange _histogramRange = _HistogramRange.thisYear;
 
   bool _loadingForwarding = false;
@@ -115,39 +135,104 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     setState(() => _graphViewMode = mode);
   }
 
+  void _setTimeRange(_TimeRange range) {
+    if (_timeRange == range) return;
+    setState(() => _timeRange = range);
+  }
+
   void _setHistogramRange(_HistogramRange range) {
     if (_histogramRange == range) return;
     setState(() => _histogramRange = range);
   }
 
+  /// Builds daily spending points for the selected time range.
+  List<DailySpendingPoint> _buildTimeRangeData(List<Receipt> receipts) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    late DateTime startDate;
+    switch (_timeRange) {
+      case _TimeRange.oneDay:
+        startDate = today;
+        break;
+      case _TimeRange.oneWeek:
+        startDate = today.subtract(const Duration(days: 6));
+        break;
+      case _TimeRange.oneMonth:
+        startDate = DateTime(today.year, today.month - 1, today.day);
+        break;
+      case _TimeRange.threeMonths:
+        startDate = DateTime(today.year, today.month - 3, today.day);
+        break;
+      case _TimeRange.oneYear:
+        startDate = DateTime(today.year - 1, today.month, today.day);
+        break;
+      case _TimeRange.all:
+        DateTime? earliest;
+        for (final r in receipts) {
+          final d = r.effectiveDate;
+          if (d != null && (earliest == null || d.isBefore(earliest))) {
+            earliest = d;
+          }
+        }
+        startDate = earliest ?? today;
+        break;
+    }
+
+    final dayAmounts = <int, double>{};
+    final totalDays = today.difference(startDate).inDays + 1;
+
+    for (final receipt in receipts) {
+      final amount = receipt.effectiveTotalAmount;
+      final date = receipt.effectiveDate;
+      if (amount == null || date == null) continue;
+      final receiptDay = DateTime(date.year, date.month, date.day);
+      if (receiptDay.isBefore(startDate) || receiptDay.isAfter(today)) continue;
+      final dayIndex = receiptDay.difference(startDate).inDays;
+      dayAmounts[dayIndex] = (dayAmounts[dayIndex] ?? 0) + amount;
+    }
+
+    var cumulative = 0.0;
+    return List.generate(math.max(1, totalDays), (index) {
+      final amount = dayAmounts[index] ?? 0;
+      cumulative += amount;
+      return DailySpendingPoint(
+        day: index + 1,
+        amount: amount,
+        cumulative: cumulative,
+      );
+    });
+  }
+
+  double _timeRangeSpend(List<DailySpendingPoint> points) {
+    return points.fold<double>(0, (sum, p) => sum + p.amount);
+  }
+
+  String _timeRangeSubtitle() {
+    switch (_timeRange) {
+      case _TimeRange.oneDay:
+        return 'Today';
+      case _TimeRange.oneWeek:
+        return 'Past 7 days';
+      case _TimeRange.oneMonth:
+        return 'Past month';
+      case _TimeRange.threeMonths:
+        return 'Past 3 months';
+      case _TimeRange.oneYear:
+        return 'Past year';
+      case _TimeRange.all:
+        return 'All time';
+    }
+  }
+
   static const _shortMonthLabels = <String>[
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
 
   static const _longMonthLabels = <String>[
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
   ];
 
   String _histogramRangeTitle(_HistogramRange range) {
@@ -342,6 +427,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             0,
             (sum, point) => sum + point.amount,
           );
+          final timeRangePoints = _buildTimeRangeData(receipts);
+          final timeRangeTotal = _timeRangeSpend(timeRangePoints);
           final filtered = receipts.where((receipt) {
             final query = _searchQuery.trim().toLowerCase();
             if (query.isEmpty) return true;
@@ -374,11 +461,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               children: [
                 // ── Spending card ──
                 Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                   child: Padding(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // ── View mode toggle ──
                         Row(
                           children: [
                             Expanded(
@@ -402,8 +494,150 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 16),
+
+                        // ── Month view ──
+                        if (_graphViewMode == _GraphViewMode.month) ...[
+                          // Time range pills (at the top, Robinhood-style)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: _TimeRange.values.map((range) {
+                              final isSelected = range == _timeRange;
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 2,
+                                ),
+                                child: GestureDetector(
+                                  onTap: () => _setTimeRange(range),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(
+                                      milliseconds: 200,
+                                    ),
+                                    curve: Curves.easeOut,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? trendColor
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      _timeRangeLabel(range),
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : cs.onSurface.withValues(
+                                                alpha: 0.45,
+                                              ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 12),
+                          // Month navigation (only for 1M)
+                          if (_timeRange == _TimeRange.oneMonth) ...[
+                            Row(
+                              children: [
+                                IconButton(
+                                  onPressed: () => _changeMonth(-1),
+                                  icon: const Icon(Icons.chevron_left_rounded),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: cs.primary.withValues(
+                                      alpha: 0.06,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    monthLabel,
+                                    textAlign: TextAlign.center,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: () => _changeMonth(1),
+                                  icon: const Icon(Icons.chevron_right_rounded),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: cs.primary.withValues(
+                                      alpha: 0.06,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          // Subtitle for non-1M ranges
+                          if (_timeRange != _TimeRange.oneMonth) ...[
+                            Text(
+                              _timeRangeSubtitle(),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          // Amount - switches based on time range
+                          Text(
+                            _timeRange == _TimeRange.oneMonth
+                                ? formatCurrency(spend)
+                                : formatCurrency(timeRangeTotal),
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineLarge
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -1.0,
+                                  fontSize: 34,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          if (_timeRange == _TimeRange.oneMonth)
+                            _MonthChangeLabel(
+                              change: monthChange,
+                              color: trendColor,
+                            )
+                          else
+                            Text(
+                              _timeRangeSubtitle(),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: cs.onSurface.withValues(alpha: 0.55),
+                                  ),
+                            ),
+                          const SizedBox(height: 16),
+                          // Chart - switches data based on time range
+                          if (_timeRange == _TimeRange.oneMonth)
+                            _RobinhoodMonthlyChart(
+                              points: dailyPoints,
+                              lineColor: trendColor,
+                              visibleDay: lastVisibleDay,
+                              totalDays: totalDaysInMonth,
+                              isCurrentMonth: isCurrentMonth,
+                            )
+                          else
+                            _RobinhoodTimeRangeChart(
+                              points: timeRangePoints,
+                              lineColor: trendColor,
+                            ),
+                        ],
+
+                        // ── Histogram view ──
                         if (_graphViewMode == _GraphViewMode.histogram) ...[
-                          const SizedBox(height: 8),
                           SegmentedButton<_HistogramRange>(
                             segments: const [
                               ButtonSegment<_HistogramRange>(
@@ -425,87 +659,45 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             },
                             showSelectedIcon: false,
                           ),
-                        ],
-                        const SizedBox(height: 16),
-                        if (_graphViewMode == _GraphViewMode.month)
-                          Row(
-                            children: [
-                              IconButton(
-                                onPressed: () => _changeMonth(-1),
-                                icon: const Icon(Icons.chevron_left_rounded),
-                                style: IconButton.styleFrom(
-                                  backgroundColor: cs.primary.withValues(
-                                    alpha: 0.06,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  monthLabel,
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(context).textTheme.titleMedium
-                                      ?.copyWith(fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                              IconButton(
-                                onPressed: () => _changeMonth(1),
-                                icon: const Icon(Icons.chevron_right_rounded),
-                                style: IconButton.styleFrom(
-                                  backgroundColor: cs.primary.withValues(
-                                    alpha: 0.06,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          )
-                        else
+                          const SizedBox(height: 16),
                           Text(
                             _histogramRangeTitle(_histogramRange),
-                            style: Theme.of(context).textTheme.titleMedium
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w600),
                           ),
-                        const SizedBox(height: 16),
-                        Text(
-                          formatCurrency(
-                            _graphViewMode == _GraphViewMode.month
-                                ? spend
-                                : histogramTotalSpend,
-                          ),
-                          style: Theme.of(context).textTheme.headlineMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.5,
-                              ),
-                        ),
-                        const SizedBox(height: 4),
-                        if (_graphViewMode == _GraphViewMode.month)
-                          _MonthChangeLabel(
-                            change: monthChange,
-                            color: trendColor,
-                          )
-                        else
+                          const SizedBox(height: 12),
                           Text(
-                            'Monthly spending trend for ${_histogramRangeTitle(_histogramRange).toLowerCase()}',
-                            style: Theme.of(context).textTheme.bodySmall
+                            formatCurrency(histogramTotalSpend),
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineLarge
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -1.0,
+                                  fontSize: 34,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Monthly spending trend',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
                                 ?.copyWith(
                                   color: cs.onSurface.withValues(alpha: 0.55),
                                 ),
                           ),
-                        const SizedBox(height: 16),
-                        if (_graphViewMode == _GraphViewMode.month)
-                          _RobinhoodMonthlyChart(
-                            points: dailyPoints,
-                            lineColor: trendColor,
-                            visibleDay: lastVisibleDay,
-                            totalDays: totalDaysInMonth,
-                            isCurrentMonth: isCurrentMonth,
-                          )
-                        else
+                          const SizedBox(height: 16),
                           _HistogramSpendingChart(
                             points: histogramMonthlyData,
                             lineColor: histogramColor,
                           ),
+                        ],
+
                         const SizedBox(height: 16),
+                        // ── Action buttons ──
                         Wrap(
                           spacing: 8,
                           children: [
@@ -901,36 +1093,12 @@ class _ReceiptTile extends ConsumerWidget {
   }
 }
 
-// ── Chart ──
+// ── Chart constants ──
 const double _chartHorizontalPadding = 12.0;
 const double _chartTopPadding = 12.0;
 const double _chartBottomPadding = 14.0;
 
-class _HistogramMonthPoint {
-  const _HistogramMonthPoint({
-    required this.monthKey,
-    required this.month,
-    required this.year,
-    required this.label,
-    required this.fullLabel,
-    required this.amount,
-  });
-
-  final String monthKey;
-  final int month;
-  final int year;
-  final String label;
-  final String fullLabel;
-  final double amount;
-}
-
-class _HistogramYAxisTick {
-  const _HistogramYAxisTick({required this.fraction, required this.label});
-
-  final double fraction;
-  final String label;
-}
-
+// ── Month chart (daily amounts, drops to 0) ──
 class _RobinhoodMonthlyChart extends StatefulWidget {
   const _RobinhoodMonthlyChart({
     required this.points,
@@ -963,6 +1131,9 @@ class _RobinhoodMonthlyChartState extends State<_RobinhoodMonthlyChart> {
     }
   }
 
+  /// For the current month, show all days up to today so the graph
+  /// looks like a timeline. For past months, condense to only days
+  /// with spending so the graph is focused (Robinhood-style).
   List<DailySpendingPoint> _normalizedPoints() {
     final totalDays = math.max(1, widget.totalDays);
     final amountByDay = <int, double>{};
@@ -972,17 +1143,39 @@ class _RobinhoodMonthlyChartState extends State<_RobinhoodMonthlyChart> {
       }
     }
 
-    var cumulative = 0.0;
-    return List.generate(totalDays, (index) {
-      final day = index + 1;
-      final amount = amountByDay[day] ?? 0;
-      cumulative += amount;
-      return DailySpendingPoint(
-        day: day,
-        amount: amount,
-        cumulative: cumulative,
-      );
-    });
+    if (widget.isCurrentMonth) {
+      // Current month: show all days (timeline view)
+      var cumulative = 0.0;
+      return List.generate(totalDays, (index) {
+        final day = index + 1;
+        final amount = amountByDay[day] ?? 0;
+        cumulative += amount;
+        return DailySpendingPoint(
+          day: day,
+          amount: amount,
+          cumulative: cumulative,
+        );
+      });
+    } else {
+      // Past months: only days with spending (condensed view)
+      final active = <DailySpendingPoint>[];
+      var cumulative = 0.0;
+      for (var day = 1; day <= totalDays; day++) {
+        final amount = amountByDay[day];
+        if (amount != null && amount > 0) {
+          cumulative += amount;
+          active.add(DailySpendingPoint(
+            day: day,
+            amount: amount,
+            cumulative: cumulative,
+          ));
+        }
+      }
+      if (active.isEmpty) {
+        return [const DailySpendingPoint(day: 1, amount: 0, cumulative: 0)];
+      }
+      return active;
+    }
   }
 
   int _indexFromDx(double dx, double width, int count) {
@@ -1027,8 +1220,6 @@ class _RobinhoodMonthlyChartState extends State<_RobinhoodMonthlyChart> {
     final selectedPoint = _selectedIndex == null
         ? null
         : visiblePoints[_selectedIndex!.clamp(0, visiblePoints.length - 1)];
-    final middleDay = ((widget.totalDays + 1) / 2).round();
-    final visibleMiddleDay = ((visiblePoints.last.day + 1) / 2).round();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1056,7 +1247,7 @@ class _RobinhoodMonthlyChartState extends State<_RobinhoodMonthlyChart> {
         ),
         const SizedBox(height: 8),
         Container(
-          height: 182,
+          height: 220,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             gradient: LinearGradient(
@@ -1097,6 +1288,7 @@ class _RobinhoodMonthlyChartState extends State<_RobinhoodMonthlyChart> {
                       width,
                       visiblePoints.length,
                     ),
+                    onPanEnd: (_) => setState(() => _selectedIndex = null),
                     child: CustomPaint(
                       painter: _RobinhoodChartPainter(
                         points: visiblePoints,
@@ -1110,35 +1302,6 @@ class _RobinhoodMonthlyChartState extends State<_RobinhoodMonthlyChart> {
               },
             ),
           ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Day 1',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: cs.onSurface.withValues(alpha: 0.4),
-              ),
-            ),
-            Text(
-              widget.isCurrentMonth
-                  ? 'Day $visibleMiddleDay'
-                  : 'Day $middleDay',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface.withValues(alpha: 0.7),
-              ),
-            ),
-            Text(
-              widget.isCurrentMonth
-                  ? 'Today ${visiblePoints.last.day}'
-                  : 'Day ${widget.totalDays}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: cs.onSurface.withValues(alpha: 0.4),
-              ),
-            ),
-          ],
         ),
         const SizedBox(height: 10),
         Row(
@@ -1161,6 +1324,204 @@ class _RobinhoodMonthlyChartState extends State<_RobinhoodMonthlyChart> {
   }
 }
 
+// ── Robinhood time-range chart (condensed – only days with spending) ──
+class _RobinhoodTimeRangeChart extends StatefulWidget {
+  const _RobinhoodTimeRangeChart({
+    required this.points,
+    required this.lineColor,
+  });
+
+  final List<DailySpendingPoint> points;
+  final Color lineColor;
+
+  @override
+  State<_RobinhoodTimeRangeChart> createState() =>
+      _RobinhoodTimeRangeChartState();
+}
+
+class _RobinhoodTimeRangeChartState extends State<_RobinhoodTimeRangeChart> {
+  int? _selectedIndex;
+
+  @override
+  void didUpdateWidget(covariant _RobinhoodTimeRangeChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.points.length != widget.points.length) {
+      _selectedIndex = null;
+    }
+  }
+
+  /// Filter to only days that have spending, keeping the chart condensed.
+  List<DailySpendingPoint> _condensedPoints() {
+    final active = widget.points.where((p) => p.amount > 0).toList();
+    if (active.isEmpty) {
+      // Return at least one zero point so the chart doesn't crash
+      return [const DailySpendingPoint(day: 1, amount: 0, cumulative: 0)];
+    }
+    return active;
+  }
+
+  int _indexFromDx(double dx, double width, int count) {
+    if (count <= 1) return 0;
+    final chartWidth = math.max(1.0, width - (_chartHorizontalPadding * 2));
+    final normalized = ((dx - _chartHorizontalPadding) / chartWidth).clamp(
+      0.0,
+      1.0,
+    );
+    return (normalized * (count - 1)).round();
+  }
+
+  void _updateSelection(double dx, double width, int count) {
+    final nextIndex = _indexFromDx(dx, width, count);
+    if (nextIndex == _selectedIndex) return;
+    setState(() => _selectedIndex = nextIndex);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final condensed = _condensedPoints();
+
+    var peak = condensed.first;
+    for (final point in condensed) {
+      if (point.amount > peak.amount) peak = point;
+    }
+
+    final totalSpend = condensed.fold<double>(
+      0,
+      (sum, p) => sum + p.amount,
+    );
+    final selectedPoint = _selectedIndex == null
+        ? null
+        : condensed[_selectedIndex!.clamp(0, condensed.length - 1)];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 120),
+          child: selectedPoint == null
+              ? Text(
+                  'Touch and slide to inspect spending',
+                  key: const ValueKey('hint'),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: cs.onSurface.withValues(alpha: 0.55),
+                  ),
+                )
+              : Text(
+                  'Day ${selectedPoint.day}: ${formatCurrency(selectedPoint.amount)}',
+                  key: ValueKey<int>(selectedPoint.day),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: widget.lineColor,
+                  ),
+                ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: 220,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                widget.lineColor.withValues(alpha: 0.08),
+                cs.surface.withValues(alpha: 0.95),
+              ],
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                return MouseRegion(
+                  onHover: (event) => _updateSelection(
+                    event.localPosition.dx,
+                    width,
+                    condensed.length,
+                  ),
+                  onExit: (_) => setState(() => _selectedIndex = null),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: (details) => _updateSelection(
+                      details.localPosition.dx,
+                      width,
+                      condensed.length,
+                    ),
+                    onPanStart: (details) => _updateSelection(
+                      details.localPosition.dx,
+                      width,
+                      condensed.length,
+                    ),
+                    onPanUpdate: (details) => _updateSelection(
+                      details.localPosition.dx,
+                      width,
+                      condensed.length,
+                    ),
+                    onPanEnd: (_) => setState(() => _selectedIndex = null),
+                    child: CustomPaint(
+                      painter: _RobinhoodChartPainter(
+                        points: condensed,
+                        lineColor: widget.lineColor,
+                        selectedIndex: _selectedIndex,
+                      ),
+                      child: const SizedBox.expand(),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            _ChartPill(
+              label: 'Spent',
+              value: formatCurrency(totalSpend),
+              color: widget.lineColor,
+            ),
+            const SizedBox(width: 8),
+            _ChartPill(
+              label: 'Peak',
+              value: 'Day ${peak.day}: ${formatCurrency(peak.amount)}',
+              color: cs.secondary,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ── Histogram data models ──
+class _HistogramMonthPoint {
+  const _HistogramMonthPoint({
+    required this.monthKey,
+    required this.month,
+    required this.year,
+    required this.label,
+    required this.fullLabel,
+    required this.amount,
+  });
+
+  final String monthKey;
+  final int month;
+  final int year;
+  final String label;
+  final String fullLabel;
+  final double amount;
+}
+
+class _HistogramYAxisTick {
+  const _HistogramYAxisTick({required this.fraction, required this.label});
+
+  final double fraction;
+  final String label;
+}
+
+// ── Histogram chart ──
 class _HistogramSpendingChart extends StatefulWidget {
   const _HistogramSpendingChart({
     required this.points,
@@ -1310,7 +1671,7 @@ class _HistogramSpendingChartState extends State<_HistogramSpendingChart> {
         ),
         const SizedBox(height: 8),
         SizedBox(
-          height: 182,
+          height: 220,
           child: Row(
             children: [
               SizedBox(
@@ -1449,6 +1810,7 @@ class _HistogramSpendingChartState extends State<_HistogramSpendingChart> {
   }
 }
 
+// ── Chart pill ──
 class _ChartPill extends StatelessWidget {
   const _ChartPill({
     required this.label,
@@ -1493,83 +1855,7 @@ class _ChartPill extends StatelessWidget {
   }
 }
 
-class _HistogramChartPainter extends CustomPainter {
-  const _HistogramChartPainter({
-    required this.points,
-    required this.maxAmount,
-    required this.lineColor,
-    required this.selectedIndex,
-  });
-
-  final List<_HistogramMonthPoint> points;
-  final double maxAmount;
-  final Color lineColor;
-  final int? selectedIndex;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final chartRect = Rect.fromLTWH(
-      _chartHorizontalPadding,
-      _chartTopPadding,
-      size.width - (_chartHorizontalPadding * 2),
-      size.height - _chartTopPadding - _chartBottomPadding,
-    );
-
-    const gridLines = 4;
-    final gridPaint = Paint()
-      ..color = lineColor.withValues(alpha: 0.08)
-      ..strokeWidth = 1.0
-      ..style = PaintingStyle.stroke;
-
-    for (var i = 0; i <= gridLines; i++) {
-      final y = chartRect.top + (chartRect.height / gridLines) * i;
-      canvas.drawLine(
-        Offset(chartRect.left, y),
-        Offset(chartRect.right, y),
-        gridPaint,
-      );
-    }
-
-    if (points.isEmpty) {
-      return;
-    }
-
-    final safeMax = math.max(maxAmount, 1.0);
-    final barWidth = chartRect.width / points.length;
-    final barInset = math.min(1.2, barWidth * 0.35);
-
-    for (var i = 0; i < points.length; i++) {
-      final point = points[i];
-      final normalized = (point.amount / safeMax).clamp(0.0, 1.0);
-      final left = chartRect.left + (barWidth * i) + barInset;
-      final right = chartRect.left + (barWidth * (i + 1)) - barInset;
-      final top = chartRect.bottom - (chartRect.height * normalized);
-      final rect = Rect.fromLTRB(left, top, right, chartRect.bottom);
-      final radius = Radius.circular(math.min(4, math.max(1, barWidth / 3)));
-      final isSelected = i == selectedIndex;
-      final barPaint = Paint()
-        ..color = isSelected
-            ? lineColor
-            : lineColor.withValues(alpha: normalized == 0 ? 0.10 : 0.28);
-      canvas.drawRRect(RRect.fromRectAndRadius(rect, radius), barPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _HistogramChartPainter oldDelegate) {
-    if (oldDelegate.lineColor != lineColor ||
-        oldDelegate.selectedIndex != selectedIndex ||
-        oldDelegate.maxAmount != maxAmount ||
-        oldDelegate.points.length != points.length) {
-      return true;
-    }
-    if (points.isEmpty) {
-      return false;
-    }
-    return oldDelegate.points.last.amount != points.last.amount;
-  }
-}
-
+// ── Month chart painter (daily amounts - NOT cumulative) ──
 class _RobinhoodChartPainter extends CustomPainter {
   const _RobinhoodChartPainter({
     required this.points,
@@ -1605,20 +1891,16 @@ class _RobinhoodChartPainter extends CustomPainter {
       );
     }
 
-    if (points.isEmpty) {
-      return;
-    }
+    if (points.isEmpty) return;
 
+    // Use daily amount (not cumulative) so graph returns to 0
     final maxAmount = math.max(
-      points.fold<double>(
-        0,
-        (maxValue, point) => math.max(maxValue, point.amount),
-      ),
+      points.fold<double>(0, (m, p) => math.max(m, p.amount)),
       1.0,
     );
 
     Offset pointAt(int index) {
-      final xFactor = points.length == 1 ? 1.0 : index / (points.length - 1);
+      final xFactor = points.length == 1 ? 0.5 : index / (points.length - 1);
       final x = chartRect.left + (chartRect.width * xFactor);
       final yFactor = points[index].amount / maxAmount;
       final y = chartRect.bottom - (chartRect.height * yFactor);
@@ -1698,18 +1980,84 @@ class _RobinhoodChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _RobinhoodChartPainter oldDelegate) {
-    if (oldDelegate.lineColor != lineColor) {
+    if (oldDelegate.lineColor != lineColor) return true;
+    if (oldDelegate.selectedIndex != selectedIndex) return true;
+    if (oldDelegate.points.length != points.length) return true;
+    if (points.isEmpty) return false;
+    return oldDelegate.points.last.amount != points.last.amount;
+  }
+}
+
+// ── Histogram bar chart painter ──
+class _HistogramChartPainter extends CustomPainter {
+  const _HistogramChartPainter({
+    required this.points,
+    required this.maxAmount,
+    required this.lineColor,
+    required this.selectedIndex,
+  });
+
+  final List<_HistogramMonthPoint> points;
+  final double maxAmount;
+  final Color lineColor;
+  final int? selectedIndex;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final chartRect = Rect.fromLTWH(
+      _chartHorizontalPadding,
+      _chartTopPadding,
+      size.width - (_chartHorizontalPadding * 2),
+      size.height - _chartTopPadding - _chartBottomPadding,
+    );
+
+    const gridLines = 4;
+    final gridPaint = Paint()
+      ..color = lineColor.withValues(alpha: 0.08)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    for (var i = 0; i <= gridLines; i++) {
+      final y = chartRect.top + (chartRect.height / gridLines) * i;
+      canvas.drawLine(
+        Offset(chartRect.left, y),
+        Offset(chartRect.right, y),
+        gridPaint,
+      );
+    }
+
+    if (points.isEmpty) return;
+
+    final safeMax = math.max(maxAmount, 1.0);
+    final barWidth = chartRect.width / points.length;
+    final barInset = math.min(1.2, barWidth * 0.35);
+
+    for (var i = 0; i < points.length; i++) {
+      final point = points[i];
+      final normalized = (point.amount / safeMax).clamp(0.0, 1.0);
+      final left = chartRect.left + (barWidth * i) + barInset;
+      final right = chartRect.left + (barWidth * (i + 1)) - barInset;
+      final top = chartRect.bottom - (chartRect.height * normalized);
+      final rect = Rect.fromLTRB(left, top, right, chartRect.bottom);
+      final radius = Radius.circular(math.min(4, math.max(1, barWidth / 3)));
+      final isSelected = i == selectedIndex;
+      final barPaint = Paint()
+        ..color = isSelected
+            ? lineColor
+            : lineColor.withValues(alpha: normalized == 0 ? 0.10 : 0.28);
+      canvas.drawRRect(RRect.fromRectAndRadius(rect, radius), barPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _HistogramChartPainter oldDelegate) {
+    if (oldDelegate.lineColor != lineColor ||
+        oldDelegate.selectedIndex != selectedIndex ||
+        oldDelegate.maxAmount != maxAmount ||
+        oldDelegate.points.length != points.length) {
       return true;
     }
-    if (oldDelegate.selectedIndex != selectedIndex) {
-      return true;
-    }
-    if (oldDelegate.points.length != points.length) {
-      return true;
-    }
-    if (points.isEmpty) {
-      return false;
-    }
+    if (points.isEmpty) return false;
     return oldDelegate.points.last.amount != points.last.amount;
   }
 }
