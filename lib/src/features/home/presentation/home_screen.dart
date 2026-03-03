@@ -460,150 +460,227 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
               children: [
                 // ── Spending card ──
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isDark
+                          ? [
+                              const Color(0xFF1A1A2E),
+                              const Color(0xFF16161F),
+                            ]
+                          : [
+                              Colors.white,
+                              const Color(0xFFF8FAFE),
+                            ],
+                    ),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.06)
+                          : Colors.grey.shade200,
+                    ),
+                    boxShadow: isDark
+                        ? null
+                        : [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 20,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ── View mode toggle ──
-                        Row(
-                          children: [
-                            Expanded(
-                              child: SegmentedButton<_GraphViewMode>(
-                                segments: const [
-                                  ButtonSegment<_GraphViewMode>(
-                                    value: _GraphViewMode.month,
-                                    label: Text('Month'),
-                                  ),
-                                  ButtonSegment<_GraphViewMode>(
-                                    value: _GraphViewMode.histogram,
-                                    label: Text('Histogram'),
-                                  ),
-                                ],
-                                selected: {_graphViewMode},
-                                onSelectionChanged: (value) {
-                                  _setGraphViewMode(value.first);
-                                },
-                                showSelectedIcon: false,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        // ── Month view ──
-                        if (_graphViewMode == _GraphViewMode.month) ...[
-                          // Time range pills (at the top, Robinhood-style)
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: _TimeRange.values.map((range) {
-                              final isSelected = range == _timeRange;
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 2,
-                                ),
-                                child: GestureDetector(
-                                  onTap: () => _setTimeRange(range),
-                                  child: AnimatedContainer(
-                                    duration: const Duration(
-                                      milliseconds: 200,
-                                    ),
-                                    curve: Curves.easeOut,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: isSelected
-                                          ? trendColor
-                                          : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      _timeRangeLabel(range),
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: isSelected
-                                            ? Colors.white
-                                            : cs.onSurface.withValues(
-                                                alpha: 0.45,
-                                              ),
+                        // ── Custom view mode toggle ──
+                        Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.06)
+                                : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            children: [
+                              for (final mode in _GraphViewMode.values)
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () => _setGraphViewMode(mode),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 200),
+                                      curve: Curves.easeOut,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 10,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: _graphViewMode == mode
+                                            ? (isDark
+                                                ? Colors.white.withValues(alpha: 0.12)
+                                                : Colors.white)
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(11),
+                                        boxShadow: _graphViewMode == mode && !isDark
+                                            ? [
+                                                BoxShadow(
+                                                  color: Colors.black.withValues(alpha: 0.06),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ]
+                                            : null,
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            mode == _GraphViewMode.month
+                                                ? Icons.show_chart_rounded
+                                                : Icons.bar_chart_rounded,
+                                            size: 16,
+                                            color: _graphViewMode == mode
+                                                ? cs.primary
+                                                : cs.onSurface.withValues(alpha: 0.4),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            mode == _GraphViewMode.month
+                                                ? 'Spending'
+                                                : 'Histogram',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: _graphViewMode == mode
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w500,
+                                              color: _graphViewMode == mode
+                                                  ? cs.onSurface
+                                                  : cs.onSurface.withValues(alpha: 0.45),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ),
                                 ),
-                              );
-                            }).toList(),
+                            ],
                           ),
-                          const SizedBox(height: 12),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // ── Month view ──
+                        if (_graphViewMode == _GraphViewMode.month) ...[
+                          // Time range pills
+                          Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.04)
+                                  : Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: _TimeRange.values.map((range) {
+                                final isSelected = range == _timeRange;
+                                return Expanded(
+                                  child: GestureDetector(
+                                    onTap: () => _setTimeRange(range),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      curve: Curves.easeOut,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? trendColor
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          _timeRangeLabel(range),
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: isSelected
+                                                ? Colors.white
+                                                : cs.onSurface.withValues(
+                                                    alpha: 0.4,
+                                                  ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
                           // Month navigation (only for 1M)
                           if (_timeRange == _TimeRange.oneMonth) ...[
                             Row(
                               children: [
-                                IconButton(
-                                  onPressed: () => _changeMonth(-1),
-                                  icon: const Icon(Icons.chevron_left_rounded),
-                                  style: IconButton.styleFrom(
-                                    backgroundColor: cs.primary.withValues(
-                                      alpha: 0.06,
-                                    ),
-                                  ),
+                                _NavArrowButton(
+                                  icon: Icons.chevron_left_rounded,
+                                  onTap: () => _changeMonth(-1),
+                                  isDark: isDark,
                                 ),
                                 Expanded(
                                   child: Text(
                                     monthLabel,
                                     textAlign: TextAlign.center,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.w600),
-                                  ),
-                                ),
-                                IconButton(
-                                  onPressed: () => _changeMonth(1),
-                                  icon: const Icon(Icons.chevron_right_rounded),
-                                  style: IconButton.styleFrom(
-                                    backgroundColor: cs.primary.withValues(
-                                      alpha: 0.06,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: cs.onSurface,
+                                      letterSpacing: -0.2,
                                     ),
                                   ),
                                 ),
+                                _NavArrowButton(
+                                  icon: Icons.chevron_right_rounded,
+                                  onTap: () => _changeMonth(1),
+                                  isDark: isDark,
+                                ),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 16),
                           ],
                           // Subtitle for non-1M ranges
                           if (_timeRange != _TimeRange.oneMonth) ...[
                             Text(
                               _timeRangeSubtitle(),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w600),
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: cs.onSurface.withValues(alpha: 0.6),
+                                letterSpacing: -0.1,
+                              ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 4),
                           ],
-                          // Amount - switches based on time range
+                          // Amount
                           Text(
                             _timeRange == _TimeRange.oneMonth
                                 ? formatCurrency(spend)
                                 : formatCurrency(timeRangeTotal),
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineLarge
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -1.0,
-                                  fontSize: 34,
-                                ),
+                            style: TextStyle(
+                              fontSize: 36,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -1.5,
+                              height: 1.1,
+                              color: cs.onSurface,
+                            ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 6),
                           if (_timeRange == _TimeRange.oneMonth)
                             _MonthChangeLabel(
                               change: monthChange,
@@ -612,15 +689,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           else
                             Text(
                               _timeRangeSubtitle(),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: cs.onSurface.withValues(alpha: 0.55),
-                                  ),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: cs.onSurface.withValues(alpha: 0.45),
+                              ),
                             ),
-                          const SizedBox(height: 16),
-                          // Chart - switches data based on time range
+                          const SizedBox(height: 20),
+                          // Chart
                           if (_timeRange == _TimeRange.oneMonth)
                             _RobinhoodMonthlyChart(
                               points: dailyPoints,
@@ -638,58 +714,86 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                         // ── Histogram view ──
                         if (_graphViewMode == _GraphViewMode.histogram) ...[
-                          SegmentedButton<_HistogramRange>(
-                            segments: const [
-                              ButtonSegment<_HistogramRange>(
-                                value: _HistogramRange.thisYear,
-                                label: Text('This Year'),
-                              ),
-                              ButtonSegment<_HistogramRange>(
-                                value: _HistogramRange.fiveYears,
-                                label: Text('5Y'),
-                              ),
-                              ButtonSegment<_HistogramRange>(
-                                value: _HistogramRange.all,
-                                label: Text('All'),
-                              ),
-                            ],
-                            selected: {_histogramRange},
-                            onSelectionChanged: (value) {
-                              _setHistogramRange(value.first);
-                            },
-                            showSelectedIcon: false,
+                          // Custom histogram range toggle
+                          Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.04)
+                                  : Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                for (final range in _HistogramRange.values)
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: () => _setHistogramRange(range),
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 200),
+                                        curve: Curves.easeOut,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 8,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: _histogramRange == range
+                                              ? histogramColor
+                                              : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            range == _HistogramRange.thisYear
+                                                ? 'This Year'
+                                                : range == _HistogramRange.fiveYears
+                                                    ? '5 Years'
+                                                    : 'All',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              color: _histogramRange == range
+                                                  ? Colors.white
+                                                  : cs.onSurface.withValues(alpha: 0.4),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 20),
                           Text(
                             _histogramRangeTitle(_histogramRange),
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            formatCurrency(histogramTotalSpend),
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineLarge
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -1.0,
-                                  fontSize: 34,
-                                ),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: cs.onSurface.withValues(alpha: 0.6),
+                              letterSpacing: -0.1,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Monthly spending trend',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(
-                                  color: cs.onSurface.withValues(alpha: 0.55),
-                                ),
+                            formatCurrency(histogramTotalSpend),
+                            style: TextStyle(
+                              fontSize: 36,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -1.5,
+                              height: 1.1,
+                              color: cs.onSurface,
+                            ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Monthly spending trend',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: cs.onSurface.withValues(alpha: 0.45),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
                           _HistogramSpendingChart(
                             points: histogramMonthlyData,
                             lineColor: histogramColor,
@@ -698,25 +802,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                         const SizedBox(height: 16),
                         // ── Action buttons ──
-                        Wrap(
-                          spacing: 8,
+                        Row(
                           children: [
-                            if (_graphViewMode == _GraphViewMode.month)
-                              FilledButton.tonalIcon(
-                                onPressed: _shareGraph,
-                                icon: const Icon(
-                                  Icons.share_outlined,
-                                  size: 18,
+                            if (_graphViewMode == _GraphViewMode.month) ...[
+                              Expanded(
+                                child: _ActionChip(
+                                  icon: Icons.ios_share_rounded,
+                                  label: 'Share',
+                                  onTap: _shareGraph,
+                                  color: cs.primary,
+                                  isDark: isDark,
                                 ),
-                                label: const Text('Share'),
                               ),
-                            OutlinedButton.icon(
-                              onPressed: () => context.push('/app/pricing'),
-                              icon: const Icon(
-                                Icons.diamond_outlined,
-                                size: 18,
+                              const SizedBox(width: 10),
+                            ],
+                            Expanded(
+                              child: _ActionChip(
+                                icon: Icons.diamond_outlined,
+                                label: 'Pricing',
+                                onTap: () => context.push('/app/pricing'),
+                                color: cs.primary,
+                                isDark: isDark,
                               ),
-                              label: const Text('Pricing'),
                             ),
                           ],
                         ),
@@ -724,9 +831,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
 
                 // ── Email forwarding ──
-                Card(
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isDark
+                          ? [
+                              const Color(0xFF1A1A2E),
+                              const Color(0xFF16161F),
+                            ]
+                          : [
+                              Colors.white,
+                              const Color(0xFFF8FAFE),
+                            ],
+                    ),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.06)
+                          : Colors.grey.shade200,
+                    ),
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(20),
                     child: Column(
@@ -735,10 +864,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: cs.primary.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(10),
+                                gradient: LinearGradient(
+                                  colors: [
+                                    cs.primary.withValues(alpha: 0.15),
+                                    cs.primary.withValues(alpha: 0.05),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               child: Icon(
                                 Icons.email_outlined,
@@ -747,64 +881,112 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            Text(
-                              'Email forwarding',
-                              style: Theme.of(context).textTheme.titleMedium,
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Email Forwarding',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: cs.onSurface,
+                                      letterSpacing: -0.2,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Forward receipts to auto-track',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: cs.onSurface.withValues(alpha: 0.45),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 14),
                         if (_loadingForwarding)
-                          const LinearProgressIndicator()
-                        else if (_forwardingError != null)
-                          Text(
-                            _forwardingError!,
-                            style: TextStyle(color: cs.error, fontSize: 13),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              minHeight: 3,
+                              backgroundColor: cs.primary.withValues(alpha: 0.08),
+                            ),
                           )
-                        else if (_forwardingAddress != null) ...[
+                        else if (_forwardingError != null)
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
+                              color: cs.error.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              _forwardingError!,
+                              style: TextStyle(
+                                color: cs.error,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          )
+                        else if (_forwardingAddress != null) ...[
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
                               color: isDark
                                   ? Colors.white.withValues(alpha: 0.04)
-                                  : Colors.grey.shade50,
-                              borderRadius: BorderRadius.circular(10),
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                             child: SelectableText(
                               _forwardingAddress!,
                               style: TextStyle(
                                 fontFamily: 'monospace',
-                                fontSize: 13,
-                                color: cs.onSurface.withValues(alpha: 0.8),
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                                color: cs.onSurface.withValues(alpha: 0.75),
+                                letterSpacing: -0.2,
                               ),
                             ),
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 12),
                           Row(
                             children: [
-                              OutlinedButton.icon(
-                                onPressed: () {
-                                  Clipboard.setData(
-                                    ClipboardData(text: _forwardingAddress!),
-                                  );
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Copied to clipboard'),
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(Icons.copy_rounded, size: 16),
-                                label: const Text('Copy'),
-                              ),
-                              const SizedBox(width: 8),
-                              OutlinedButton.icon(
-                                onPressed: _loadForwardingAddress,
-                                icon: const Icon(
-                                  Icons.refresh_rounded,
-                                  size: 16,
+                              Expanded(
+                                child: _ActionChip(
+                                  icon: Icons.copy_rounded,
+                                  label: 'Copy',
+                                  onTap: () {
+                                    Clipboard.setData(
+                                      ClipboardData(text: _forwardingAddress!),
+                                    );
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Copied to clipboard'),
+                                      ),
+                                    );
+                                  },
+                                  color: cs.primary,
+                                  isDark: isDark,
                                 ),
-                                label: const Text('Refresh'),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: _ActionChip(
+                                  icon: Icons.refresh_rounded,
+                                  label: 'Refresh',
+                                  onTap: _loadForwardingAddress,
+                                  color: cs.primary,
+                                  isDark: isDark,
+                                ),
                               ),
                             ],
                           ),
@@ -812,60 +994,90 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           Text(
                             'No forwarding address yet.',
                             style: TextStyle(
-                              color: cs.onSurface.withValues(alpha: 0.5),
+                              color: cs.onSurface.withValues(alpha: 0.45),
+                              fontSize: 13,
                             ),
                           ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 20),
 
                 // ── Search ──
-                TextField(
-                  controller: _searchController,
-                  onChanged: (value) => setState(() {
-                    _searchQuery = value;
-                    _visibleReceiptCount = _receiptBatchSize;
-                  }),
-                  decoration: InputDecoration(
-                    hintText: 'Search receipts...',
-                    prefixIcon: Icon(
-                      Icons.search_rounded,
-                      color: cs.onSurface.withValues(alpha: 0.4),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.05)
+                        : Colors.white,
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.06)
+                          : Colors.grey.shade200,
                     ),
-                    suffixIcon: _searchController.text.isEmpty
-                        ? null
-                        : IconButton(
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {
-                                _searchQuery = '';
-                                _visibleReceiptCount = _receiptBatchSize;
-                              });
-                            },
-                            icon: const Icon(Icons.clear_rounded, size: 20),
-                          ),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (value) => setState(() {
+                      _searchQuery = value;
+                      _visibleReceiptCount = _receiptBatchSize;
+                    }),
+                    decoration: InputDecoration(
+                      hintText: 'Search receipts...',
+                      hintStyle: TextStyle(
+                        color: cs.onSurface.withValues(alpha: 0.3),
+                        fontWeight: FontWeight.w400,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.search_rounded,
+                        color: cs.onSurface.withValues(alpha: 0.3),
+                      ),
+                      suffixIcon: _searchController.text.isEmpty
+                          ? null
+                          : IconButton(
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {
+                                  _searchQuery = '';
+                                  _visibleReceiptCount = _receiptBatchSize;
+                                });
+                              },
+                              icon: const Icon(Icons.clear_rounded, size: 18),
+                            ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
 
                 // ── Receipts header ──
                 Row(
                   children: [
                     Text(
                       'Receipts',
-                      style: Theme.of(context).textTheme.titleMedium,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                        color: cs.onSurface,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
+                        horizontal: 10,
+                        vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: cs.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
+                        color: cs.primary.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         '${filtered.length}',
@@ -878,27 +1090,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 if (filtered.isEmpty)
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        children: [
-                          Icon(
+                  Container(
+                    padding: const EdgeInsets.all(32),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.03)
+                          : Colors.grey.shade50,
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: cs.onSurface.withValues(alpha: 0.05),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
                             Icons.receipt_long_outlined,
-                            size: 40,
+                            size: 32,
                             color: cs.onSurface.withValues(alpha: 0.2),
                           ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'No receipts found',
-                            style: TextStyle(
-                              color: cs.onSurface.withValues(alpha: 0.5),
-                            ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No receipts found',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurface.withValues(alpha: 0.4),
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Upload a receipt to get started',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: cs.onSurface.withValues(alpha: 0.3),
+                          ),
+                        ),
+                      ],
                     ),
                   )
                 else
@@ -908,12 +1141,101 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 if (hasMoreVisible)
                   const Padding(
                     padding: EdgeInsets.only(top: 12),
-                    child: Center(child: CircularProgressIndicator()),
+                    child: Center(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      ),
+                    ),
                   ),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+// ── Navigation arrow button ──
+class _NavArrowButton extends StatelessWidget {
+  const _NavArrowButton({
+    required this.icon,
+    required this.onTap,
+    required this.isDark,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, size: 20),
+      ),
+    );
+  }
+}
+
+// ── Reusable action chip button ──
+class _ActionChip extends StatelessWidget {
+  const _ActionChip({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    required this.color,
+    required this.isDark,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color color;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.04)
+                : Colors.grey.shade200,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -931,31 +1253,40 @@ class _MonthChangeLabel extends StatelessWidget {
     if (change == null) {
       return Text(
         'No previous month data',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+        style: TextStyle(
+          fontSize: 13,
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
         ),
       );
     }
 
-    return Row(
-      children: [
-        Icon(
-          change.isIncrease
-              ? Icons.trending_up_rounded
-              : Icons.trending_down_rounded,
-          size: 18,
-          color: color,
-        ),
-        const SizedBox(width: 4),
-        Text(
-          '${change.isIncrease ? 'Up' : 'Down'} ${change.percent}% vs last month',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            change.isIncrease
+                ? Icons.trending_up_rounded
+                : Icons.trending_down_rounded,
+            size: 15,
             color: color,
           ),
-        ),
-      ],
+          const SizedBox(width: 4),
+          Text(
+            '${change.percent}% vs last month',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -966,18 +1297,18 @@ class _ReceiptTile extends ConsumerWidget {
 
   final Receipt receipt;
 
-  Color _badgeColor(BuildContext context) {
+  Color _statusColor(BuildContext context) {
     switch (receipt.status) {
       case ReceiptStatuses.uploaded:
-        return Colors.blue;
+        return const Color(0xFF3B82F6);
       case ReceiptStatuses.processing:
-        return Colors.amber.shade700;
+        return const Color(0xFFF59E0B);
       case ReceiptStatuses.extracted:
-        return Colors.teal;
+        return const Color(0xFF14B8A6);
       case ReceiptStatuses.needsReview:
-        return Colors.orange;
+        return const Color(0xFFF97316);
       case ReceiptStatuses.finalStatus:
-        return const Color(0xFF00C805);
+        return const Color(0xFF22C55E);
       default:
         return Theme.of(context).colorScheme.secondary;
     }
@@ -986,6 +1317,7 @@ class _ReceiptTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final merchant =
         receipt.merchant?.canonicalName ??
         receipt.merchant?.rawName ??
@@ -995,49 +1327,71 @@ class _ReceiptTile extends ConsumerWidget {
     final urlAsync = ref.watch(
       receiptFileUrlProvider(receipt.file.storagePath),
     );
-    final badge = _badgeColor(context);
+    final statusColor = _statusColor(context);
 
-    return Card(
-      child: InkWell(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: GestureDetector(
         onTap: () => context.push('/app/receipt/${receipt.id}'),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.03)
+                : Colors.white,
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : const Color(0xFFEEF0F4),
+            ),
+          ),
           child: Row(
             children: [
               // Thumbnail
               Container(
-                width: 52,
-                height: 52,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: cs.primary.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(11),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : const Color(0xFFF4F6F8),
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(11),
                   child: receipt.isPdf
                       ? Icon(
                           Icons.picture_as_pdf_outlined,
-                          color: cs.primary.withValues(alpha: 0.5),
+                          size: 20,
+                          color: cs.primary.withValues(alpha: 0.45),
                         )
                       : urlAsync.when(
                           data: (url) => CachedNetworkImage(
                             imageUrl: url,
                             fit: BoxFit.cover,
                             errorWidget: (context, error, stackTrace) =>
-                                const Icon(Icons.broken_image_outlined),
+                                Icon(
+                                  Icons.broken_image_outlined,
+                                  size: 20,
+                                  color: cs.onSurface.withValues(alpha: 0.25),
+                                ),
                           ),
                           loading: () => Icon(
                             Icons.image_outlined,
-                            color: cs.primary.withValues(alpha: 0.5),
+                            size: 20,
+                            color: cs.primary.withValues(alpha: 0.35),
                           ),
-                          error: (error, stackTrace) =>
-                              const Icon(Icons.broken_image_outlined),
+                          error: (error, stackTrace) => Icon(
+                            Icons.broken_image_outlined,
+                            size: 20,
+                            color: cs.onSurface.withValues(alpha: 0.25),
+                          ),
                         ),
                 ),
               ),
-              const SizedBox(width: 14),
-              // Info
+              const SizedBox(width: 12),
+              // Left side: merchant + date
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1046,44 +1400,63 @@ class _ReceiptTile extends ConsumerWidget {
                       merchant,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${formatDate(receipt.effectiveDate, pattern: 'MMM d')} \u2022 ${formatCurrency(receipt.effectiveTotalAmount)}',
                       style: TextStyle(
-                        fontSize: 13,
-                        color: cs.onSurface.withValues(alpha: 0.6),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14.5,
+                        letterSpacing: -0.1,
+                        color: cs.onSurface,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: badge.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        receipt.status,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: badge,
-                        ),
+                    const SizedBox(height: 3),
+                    Text(
+                      formatDate(receipt.effectiveDate, pattern: 'MMM d, yyyy'),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        color: cs.onSurface.withValues(alpha: 0.4),
                       ),
                     ),
                   ],
                 ),
               ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: cs.onSurface.withValues(alpha: 0.25),
+              const SizedBox(width: 12),
+              // Right side: amount + status
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    formatCurrency(receipt.effectiveTotalAmount),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.4,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        receipt.status,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: cs.onSurface.withValues(alpha: 0.4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),
