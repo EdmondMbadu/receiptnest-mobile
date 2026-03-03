@@ -41,21 +41,30 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
                   children: [
                     TextField(
                       controller: nameController,
-                      decoration: const InputDecoration(labelText: 'Folder name'),
+                      decoration: const InputDecoration(
+                        labelText: 'Folder name',
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Flexible(
                       child: ListView(
                         shrinkWrap: true,
                         children: receipts.take(30).map((receipt) {
-                          final merchant = receipt.merchant?.canonicalName ??
+                          final merchant =
+                              receipt.merchant?.canonicalName ??
                               receipt.merchant?.rawName ??
                               receipt.file.originalName;
                           return CheckboxListTile(
                             dense: true,
                             contentPadding: EdgeInsets.zero,
-                            title: Text(merchant, maxLines: 1, overflow: TextOverflow.ellipsis),
-                            subtitle: Text(formatCurrency(receipt.totalAmount)),
+                            title: Text(
+                              merchant,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              formatCurrency(receipt.effectiveTotalAmount),
+                            ),
                             value: selected.contains(receipt.id),
                             onChanged: (value) {
                               setLocalState(() {
@@ -74,8 +83,14 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-                FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Create')),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Create'),
+                ),
               ],
             );
           },
@@ -86,30 +101,33 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
     if (confirmed != true) return;
 
     try {
-      await ref.read(folderRepositoryProvider).createFolder(
-            uid,
-            nameController.text,
-            selected.toList(),
-          );
+      await ref
+          .read(folderRepositoryProvider)
+          .createFolder(uid, nameController.text, selected.toList());
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to create folder: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to create folder: $e')));
     }
   }
 
-  Future<void> _syncAutoFolders(List<Folder> folders, List<Receipt> receipts) async {
+  Future<void> _syncAutoFolders(
+    List<Folder> folders,
+    List<Receipt> receipts,
+  ) async {
     final uid = ref.read(currentUserIdProvider);
     if (uid == null || _syncingAutoFolders) return;
 
     setState(() => _syncingAutoFolders = true);
     try {
-      await ref.read(folderRepositoryProvider).syncAutoFolders(uid, folders, receipts);
+      await ref
+          .read(folderRepositoryProvider)
+          .syncAutoFolders(uid, folders, receipts);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Auto folders synced.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Auto folders synced.')));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -137,8 +155,14 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
             decoration: const InputDecoration(labelText: 'Folder name'),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Save')),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Save'),
+            ),
           ],
         );
       },
@@ -147,12 +171,14 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
     if (ok != true) return;
 
     try {
-      await ref.read(folderRepositoryProvider).renameFolder(uid, folder.id, controller.text);
+      await ref
+          .read(folderRepositoryProvider)
+          .renameFolder(uid, folder.id, controller.text);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to rename folder: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to rename folder: $e')));
     }
   }
 
@@ -167,8 +193,14 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
           title: const Text('Delete folder'),
           content: Text('Delete "${folder.name}"?'),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Delete')),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
           ],
         );
       },
@@ -180,9 +212,9 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
       await ref.read(folderRepositoryProvider).deleteFolder(uid, folder.id);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to delete folder: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to delete folder: $e')));
     }
   }
 
@@ -198,51 +230,64 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) {
-        return StatefulBuilder(builder: (context, setLocalState) {
-          return AlertDialog(
-            title: const Text('Merge folders'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Move all receipts from "${source.name}" into:'),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: target.id,
-                  items: options
-                      .map((folder) => DropdownMenuItem(value: folder.id, child: Text(folder.name)))
-                      .toList(),
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setLocalState(() {
-                      target = options.firstWhere((folder) => folder.id == value);
-                    });
-                  },
+        return StatefulBuilder(
+          builder: (context, setLocalState) {
+            return AlertDialog(
+              title: const Text('Merge folders'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Move all receipts from "${source.name}" into:'),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    initialValue: target.id,
+                    items: options
+                        .map(
+                          (folder) => DropdownMenuItem(
+                            value: folder.id,
+                            child: Text(folder.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setLocalState(() {
+                        target = options.firstWhere(
+                          (folder) => folder.id == value,
+                        );
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Merge'),
                 ),
               ],
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-              FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Merge')),
-            ],
-          );
-        });
+            );
+          },
+        );
       },
     );
 
     if (ok != true) return;
 
     try {
-      await ref.read(folderRepositoryProvider).mergeFolders(
-            uid,
-            source: source,
-            target: target,
-          );
+      await ref
+          .read(folderRepositoryProvider)
+          .mergeFolders(uid, source: source, target: target);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to merge folders: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to merge folders: $e')));
     }
   }
 
@@ -250,13 +295,16 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final foldersAsync = ref.watch(foldersStreamProvider);
-    final receipts = ref.watch(receiptsStreamProvider).valueOrNull ?? const <Receipt>[];
+    final receipts =
+        ref.watch(receiptsStreamProvider).valueOrNull ?? const <Receipt>[];
 
     return foldersAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, _) => Center(child: Text('Failed to load folders: $err')),
       data: (folders) {
-        final receiptMap = {for (final receipt in receipts) receipt.id: receipt};
+        final receiptMap = {
+          for (final receipt in receipts) receipt.id: receipt,
+        };
 
         final visibleFolders = folders.where((folder) {
           if (_search.trim().isEmpty) return true;
@@ -292,9 +340,13 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
             ),
             const SizedBox(height: 10),
             OutlinedButton.icon(
-              onPressed: _syncingAutoFolders ? null : () => _syncAutoFolders(folders, receipts),
+              onPressed: _syncingAutoFolders
+                  ? null
+                  : () => _syncAutoFolders(folders, receipts),
               icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-              label: Text(_syncingAutoFolders ? 'Syncing...' : 'Sync auto folders'),
+              label: Text(
+                _syncingAutoFolders ? 'Syncing...' : 'Sync auto folders',
+              ),
             ),
             const SizedBox(height: 16),
             if (visibleFolders.isEmpty)
@@ -334,7 +386,10 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
                     .map((id) => receiptMap[id])
                     .whereType<Receipt>()
                     .toList();
-                final total = receiptsInFolder.fold<double>(0, (sum, r) => sum + (r.totalAmount ?? 0));
+                final total = receiptsInFolder.fold<double>(
+                  0,
+                  (sum, r) => sum + (r.effectiveTotalAmount ?? 0),
+                );
 
                 return Card(
                   child: InkWell(
@@ -403,9 +458,18 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
                             },
                             itemBuilder: (context) {
                               return const [
-                                PopupMenuItem(value: 'rename', child: Text('Rename')),
-                                PopupMenuItem(value: 'merge', child: Text('Merge')),
-                                PopupMenuItem(value: 'delete', child: Text('Delete')),
+                                PopupMenuItem(
+                                  value: 'rename',
+                                  child: Text('Rename'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'merge',
+                                  child: Text('Merge'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text('Delete'),
+                                ),
                               ];
                             },
                           ),

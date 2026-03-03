@@ -11,10 +11,7 @@ import '../data/folder_repository.dart';
 import '../models/folder.dart';
 
 class FolderDetailScreen extends ConsumerStatefulWidget {
-  const FolderDetailScreen({
-    super.key,
-    required this.folderId,
-  });
+  const FolderDetailScreen({super.key, required this.folderId});
 
   final String folderId;
 
@@ -44,15 +41,23 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
           title: const Text('Rename folder'),
           content: TextField(controller: controller),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Save')),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Save'),
+            ),
           ],
         );
       },
     );
 
     if (ok != true) return;
-    await ref.read(folderRepositoryProvider).renameFolder(uid, folder.id, controller.text);
+    await ref
+        .read(folderRepositoryProvider)
+        .renameFolder(uid, folder.id, controller.text);
   }
 
   Future<void> _delete(Folder folder) async {
@@ -66,8 +71,14 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
           title: const Text('Delete folder'),
           content: Text('Delete "${folder.name}"?'),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Delete')),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
           ],
         );
       },
@@ -88,60 +99,81 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
     if (uid == null) return;
 
     final selected = <String>{};
-    final candidates = allReceipts.where((receipt) => !folder.receiptIds.contains(receipt.id)).toList();
+    final candidates = allReceipts
+        .where((receipt) => !folder.receiptIds.contains(receipt.id))
+        .toList();
     if (candidates.isEmpty) return;
 
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) {
-        return StatefulBuilder(builder: (context, setLocalState) {
-          return AlertDialog(
-            title: const Text('Add receipts'),
-            content: SizedBox(
-              width: 420,
-              child: ListView(
-                shrinkWrap: true,
-                children: candidates.take(60).map((receipt) {
-                  final merchant = receipt.merchant?.canonicalName ??
-                      receipt.merchant?.rawName ??
-                      receipt.file.originalName;
-                  return CheckboxListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    value: selected.contains(receipt.id),
-                    title: Text(merchant, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text(formatCurrency(receipt.totalAmount)),
-                    onChanged: (value) {
-                      setLocalState(() {
-                        if (value == true) {
-                          selected.add(receipt.id);
-                        } else {
-                          selected.remove(receipt.id);
-                        }
-                      });
-                    },
-                  );
-                }).toList(),
+        return StatefulBuilder(
+          builder: (context, setLocalState) {
+            return AlertDialog(
+              title: const Text('Add receipts'),
+              content: SizedBox(
+                width: 420,
+                child: ListView(
+                  shrinkWrap: true,
+                  children: candidates.take(60).map((receipt) {
+                    final merchant =
+                        receipt.merchant?.canonicalName ??
+                        receipt.merchant?.rawName ??
+                        receipt.file.originalName;
+                    return CheckboxListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      value: selected.contains(receipt.id),
+                      title: Text(
+                        merchant,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        formatCurrency(receipt.effectiveTotalAmount),
+                      ),
+                      onChanged: (value) {
+                        setLocalState(() {
+                          if (value == true) {
+                            selected.add(receipt.id);
+                          } else {
+                            selected.remove(receipt.id);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
               ),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-              FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Add')),
-            ],
-          );
-        });
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Add'),
+                ),
+              ],
+            );
+          },
+        );
       },
     );
 
     if (ok != true || selected.isEmpty) return;
-    await ref.read(folderRepositoryProvider).addReceipts(uid, folder, selected.toList());
+    await ref
+        .read(folderRepositoryProvider)
+        .addReceipts(uid, folder, selected.toList());
   }
 
   Future<void> _removeSelected(Folder folder) async {
     final uid = ref.read(currentUserIdProvider);
     if (uid == null || _selectedReceiptIds.isEmpty) return;
 
-    await ref.read(folderRepositoryProvider).removeReceipts(uid, folder, _selectedReceiptIds.toList());
+    await ref
+        .read(folderRepositoryProvider)
+        .removeReceipts(uid, folder, _selectedReceiptIds.toList());
     setState(() => _selectedReceiptIds.clear());
   }
 
@@ -152,24 +184,24 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
     var total = 0.0;
 
     for (final receipt in receiptsInFolder) {
-      final merchant = receipt.merchant?.canonicalName ??
+      final merchant =
+          receipt.merchant?.canonicalName ??
           receipt.merchant?.rawName ??
           receipt.extraction?.supplierName?.value?.toString() ??
           'Unknown';
       final date = receipt.date ?? '';
-      final amount = receipt.totalAmount ?? 0;
+      final amount = receipt.effectiveTotalAmount ?? 0;
       total += amount;
-      rows.add('"${merchant.replaceAll('"', '""')}","$date","${amount.toStringAsFixed(2)}"');
+      rows.add(
+        '"${merchant.replaceAll('"', '""')}","$date","${amount.toStringAsFixed(2)}"',
+      );
     }
 
     rows.add('"Total","","${total.toStringAsFixed(2)}"');
 
     final csv = rows.join('\n');
     await SharePlus.instance.share(
-      ShareParams(
-        text: csv,
-        subject: '${folder.name} receipts CSV',
-      ),
+      ShareParams(text: csv, subject: '${folder.name} receipts CSV'),
     );
   }
 
@@ -177,12 +209,11 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final foldersAsync = ref.watch(foldersStreamProvider);
-    final receipts = ref.watch(receiptsStreamProvider).valueOrNull ?? const <Receipt>[];
+    final receipts =
+        ref.watch(receiptsStreamProvider).valueOrNull ?? const <Receipt>[];
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Folder'),
-      ),
+      appBar: AppBar(title: const Text('Folder')),
       body: foldersAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Failed to load folder: $err')),
@@ -192,16 +223,22 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
             return const Center(child: Text('Folder not found.'));
           }
 
-          final receiptsInFolder = receipts
-              .where((receipt) => folder.receiptIds.contains(receipt.id))
-              .toList()
-            ..sort((a, b) {
-              final aDate = a.effectiveDate ?? DateTime.fromMillisecondsSinceEpoch(0);
-              final bDate = b.effectiveDate ?? DateTime.fromMillisecondsSinceEpoch(0);
-              return bDate.compareTo(aDate);
-            });
+          final receiptsInFolder =
+              receipts
+                  .where((receipt) => folder.receiptIds.contains(receipt.id))
+                  .toList()
+                ..sort((a, b) {
+                  final aDate =
+                      a.effectiveDate ?? DateTime.fromMillisecondsSinceEpoch(0);
+                  final bDate =
+                      b.effectiveDate ?? DateTime.fromMillisecondsSinceEpoch(0);
+                  return bDate.compareTo(aDate);
+                });
 
-          final total = receiptsInFolder.fold<double>(0, (sum, receipt) => sum + (receipt.totalAmount ?? 0));
+          final total = receiptsInFolder.fold<double>(
+            0,
+            (sum, receipt) => sum + (receipt.effectiveTotalAmount ?? 0),
+          );
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -270,7 +307,9 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                             _ActionButton(
                               icon: Icons.remove_circle_outline,
                               label: 'Remove (${_selectedReceiptIds.length})',
-                              onTap: _selectedReceiptIds.isEmpty ? null : () => _removeSelected(folder),
+                              onTap: _selectedReceiptIds.isEmpty
+                                  ? null
+                                  : () => _removeSelected(folder),
                             ),
                             const SizedBox(width: 8),
                             _ActionButton(
@@ -309,12 +348,16 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                           return ListTile(
                             contentPadding: EdgeInsets.zero,
                             title: Text(entry.sourceFolderName),
-                            subtitle: Text('${entry.sourceFolderReceiptIds.length} receipts'),
+                            subtitle: Text(
+                              '${entry.sourceFolderReceiptIds.length} receipts',
+                            ),
                             trailing: TextButton(
                               onPressed: () async {
                                 final uid = ref.read(currentUserIdProvider);
                                 if (uid == null) return;
-                                await ref.read(folderRepositoryProvider).unmergeFolder(
+                                await ref
+                                    .read(folderRepositoryProvider)
+                                    .unmergeFolder(
                                       uid,
                                       target: folder,
                                       mergeEntry: entry,
@@ -354,7 +397,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                 )
               else
                 ...receiptsInFolder.map((receipt) {
-                  final merchant = receipt.merchant?.canonicalName ??
+                  final merchant =
+                      receipt.merchant?.canonicalName ??
                       receipt.merchant?.rawName ??
                       receipt.file.originalName;
                   final isSelected = _selectedReceiptIds.contains(receipt.id);
@@ -371,7 +415,10 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                       },
                       borderRadius: BorderRadius.circular(16),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         child: Row(
                           children: [
                             Checkbox(
@@ -401,17 +448,20 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                                     ),
                                   ),
                                   Text(
-                                    '${formatDate(receipt.effectiveDate)} \u2022 ${formatCurrency(receipt.totalAmount)}',
+                                    '${formatDate(receipt.effectiveDate)} \u2022 ${formatCurrency(receipt.effectiveTotalAmount)}',
                                     style: TextStyle(
                                       fontSize: 13,
-                                      color: cs.onSurface.withValues(alpha: 0.5),
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.5,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
                             IconButton(
-                              onPressed: () => context.push('/app/receipt/${receipt.id}'),
+                              onPressed: () =>
+                                  context.push('/app/receipt/${receipt.id}'),
                               icon: Icon(
                                 Icons.open_in_new_outlined,
                                 size: 20,

@@ -1,6 +1,82 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/utils/firestore_utils.dart';
+
+final _fallbackReceiptDateFormats = <DateFormat>[
+  DateFormat('M/d/y'),
+  DateFormat('M-d-y'),
+  DateFormat('d/M/y'),
+  DateFormat('d-M-y'),
+  DateFormat('y/M/d'),
+  DateFormat('y-M-d'),
+  DateFormat('MMM d, y'),
+  DateFormat('MMMM d, y'),
+];
+
+double? _parseAmount(dynamic value) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+
+  if (value is String) {
+    final normalized = value.trim().replaceAll(RegExp(r'[^0-9,.\-]'), '');
+    if (normalized.isEmpty || normalized == '-') return null;
+    String formatted = normalized;
+    final hasComma = normalized.contains(',');
+    final hasDot = normalized.contains('.');
+    if (hasComma && hasDot) {
+      final commaIndex = normalized.lastIndexOf(',');
+      final dotIndex = normalized.lastIndexOf('.');
+      formatted = commaIndex > dotIndex
+          ? normalized.replaceAll('.', '').replaceAll(',', '.')
+          : normalized.replaceAll(',', '');
+    } else if (hasComma) {
+      formatted = normalized.replaceAll(',', '.');
+    }
+    return double.tryParse(formatted);
+  }
+
+  if (value is Map<String, dynamic>) {
+    return _parseAmount(value['value'] ?? value['amount']);
+  }
+
+  return null;
+}
+
+DateTime? _parseDateValue(dynamic value) {
+  if (value == null) return null;
+
+  final fromPrimitive = asDateTime(value);
+  if (fromPrimitive != null) return fromPrimitive;
+
+  if (value is Map<String, dynamic>) {
+    return _parseDateValue(value['value'] ?? value['date'] ?? value['rawText']);
+  }
+
+  if (value is String) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+
+    final parsed = DateTime.tryParse(trimmed);
+    if (parsed != null) return parsed;
+
+    for (final format in _fallbackReceiptDateFormats) {
+      try {
+        return format.parseStrict(trimmed);
+      } catch (_) {
+        // Try the next parser.
+      }
+    }
+  }
+
+  return null;
+}
+
+String? _coerceDateString(dynamic value) {
+  if (value == null) return null;
+  if (value is String) return value;
+  return _parseDateValue(value)?.toIso8601String();
+}
 
 class ReceiptStatuses {
   static const uploaded = 'uploaded';
@@ -224,7 +300,9 @@ class Receipt {
       id: doc.id,
       userId: (data['userId'] as String?) ?? '',
       status: (data['status'] as String?) ?? ReceiptStatuses.uploaded,
-      file: ReceiptFile.fromMap((data['file'] as Map<String, dynamic>?) ?? const {}),
+      file: ReceiptFile.fromMap(
+        (data['file'] as Map<String, dynamic>?) ?? const {},
+      ),
       extraction: ReceiptExtraction.fromMap(data['extraction']),
       merchant: data['merchant'] is Map<String, dynamic>
           ? ReceiptMerchant.fromMap(data['merchant'] as Map<String, dynamic>)
@@ -232,25 +310,36 @@ class Receipt {
       category: data['category'] is Map<String, dynamic>
           ? ReceiptCategory.fromMap(data['category'] as Map<String, dynamic>)
           : null,
-      totalAmount: (data['totalAmount'] as num?)?.toDouble(),
+      totalAmount: _parseAmount(data['totalAmount']),
       currency: data['currency'] as String?,
-      date: data['date'] as String?,
+      date: _coerceDateString(data['date']),
       notes: data['notes'] as String?,
-      tags: (data['tags'] as List<dynamic>? ?? const []).whereType<String>().toList(),
+      tags: (data['tags'] as List<dynamic>? ?? const [])
+          .whereType<String>()
+          .toList(),
       createdAt: asDateTime(data['createdAt']),
       updatedAt: asDateTime(data['updatedAt']),
       source: data['source'] as String?,
     );
   }
 
+  double? get effectiveTotalAmount {
+    final normalizedTotal = _parseAmount(totalAmount);
+    if (normalizedTotal != null) return normalizedTotal;
+    return _parseAmount(extraction?.totalAmount?.value);
+  }
+
   DateTime? get effectiveDate {
-    if (date != null) {
-      final parsed = DateTime.tryParse(date!);
-      if (parsed != null) return parsed;
-    }
+    final parsedDate = _parseDateValue(date);
+    if (parsedDate != null) return parsedDate;
+
+    final extractedDate = _parseDateValue(extraction?.date?.value);
+    if (extractedDate != null) return extractedDate;
+
     return createdAt;
   }
 
   bool get isPdf =>
-      file.mimeType == 'application/pdf' || file.originalName.toLowerCase().endsWith('.pdf');
+      file.mimeType == 'application/pdf' ||
+      file.originalName.toLowerCase().endsWith('.pdf');
 }

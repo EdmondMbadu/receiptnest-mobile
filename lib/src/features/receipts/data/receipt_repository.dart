@@ -87,7 +87,7 @@ final selectedMonthSpendProvider = Provider<double>((ref) {
   final receipts = ref.watch(selectedMonthReceiptsProvider);
   return receipts.fold<double>(
     0,
-    (runningTotal, r) => runningTotal + (r.totalAmount ?? 0),
+    (runningTotal, r) => runningTotal + (r.effectiveTotalAmount ?? 0),
   );
 });
 
@@ -109,7 +109,7 @@ final previousMonthSpendProvider = Provider<double>((ref) {
       })
       .fold<double>(
         0,
-        (runningTotal, r) => runningTotal + (r.totalAmount ?? 0),
+        (runningTotal, r) => runningTotal + (r.effectiveTotalAmount ?? 0),
       );
 });
 
@@ -134,7 +134,7 @@ final dailySpendingDataProvider = Provider<List<DailySpendingPoint>>((ref) {
   final totals = List<double>.filled(daysInMonth, 0);
 
   for (final receipt in receipts) {
-    final amount = receipt.totalAmount;
+    final amount = receipt.effectiveTotalAmount;
     final date = receipt.effectiveDate;
     if (amount == null || date == null) continue;
     if (date.day >= 1 && date.day <= daysInMonth) {

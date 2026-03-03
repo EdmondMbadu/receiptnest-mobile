@@ -174,7 +174,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     DateTime? earliestMonth;
 
     for (final receipt in receipts) {
-      final amount = receipt.totalAmount;
+      final amount = receipt.effectiveTotalAmount;
       final date = receipt.effectiveDate;
       if (amount == null || date == null) continue;
 
@@ -353,7 +353,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     .toLowerCase();
             final fileName = receipt.file.originalName.toLowerCase();
             final date = receipt.date?.toLowerCase() ?? '';
-            final amount = receipt.totalAmount?.toString() ?? '';
+            final amount = receipt.effectiveTotalAmount?.toString() ?? '';
 
             return merchant.contains(query) ||
                 fileName.contains(query) ||
@@ -861,7 +861,7 @@ class _ReceiptTile extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${formatDate(receipt.effectiveDate, pattern: 'MMM d')} \u2022 ${formatCurrency(receipt.totalAmount)}',
+                      '${formatDate(receipt.effectiveDate, pattern: 'MMM d')} \u2022 ${formatCurrency(receipt.effectiveTotalAmount)}',
                       style: TextStyle(
                         fontSize: 13,
                         color: cs.onSurface.withValues(alpha: 0.6),

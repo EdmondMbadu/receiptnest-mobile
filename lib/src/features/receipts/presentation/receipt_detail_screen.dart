@@ -60,7 +60,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
         receipt.extraction?.supplierName?.value?.toString() ??
         '';
     _amountController.text =
-        receipt.totalAmount?.toString() ??
+        receipt.effectiveTotalAmount?.toString() ??
         receipt.extraction?.totalAmount?.value?.toString() ??
         '';
     _dateController.text =
@@ -383,7 +383,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                '${formatCurrency(receipt.totalAmount)} • ${formatDate(receipt.effectiveDate)}',
+                                '${formatCurrency(receipt.effectiveTotalAmount)} • ${formatDate(receipt.effectiveDate)}',
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: cs.onSurface.withValues(alpha: 0.5),
