@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -444,6 +443,76 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         );
       },
     );
+  }
+
+  /// Groups receipts by month and returns a flat list of widgets with headers.
+  List<Widget> _buildGroupedReceiptList(
+    List<Receipt> receipts,
+    ColorScheme cs,
+    bool isDark,
+  ) {
+    final grouped = <String, List<Receipt>>{};
+    final monthOrder = <String>[];
+
+    for (final receipt in receipts) {
+      final date = receipt.effectiveDate;
+      final key = date != null
+          ? DateFormat('MMMM yyyy').format(date)
+          : 'Unknown date';
+      if (!grouped.containsKey(key)) {
+        grouped[key] = [];
+        monthOrder.add(key);
+      }
+      grouped[key]!.add(receipt);
+    }
+
+    final widgets = <Widget>[];
+    for (var i = 0; i < monthOrder.length; i++) {
+      final monthKey = monthOrder[i];
+      final monthReceipts = grouped[monthKey]!;
+      final monthTotal = monthReceipts.fold<double>(
+        0,
+        (sum, r) => sum + (r.effectiveTotalAmount ?? 0),
+      );
+
+      // Month section header
+      if (i > 0) widgets.add(const SizedBox(height: 20));
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            children: [
+              Text(
+                monthKey,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: cs.onSurface.withValues(alpha: 0.5),
+                  letterSpacing: -0.1,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                formatCurrency(monthTotal),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface.withValues(alpha: 0.35),
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      // Receipt tiles for this month
+      for (final receipt in monthReceipts) {
+        widgets.add(_ReceiptTile(receipt: receipt));
+      }
+    }
+
+    return widgets;
   }
 
   @override
@@ -1194,8 +1263,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   )
                 else
-                  ...visibleReceipts.map(
-                    (receipt) => _ReceiptTile(receipt: receipt),
+                  ..._buildGroupedReceiptList(
+                    visibleReceipts,
+                    cs,
+                    isDark,
                   ),
                 if (hasMoreVisible)
                   const Padding(
@@ -1351,30 +1422,42 @@ class _MonthChangeLabel extends StatelessWidget {
 }
 
 // ── Receipt tile ──
-class _ReceiptTile extends ConsumerWidget {
+
+const _avatarColors = <Color>[
+  Color(0xFF6366F1), // indigo
+  Color(0xFF8B5CF6), // violet
+  Color(0xFFEC4899), // pink
+  Color(0xFFF59E0B), // amber
+  Color(0xFF10B981), // emerald
+  Color(0xFF06B6D4), // cyan
+  Color(0xFF3B82F6), // blue
+  Color(0xFFEF4444), // red
+  Color(0xFF14B8A6), // teal
+  Color(0xFFF97316), // orange
+];
+
+class _ReceiptTile extends StatelessWidget {
   const _ReceiptTile({required this.receipt});
 
   final Receipt receipt;
 
-  Color _statusColor(BuildContext context) {
-    switch (receipt.status) {
-      case ReceiptStatuses.uploaded:
-        return const Color(0xFF3B82F6);
-      case ReceiptStatuses.processing:
-        return const Color(0xFFF59E0B);
-      case ReceiptStatuses.extracted:
-        return const Color(0xFF14B8A6);
-      case ReceiptStatuses.needsReview:
-        return const Color(0xFFF97316);
-      case ReceiptStatuses.finalStatus:
-        return const Color(0xFF22C55E);
-      default:
-        return Theme.of(context).colorScheme.secondary;
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || parts.first.isEmpty) return '?';
+    if (parts.length == 1) return parts.first[0].toUpperCase();
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+  }
+
+  Color _avatarColor(String name) {
+    var hash = 0;
+    for (final c in name.codeUnits) {
+      hash = (hash + c) * 37;
     }
+    return _avatarColors[hash.abs() % _avatarColors.length];
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final merchant =
@@ -1382,142 +1465,116 @@ class _ReceiptTile extends ConsumerWidget {
         receipt.merchant?.rawName ??
         receipt.extraction?.supplierName?.value?.toString() ??
         'Unknown merchant';
-
-    final urlAsync = ref.watch(
-      receiptFileUrlProvider(receipt.file.storagePath),
-    );
-    final statusColor = _statusColor(context);
+    final category = receipt.category?.name;
+    final avatarBg = _avatarColor(merchant);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: GestureDetector(
-        onTap: () => context.push('/app/receipt/${receipt.id}'),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.03)
-                : Colors.white,
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.05)
-                  : const Color(0xFFEEF0F4),
-            ),
-          ),
-          child: Row(
-            children: [
-              // Thumbnail
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(11),
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.05)
-                      : const Color(0xFFF4F6F8),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(11),
-                  child: receipt.isPdf
-                      ? Icon(
-                          Icons.picture_as_pdf_outlined,
-                          size: 20,
-                          color: cs.primary.withValues(alpha: 0.45),
-                        )
-                      : urlAsync.when(
-                          data: (url) => CachedNetworkImage(
-                            imageUrl: url,
-                            fit: BoxFit.cover,
-                            errorWidget: (context, error, stackTrace) =>
-                                Icon(
-                                  Icons.broken_image_outlined,
-                                  size: 20,
-                                  color: cs.onSurface.withValues(alpha: 0.25),
-                                ),
-                          ),
-                          loading: () => Icon(
-                            Icons.image_outlined,
-                            size: 20,
-                            color: cs.primary.withValues(alpha: 0.35),
-                          ),
-                          error: (error, stackTrace) => Icon(
-                            Icons.broken_image_outlined,
-                            size: 20,
-                            color: cs.onSurface.withValues(alpha: 0.25),
-                          ),
-                        ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Left side: merchant + date
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      merchant,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => context.push('/app/receipt/${receipt.id}'),
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 11),
+            child: Row(
+              children: [
+                // ── Initials avatar ──
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: avatarBg.withValues(alpha: isDark ? 0.25 : 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      _initials(merchant),
                       style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14.5,
-                        letterSpacing: -0.1,
-                        color: cs.onSurface,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: avatarBg,
+                        letterSpacing: 0.3,
                       ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      formatDate(receipt.effectiveDate, pattern: 'MMM d, yyyy'),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w400,
-                        color: cs.onSurface.withValues(alpha: 0.4),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Right side: amount + status
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    formatCurrency(receipt.effectiveTotalAmount),
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.4,
-                      color: cs.onSurface,
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                ),
+                const SizedBox(width: 14),
+                // ── Merchant + meta ──
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: statusColor,
-                          shape: BoxShape.circle,
+                      Text(
+                        merchant,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          letterSpacing: -0.2,
+                          color: cs.onSurface,
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        receipt.status,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: cs.onSurface.withValues(alpha: 0.4),
-                        ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Text(
+                            formatDate(
+                              receipt.effectiveDate,
+                              pattern: 'MMM d',
+                            ),
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w400,
+                              color: cs.onSurface.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          if (category != null) ...[
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                              ),
+                              child: Text(
+                                '\u00B7',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: cs.onSurface.withValues(alpha: 0.25),
+                                ),
+                              ),
+                            ),
+                            Flexible(
+                              child: Text(
+                                category,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w400,
+                                  color: cs.onSurface.withValues(alpha: 0.4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(width: 12),
+                // ── Amount ──
+                Text(
+                  formatCurrency(receipt.effectiveTotalAmount),
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.4,
+                    color: cs.onSurface,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
