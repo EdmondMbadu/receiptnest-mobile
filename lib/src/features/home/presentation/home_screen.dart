@@ -20,7 +20,6 @@ enum _GraphViewMode { month, histogram }
 
 enum _TimeRange { oneDay, oneWeek, oneMonth, threeMonths, oneYear, all }
 
-enum _HistogramRange { thisYear, fiveYears, all }
 
 String _timeRangeLabel(_TimeRange range) {
   switch (range) {
@@ -56,7 +55,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _latestFilteredCount = 0;
   _GraphViewMode _graphViewMode = _GraphViewMode.month;
   _TimeRange _timeRange = _TimeRange.oneMonth;
-  _HistogramRange _histogramRange = _HistogramRange.thisYear;
+
 
   bool _loadingForwarding = false;
   String? _forwardingAddress;
@@ -140,10 +139,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     setState(() => _timeRange = range);
   }
 
-  void _setHistogramRange(_HistogramRange range) {
-    if (_histogramRange == range) return;
-    setState(() => _histogramRange = range);
-  }
+
 
   /// Builds daily spending points for the selected time range.
   List<DailySpendingPoint> _buildTimeRangeData(List<Receipt> receipts) {
@@ -235,13 +231,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
 
-  String _histogramRangeTitle(_HistogramRange range) {
+  String _histogramRangeTitle(_TimeRange range) {
     switch (range) {
-      case _HistogramRange.thisYear:
+      case _TimeRange.oneDay:
+        return 'Today';
+      case _TimeRange.oneWeek:
+        return 'This week';
+      case _TimeRange.oneMonth:
+        return 'This month';
+      case _TimeRange.threeMonths:
+        return 'Last 3 months';
+      case _TimeRange.oneYear:
         return 'This year';
-      case _HistogramRange.fiveYears:
-        return 'Last 5 years';
-      case _HistogramRange.all:
+      case _TimeRange.all:
         return 'All time';
     }
   }
@@ -252,16 +254,57 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   List<_HistogramMonthPoint> _buildHistogramMonthlyData(
     List<Receipt> receipts,
+    int selectedMonth,
+    int selectedYear,
   ) {
     final now = DateTime.now();
-    final endMonth = DateTime(now.year, now.month, 1);
+    final today = DateTime(now.year, now.month, now.day);
+    final endMonth = _timeRange == _TimeRange.oneMonth
+        ? DateTime(selectedYear, selectedMonth, 1)
+        : DateTime(now.year, now.month, 1);
     final monthlyTotals = <String, double>{};
     DateTime? earliestMonth;
+
+    // Compute the same date-range filter used by the spending chart.
+    late DateTime rangeStart;
+    late DateTime rangeEnd;
+    switch (_timeRange) {
+      case _TimeRange.oneDay:
+        rangeStart = today;
+        rangeEnd = today;
+        break;
+      case _TimeRange.oneWeek:
+        rangeStart = today.subtract(const Duration(days: 6));
+        rangeEnd = today;
+        break;
+      case _TimeRange.oneMonth:
+        // Match the spending chart: use the selected month exactly.
+        rangeStart = DateTime(selectedYear, selectedMonth, 1);
+        rangeEnd = DateTime(selectedYear, selectedMonth + 1, 0); // last day
+        break;
+      case _TimeRange.threeMonths:
+        rangeStart = DateTime(today.year, today.month - 3, today.day);
+        rangeEnd = today;
+        break;
+      case _TimeRange.oneYear:
+        rangeStart = DateTime(today.year - 1, today.month, today.day);
+        rangeEnd = today;
+        break;
+      case _TimeRange.all:
+        rangeStart = DateTime(1900);
+        rangeEnd = today;
+        break;
+    }
 
     for (final receipt in receipts) {
       final amount = receipt.effectiveTotalAmount;
       final date = receipt.effectiveDate;
       if (amount == null || date == null) continue;
+
+      final receiptDay = DateTime(date.year, date.month, date.day);
+      if (receiptDay.isBefore(rangeStart) || receiptDay.isAfter(rangeEnd)) {
+        continue;
+      }
 
       final monthDate = DateTime(date.year, date.month, 1);
       if (earliestMonth == null || monthDate.isBefore(earliestMonth)) {
@@ -272,11 +315,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       monthlyTotals[key] = (monthlyTotals[key] ?? 0) + amount;
     }
 
-    var startMonth = DateTime(now.year, 1, 1);
-    if (_histogramRange == _HistogramRange.fiveYears) {
-      startMonth = DateTime(endMonth.year, endMonth.month - 59, 1);
-    } else if (_histogramRange == _HistogramRange.all) {
-      startMonth = earliestMonth ?? endMonth;
+    late DateTime startMonth;
+    switch (_timeRange) {
+      case _TimeRange.oneDay:
+        startMonth = DateTime(now.year, now.month, 1);
+        break;
+      case _TimeRange.oneWeek:
+        startMonth = DateTime(rangeStart.year, rangeStart.month, 1);
+        break;
+      case _TimeRange.oneMonth:
+        startMonth = DateTime(selectedYear, selectedMonth, 1);
+        break;
+      case _TimeRange.threeMonths:
+        startMonth = DateTime(rangeStart.year, rangeStart.month, 1);
+        break;
+      case _TimeRange.oneYear:
+        startMonth = DateTime(now.year, 1, 1);
+        break;
+      case _TimeRange.all:
+        startMonth = earliestMonth ?? endMonth;
+        break;
     }
 
     if (startMonth.isAfter(endMonth)) {
@@ -291,9 +349,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final short = _shortMonthLabels[cursor.month - 1];
       final long = _longMonthLabels[cursor.month - 1];
       final shortYear = (cursor.year % 100).toString().padLeft(2, '0');
-      final label = _histogramRange == _HistogramRange.thisYear
-          ? short
-          : '$short $shortYear';
+      final showYear = _timeRange == _TimeRange.all ||
+          _timeRange == _TimeRange.oneYear;
+      final label = showYear ? '$short $shortYear' : short;
       final fullLabel = '$long ${cursor.year}';
 
       data.add(
@@ -422,7 +480,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Failed to load receipts: $err')),
         data: (receipts) {
-          final histogramMonthlyData = _buildHistogramMonthlyData(receipts);
+          final histogramMonthlyData = _buildHistogramMonthlyData(receipts, month, year);
           final histogramTotalSpend = histogramMonthlyData.fold<double>(
             0,
             (sum, point) => sum + point.amount,
@@ -724,48 +782,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
-                              children: [
-                                for (final range in _HistogramRange.values)
-                                  Expanded(
-                                    child: GestureDetector(
-                                      onTap: () => _setHistogramRange(range),
-                                      child: AnimatedContainer(
-                                        duration: const Duration(milliseconds: 200),
-                                        curve: Curves.easeOut,
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 8,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: _histogramRange == range
-                                              ? histogramColor
-                                              : Colors.transparent,
-                                          borderRadius: BorderRadius.circular(10),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            range == _HistogramRange.thisYear
-                                                ? 'This Year'
-                                                : range == _HistogramRange.fiveYears
-                                                    ? '5 Years'
-                                                    : 'All',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w700,
-                                              color: _histogramRange == range
-                                                  ? Colors.white
-                                                  : cs.onSurface.withValues(alpha: 0.4),
-                                            ),
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: _TimeRange.values.map((range) {
+                                final isSelected = range == _timeRange;
+                                return Expanded(
+                                  child: GestureDetector(
+                                    onTap: () => _setTimeRange(range),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      curve: Curves.easeOut,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? histogramColor
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          _timeRangeLabel(range),
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: isSelected
+                                                ? Colors.white
+                                                : cs.onSurface.withValues(
+                                                    alpha: 0.4,
+                                                  ),
                                           ),
                                         ),
                                       ),
                                     ),
                                   ),
-                              ],
+                                );
+                              }).toList(),
                             ),
                           ),
                           const SizedBox(height: 20),
                           Text(
-                            _histogramRangeTitle(_histogramRange),
+                            _histogramRangeTitle(_timeRange),
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
