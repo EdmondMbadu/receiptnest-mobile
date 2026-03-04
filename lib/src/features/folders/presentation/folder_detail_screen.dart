@@ -16,7 +16,8 @@ class FolderDetailScreen extends ConsumerStatefulWidget {
   final String folderId;
 
   @override
-  ConsumerState<FolderDetailScreen> createState() => _FolderDetailScreenState();
+  ConsumerState<FolderDetailScreen> createState() =>
+      _FolderDetailScreenState();
 }
 
 class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
@@ -33,11 +34,16 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
     final uid = ref.read(currentUserIdProvider);
     if (uid == null) return;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final controller = TextEditingController(text: folder.name);
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          backgroundColor: isDark ? const Color(0xFF1A1A28) : Colors.white,
           title: const Text('Rename folder'),
           content: TextField(controller: controller),
           actions: [
@@ -47,6 +53,11 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
               child: const Text('Save'),
             ),
           ],
@@ -64,11 +75,32 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
     final uid = ref.read(currentUserIdProvider);
     if (uid == null) return;
 
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Delete folder'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          backgroundColor: isDark ? const Color(0xFF1A1A28) : Colors.white,
+          title: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: cs.error.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.warning_amber_rounded,
+                    size: 20, color: cs.error),
+              ),
+              const SizedBox(width: 12),
+              const Text('Delete folder'),
+            ],
+          ),
           content: Text('Delete "${folder.name}"?'),
           actions: [
             TextButton(
@@ -77,6 +109,9 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: cs.error,
+              ),
               child: const Text('Delete'),
             ),
           ],
@@ -104,12 +139,18 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         .toList();
     if (candidates.isEmpty) return;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setLocalState) {
             return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              backgroundColor:
+                  isDark ? const Color(0xFF1A1A28) : Colors.white,
               title: const Text('Add receipts'),
               content: SizedBox(
                 width: 420,
@@ -152,6 +193,11 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                 ),
                 FilledButton(
                   onPressed: () => Navigator.of(context).pop(true),
+                  style: FilledButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
                   child: const Text('Add'),
                 ),
               ],
@@ -177,7 +223,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
     setState(() => _selectedReceiptIds.clear());
   }
 
-  Future<void> _exportCsv(Folder folder, List<Receipt> receiptsInFolder) async {
+  Future<void> _exportCsv(
+      Folder folder, List<Receipt> receiptsInFolder) async {
     if (receiptsInFolder.isEmpty) return;
 
     final rows = <String>['"Merchant","Date","Amount"'];
@@ -208,191 +255,369 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final foldersAsync = ref.watch(foldersStreamProvider);
     final receipts =
         ref.watch(receiptsStreamProvider).valueOrNull ?? const <Receipt>[];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Folder')),
+      backgroundColor:
+          isDark ? const Color(0xFF0D0D14) : const Color(0xFFF6F7F9),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        title: const Text('Folder'),
+        titleTextStyle: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: cs.onSurface,
+        ),
+      ),
       body: foldersAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Failed to load folder: $err')),
+        loading: () => Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: cs.primary,
+          ),
+        ),
+        error: (err, _) =>
+            Center(child: Text('Failed to load folder: $err')),
         data: (folders) {
           final folder = _folderById(folders);
           if (folder == null) {
-            return const Center(child: Text('Folder not found.'));
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.folder_off_outlined,
+                      size: 48,
+                      color: cs.onSurface.withValues(alpha: 0.15)),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Folder not found',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ],
+              ),
+            );
           }
 
-          final receiptsInFolder =
-              receipts
-                  .where((receipt) => folder.receiptIds.contains(receipt.id))
-                  .toList()
-                ..sort((a, b) {
-                  final aDate =
-                      a.effectiveDate ?? DateTime.fromMillisecondsSinceEpoch(0);
-                  final bDate =
-                      b.effectiveDate ?? DateTime.fromMillisecondsSinceEpoch(0);
-                  return bDate.compareTo(aDate);
-                });
+          final receiptsInFolder = receipts
+              .where(
+                  (receipt) => folder.receiptIds.contains(receipt.id))
+              .toList()
+            ..sort((a, b) {
+              final aDate = a.effectiveDate ??
+                  DateTime.fromMillisecondsSinceEpoch(0);
+              final bDate = b.effectiveDate ??
+                  DateTime.fromMillisecondsSinceEpoch(0);
+              return bDate.compareTo(aDate);
+            });
 
           final total = receiptsInFolder.fold<double>(
             0,
-            (sum, receipt) => sum + (receipt.effectiveTotalAmount ?? 0),
+            (sum, receipt) =>
+                sum + (receipt.effectiveTotalAmount ?? 0),
           );
 
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
             children: [
-              // Folder header card
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
+              // ── Folder header card ──
+              Container(
+                padding: const EdgeInsets.all(22),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF151520)
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : Colors.grey.shade200,
+                  ),
+                  boxShadow: isDark
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: Colors.black
+                                .withValues(alpha: 0.04),
+                            blurRadius: 20,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                cs.primary
+                                    .withValues(alpha: 0.15),
+                                cs.primary
+                                    .withValues(alpha: 0.05),
+                              ],
+                            ),
+                            borderRadius:
+                                BorderRadius.circular(16),
+                          ),
+                          child: Icon(
+                            Icons.folder_rounded,
+                            color: cs.primary,
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                folder.name,
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.3,
+                                  color: cs.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${folder.receiptIds.length} receipts \u2022 ${formatCurrency(total)}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: cs.onSurface
+                                      .withValues(alpha: 0.45),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _ActionButton(
+                            icon: Icons.edit_outlined,
+                            label: 'Rename',
+                            onTap: () => _rename(folder),
+                          ),
+                          const SizedBox(width: 8),
+                          _ActionButton(
+                            icon: Icons.add_rounded,
+                            label: 'Add',
+                            onTap: () =>
+                                _addReceipts(folder, receipts),
+                          ),
+                          const SizedBox(width: 8),
+                          _ActionButton(
+                            icon: Icons.remove_circle_outline,
+                            label:
+                                'Remove (${_selectedReceiptIds.length})',
+                            onTap: _selectedReceiptIds.isEmpty
+                                ? null
+                                : () =>
+                                    _removeSelected(folder),
+                          ),
+                          const SizedBox(width: 8),
+                          _ActionButton(
+                            icon:
+                                Icons.file_download_outlined,
+                            label: 'CSV',
+                            onTap: () => _exportCsv(
+                                folder, receiptsInFolder),
+                          ),
+                          const SizedBox(width: 8),
+                          _ActionButton(
+                            icon: Icons.delete_outline,
+                            label: 'Delete',
+                            onTap: () => _delete(folder),
+                            destructive: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── Merged sources ──
+              if (folder.mergedSources.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF151520)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white
+                              .withValues(alpha: 0.06)
+                          : Colors.grey.shade200,
+                    ),
+                  ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
                           Container(
-                            width: 44,
-                            height: 44,
+                            width: 30,
+                            height: 30,
                             decoration: BoxDecoration(
-                              color: cs.primary.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.orange
+                                  .withValues(alpha: 0.1),
+                              borderRadius:
+                                  BorderRadius.circular(8),
                             ),
                             child: Icon(
-                              Icons.folder_rounded,
-                              color: cs.primary,
-                              size: 24,
-                            ),
+                                Icons.merge_rounded,
+                                size: 16,
+                                color: Colors.orange.shade700),
                           ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  folder.name,
-                                  style: Theme.of(context).textTheme.titleLarge,
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${folder.receiptIds.length} receipts \u2022 ${formatCurrency(total)}',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: cs.onSurface.withValues(alpha: 0.5),
-                                  ),
-                                ),
-                              ],
+                          const SizedBox(width: 10),
+                          Text(
+                            'Merged sources (${folder.mergedSources.length})',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: cs.onSurface,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            _ActionButton(
-                              icon: Icons.edit_outlined,
-                              label: 'Rename',
-                              onTap: () => _rename(folder),
-                            ),
-                            const SizedBox(width: 8),
-                            _ActionButton(
-                              icon: Icons.add_rounded,
-                              label: 'Add',
-                              onTap: () => _addReceipts(folder, receipts),
-                            ),
-                            const SizedBox(width: 8),
-                            _ActionButton(
-                              icon: Icons.remove_circle_outline,
-                              label: 'Remove (${_selectedReceiptIds.length})',
-                              onTap: _selectedReceiptIds.isEmpty
-                                  ? null
-                                  : () => _removeSelected(folder),
-                            ),
-                            const SizedBox(width: 8),
-                            _ActionButton(
-                              icon: Icons.file_download_outlined,
-                              label: 'CSV',
-                              onTap: () => _exportCsv(folder, receiptsInFolder),
-                            ),
-                            const SizedBox(width: 8),
-                            _ActionButton(
-                              icon: Icons.delete_outline,
-                              label: 'Delete',
-                              onTap: () => _delete(folder),
-                              destructive: true,
-                            ),
-                          ],
-                        ),
-                      ),
+                      const SizedBox(height: 12),
+                      ...folder.mergedSources.map((entry) {
+                        return Padding(
+                          padding:
+                              const EdgeInsets.only(bottom: 6),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment
+                                          .start,
+                                  children: [
+                                    Text(
+                                      entry.sourceFolderName,
+                                      style: TextStyle(
+                                        fontWeight:
+                                            FontWeight.w600,
+                                        fontSize: 14,
+                                        color: cs.onSurface,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${entry.sourceFolderReceiptIds.length} receipts',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: cs.onSurface
+                                            .withValues(
+                                                alpha: 0.4),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () async {
+                                  final uid = ref.read(
+                                      currentUserIdProvider);
+                                  if (uid == null) return;
+                                  await ref
+                                      .read(
+                                          folderRepositoryProvider)
+                                      .unmergeFolder(
+                                        uid,
+                                        target: folder,
+                                        mergeEntry: entry,
+                                      );
+                                },
+                                style: TextButton.styleFrom(
+                                  textStyle:
+                                      const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight:
+                                        FontWeight.w600,
+                                  ),
+                                ),
+                                child:
+                                    const Text('Unmerge'),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
                     ],
                   ),
                 ),
-              ),
-              if (folder.mergedSources.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Merged sources (${folder.mergedSources.length})',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 8),
-                        ...folder.mergedSources.map((entry) {
-                          return ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(entry.sourceFolderName),
-                            subtitle: Text(
-                              '${entry.sourceFolderReceiptIds.length} receipts',
-                            ),
-                            trailing: TextButton(
-                              onPressed: () async {
-                                final uid = ref.read(currentUserIdProvider);
-                                if (uid == null) return;
-                                await ref
-                                    .read(folderRepositoryProvider)
-                                    .unmergeFolder(
-                                      uid,
-                                      target: folder,
-                                      mergeEntry: entry,
-                                    );
-                              },
-                              child: const Text('Unmerge'),
-                            ),
-                          );
-                        }),
-                      ],
+              ],
+              const SizedBox(height: 14),
+
+              // ── Receipt list ──
+              if (receiptsInFolder.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF151520)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white
+                              .withValues(alpha: 0.06)
+                          : Colors.grey.shade200,
                     ),
                   ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              if (receiptsInFolder.isEmpty)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      children: [
-                        Icon(
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: cs.primary
+                              .withValues(alpha: 0.08),
+                          borderRadius:
+                              BorderRadius.circular(14),
+                        ),
+                        child: Icon(
                           Icons.receipt_long_outlined,
-                          size: 36,
-                          color: cs.onSurface.withValues(alpha: 0.15),
+                          size: 24,
+                          color: cs.onSurface
+                              .withValues(alpha: 0.2),
                         ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'No receipts in this folder',
-                          style: TextStyle(
-                            color: cs.onSurface.withValues(alpha: 0.5),
-                          ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No receipts in this folder',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface
+                              .withValues(alpha: 0.45),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 )
               else
@@ -401,74 +626,167 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                       receipt.merchant?.canonicalName ??
                       receipt.merchant?.rawName ??
                       receipt.file.originalName;
-                  final isSelected = _selectedReceiptIds.contains(receipt.id);
-                  return Card(
-                    child: InkWell(
-                      onTap: () {
-                        setState(() {
-                          if (isSelected) {
-                            _selectedReceiptIds.remove(receipt.id);
-                          } else {
-                            _selectedReceiptIds.add(receipt.id);
-                          }
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(16),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                  final isSelected =
+                      _selectedReceiptIds.contains(receipt.id);
+
+                  // Generate initials
+                  final words = merchant.trim().split(RegExp(r'\s+'));
+                  final initials = words.length >= 2
+                      ? '${words[0][0]}${words[1][0]}'.toUpperCase()
+                      : merchant.substring(0, merchant.length.clamp(0, 2)).toUpperCase();
+
+                  const avatarColors = [
+                    Color(0xFF6366F1),
+                    Color(0xFF8B5CF6),
+                    Color(0xFFEC4899),
+                    Color(0xFFF59E0B),
+                    Color(0xFF10B981),
+                    Color(0xFF3B82F6),
+                    Color(0xFFEF4444),
+                    Color(0xFF14B8A6),
+                  ];
+                  final avatarColor = avatarColors[
+                      merchant.hashCode.abs() % avatarColors.length];
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF151520)
+                            : Colors.white,
+                        borderRadius:
+                            BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isSelected
+                              ? cs.primary
+                                  .withValues(alpha: 0.3)
+                              : (isDark
+                                  ? Colors.white
+                                      .withValues(
+                                          alpha: 0.06)
+                                  : Colors.grey.shade200),
                         ),
-                        child: Row(
-                          children: [
-                            Checkbox(
-                              value: isSelected,
-                              onChanged: (value) {
-                                setState(() {
-                                  if (value == true) {
-                                    _selectedReceiptIds.add(receipt.id);
-                                  } else {
-                                    _selectedReceiptIds.remove(receipt.id);
-                                  }
-                                });
-                              },
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    merchant,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
-                                    ),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            setState(() {
+                              if (isSelected) {
+                                _selectedReceiptIds
+                                    .remove(receipt.id);
+                              } else {
+                                _selectedReceiptIds
+                                    .add(receipt.id);
+                              }
+                            });
+                          },
+                          borderRadius:
+                              BorderRadius.circular(16),
+                          child: Padding(
+                            padding:
+                                const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 12),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: avatarColor
+                                        .withValues(
+                                            alpha: 0.12),
+                                    borderRadius:
+                                        BorderRadius
+                                            .circular(12),
                                   ),
-                                  Text(
-                                    '${formatDate(receipt.effectiveDate)} \u2022 ${formatCurrency(receipt.effectiveTotalAmount)}',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: cs.onSurface.withValues(
-                                        alpha: 0.5,
+                                  child: Center(
+                                    child: Text(
+                                      initials,
+                                      style: TextStyle(
+                                        color: avatarColor,
+                                        fontWeight:
+                                            FontWeight.w700,
+                                        fontSize: 14,
                                       ),
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment
+                                            .start,
+                                    children: [
+                                      Text(
+                                        merchant,
+                                        style: TextStyle(
+                                          fontWeight:
+                                              FontWeight
+                                                  .w600,
+                                          fontSize: 14,
+                                          color: cs
+                                              .onSurface,
+                                        ),
+                                      ),
+                                      const SizedBox(
+                                          height: 2),
+                                      Text(
+                                        '${formatDate(receipt.effectiveDate)} \u2022 ${formatCurrency(receipt.effectiveTotalAmount)}',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: cs
+                                              .onSurface
+                                              .withValues(
+                                                  alpha:
+                                                      0.45),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (isSelected)
+                                  Icon(
+                                    Icons
+                                        .check_circle_rounded,
+                                    size: 22,
+                                    color: cs.primary,
+                                  ),
+                                const SizedBox(width: 4),
+                                Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: cs.primary
+                                        .withValues(
+                                            alpha: 0.06),
+                                    borderRadius:
+                                        BorderRadius
+                                            .circular(8),
+                                  ),
+                                  child: IconButton(
+                                    onPressed: () =>
+                                        context.push(
+                                            '/app/receipt/${receipt.id}'),
+                                    icon: Icon(
+                                      Icons
+                                          .open_in_new_outlined,
+                                      size: 16,
+                                      color: cs.onSurface
+                                          .withValues(
+                                              alpha:
+                                                  0.4),
+                                    ),
+                                    padding:
+                                        EdgeInsets.zero,
+                                  ),
+                                ),
+                              ],
                             ),
-                            IconButton(
-                              onPressed: () =>
-                                  context.push('/app/receipt/${receipt.id}'),
-                              icon: Icon(
-                                Icons.open_in_new_outlined,
-                                size: 20,
-                                color: cs.onSurface.withValues(alpha: 0.4),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
@@ -498,6 +816,7 @@ class _ActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final color = destructive ? cs.error : cs.primary;
     final isDisabled = onTap == null;
 
@@ -505,16 +824,22 @@ class _ActionButton extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
+            color: isDisabled
+                ? Colors.transparent
+                : color.withValues(alpha: 0.06),
             border: Border.all(
               color: isDisabled
-                  ? cs.onSurface.withValues(alpha: 0.08)
+                  ? (isDark
+                      ? Colors.white.withValues(alpha: 0.06)
+                      : Colors.grey.shade200)
                   : color.withValues(alpha: 0.15),
             ),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -523,7 +848,7 @@ class _ActionButton extends StatelessWidget {
                 icon,
                 size: 16,
                 color: isDisabled
-                    ? cs.onSurface.withValues(alpha: 0.25)
+                    ? cs.onSurface.withValues(alpha: 0.2)
                     : color,
               ),
               const SizedBox(width: 6),
@@ -531,9 +856,9 @@ class _ActionButton extends StatelessWidget {
                 label,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w600,
                   color: isDisabled
-                      ? cs.onSurface.withValues(alpha: 0.25)
+                      ? cs.onSurface.withValues(alpha: 0.2)
                       : color,
                 ),
               ),

@@ -43,6 +43,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
   bool _loaded = false;
   bool _saving = false;
   String? _error;
+  String? _success;
 
   @override
   void dispose() {
@@ -77,6 +78,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
     setState(() {
       _saving = true;
       _error = null;
+      _success = null;
     });
 
     try {
@@ -113,10 +115,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
           .read(receiptRepositoryProvider)
           .updateReceipt(uid, receipt.id, updates);
       if (!mounted) return;
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Receipt updated.')));
+      setState(() => _success = 'Receipt updated successfully.');
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -130,11 +129,33 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
     final uid = ref.read(currentUserIdProvider);
     if (uid == null) return;
 
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Delete receipt'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          backgroundColor: isDark ? const Color(0xFF1A1A28) : Colors.white,
+          title: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: cs.error.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.warning_amber_rounded,
+                    size: 20, color: cs.error),
+              ),
+              const SizedBox(width: 12),
+              const Text('Delete receipt'),
+            ],
+          ),
           content: const Text('Are you sure? This cannot be undone.'),
           actions: [
             TextButton(
@@ -144,7 +165,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
               style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error,
+                backgroundColor: cs.error,
               ),
               child: const Text('Delete'),
             ),
@@ -205,6 +226,8 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
   }
 
   Widget _buildPreviewCard(Receipt receipt) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final extension = _fileExtension(receipt);
     final isPdf =
         extension == 'pdf' ||
@@ -217,10 +240,22 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
           .getReceiptFileUrl(receipt.file.storagePath),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Card(
-            child: SizedBox(
-              height: 260,
-              child: Center(child: CircularProgressIndicator()),
+          return Container(
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF151520) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.grey.shade200,
+              ),
+            ),
+            height: 260,
+            child: Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: cs.primary,
+              ),
             ),
           );
         }
@@ -228,7 +263,16 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
         if (snapshot.hasError ||
             snapshot.data == null ||
             snapshot.data!.isEmpty) {
-          return Card(
+          return Container(
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF151520) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.grey.shade200,
+              ),
+            ),
             child: _InlinePreviewError(
               message: 'Could not load in-app preview.',
               onOpenExternally: null,
@@ -237,299 +281,561 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
         }
 
         final fileUrl = snapshot.data!;
+
+        Widget previewContent;
         if (_isImagePreviewable(receipt)) {
-          return Card(
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
-                  child: Text(
-                    'Preview',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
+          previewContent = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: cs.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.image_outlined,
+                          size: 16, color: cs.primary),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Preview',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 300,
-                  child: Container(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.3),
-                    child: InteractiveViewer(
-                      minScale: 0.8,
-                      maxScale: 5,
-                      child: Center(
-                        child: CachedNetworkImage(
-                          imageUrl: fileUrl,
-                          fit: BoxFit.contain,
-                          progressIndicatorBuilder: (context, url, progress) {
-                            return Center(
-                              child: CircularProgressIndicator(
-                                value: progress.progress,
-                              ),
-                            );
-                          },
-                          errorWidget: (context, url, error) {
-                            return _InlinePreviewError(
-                              message: 'Image preview is unavailable in-app.',
-                              onOpenExternally: () =>
-                                  _openUrlExternally(fileUrl),
-                            );
-                          },
-                        ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                height: 300,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.03)
+                        : Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: InteractiveViewer(
+                    minScale: 0.8,
+                    maxScale: 5,
+                    child: Center(
+                      child: CachedNetworkImage(
+                        imageUrl: fileUrl,
+                        fit: BoxFit.contain,
+                        progressIndicatorBuilder: (context, url, progress) {
+                          return Center(
+                            child: CircularProgressIndicator(
+                              value: progress.progress,
+                              strokeWidth: 2.5,
+                              color: cs.primary,
+                            ),
+                          );
+                        },
+                        errorWidget: (context, url, error) {
+                          return _InlinePreviewError(
+                            message: 'Image preview is unavailable in-app.',
+                            onOpenExternally: () =>
+                                _openUrlExternally(fileUrl),
+                          );
+                        },
                       ),
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 16),
+            ],
           );
-        }
-
-        if (_isDocumentPreviewable(receipt)) {
-          return Card(
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
-                  child: Text(
-                    'Preview',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+        } else if (_isDocumentPreviewable(receipt)) {
+          previewContent = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: cs.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.description_outlined,
+                          size: 16, color: cs.primary),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Preview',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                height: 380,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: _InAppDocumentPreview(
+                      fileUrl: fileUrl,
+                      startWithGoogleViewer: useGoogleViewer,
+                      onOpenExternally: () => _openUrlExternally(fileUrl),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 380,
-                  child: _InAppDocumentPreview(
-                    fileUrl: fileUrl,
-                    startWithGoogleViewer: useGoogleViewer,
-                    onOpenExternally: () => _openUrlExternally(fileUrl),
-                  ),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 16),
+            ],
           );
-        }
-
-        return Card(
-          child: _InlinePreviewError(
+        } else {
+          previewContent = _InlinePreviewError(
             message: 'This file type does not support in-app preview yet.',
             onOpenExternally: () => _openUrlExternally(fileUrl),
+          );
+        }
+
+        return Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF151520) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : Colors.grey.shade200,
+            ),
+            boxShadow: isDark
+                ? null
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 20,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
           ),
+          child: previewContent,
         );
       },
+    );
+  }
+
+  Widget _statusBanner(String message, {bool isError = true}) {
+    final cs = Theme.of(context).colorScheme;
+    final color = isError ? cs.error : const Color(0xFF00C805);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isError
+                ? Icons.error_outline_rounded
+                : Icons.check_circle_outline_rounded,
+            size: 16,
+            color: color,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final receiptAsync = ref.watch(receiptFutureProvider(widget.receiptId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Receipt')),
+      backgroundColor:
+          isDark ? const Color(0xFF0D0D14) : const Color(0xFFF6F7F9),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        title: const Text('Receipt'),
+        titleTextStyle: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: cs.onSurface,
+        ),
+      ),
       body: receiptAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Failed to load receipt: $err')),
+        loading: () => Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: cs.primary,
+          ),
+        ),
+        error: (err, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline_rounded,
+                  size: 48, color: cs.error.withValues(alpha: 0.5)),
+              const SizedBox(height: 12),
+              Text(
+                'Failed to load receipt',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+            ],
+          ),
+        ),
         data: (receipt) {
           if (receipt == null) {
-            return const Center(child: Text('Receipt not found.'));
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.receipt_long_outlined,
+                      size: 48,
+                      color: cs.onSurface.withValues(alpha: 0.15)),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Receipt not found',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ],
+              ),
+            );
           }
 
           _loadForm(receipt);
 
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
             children: [
-              Card(
-                child: InkWell(
-                  onTap: () => _openFile(receipt),
-                  borderRadius: BorderRadius.circular(16),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: cs.primary.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(12),
+              // ── File card ──
+              Container(
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF151520) : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : Colors.grey.shade200,
+                  ),
+                  boxShadow: isDark
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 20,
+                            offset: const Offset(0, 4),
                           ),
-                          child: Icon(
-                            receipt.isPdf
-                                ? Icons.picture_as_pdf_outlined
-                                : Icons.insert_drive_file_outlined,
-                            color: cs.primary,
-                            size: 22,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                receipt.file.originalName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
+                        ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _openFile(receipt),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  cs.primary.withValues(alpha: 0.15),
+                                  cs.primary.withValues(alpha: 0.05),
+                                ],
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${formatCurrency(receipt.effectiveTotalAmount)} • ${formatDate(receipt.effectiveDate)}',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: cs.onSurface.withValues(alpha: 0.5),
-                                ),
-                              ),
-                            ],
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Icon(
+                              receipt.isPdf
+                                  ? Icons.picture_as_pdf_outlined
+                                  : Icons.insert_drive_file_outlined,
+                              color: cs.primary,
+                              size: 22,
+                            ),
                           ),
-                        ),
-                        Icon(
-                          Icons.open_in_new_rounded,
-                          size: 20,
-                          color: cs.primary,
-                        ),
-                      ],
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  receipt.file.originalName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                    color: cs.onSurface,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  '${formatCurrency(receipt.effectiveTotalAmount)} \u2022 ${formatDate(receipt.effectiveDate)}',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color:
+                                        cs.onSurface.withValues(alpha: 0.45),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: cs.primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.open_in_new_rounded,
+                              size: 18,
+                              color: cs.primary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
               _buildPreviewCard(receipt),
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
 
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Details',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _merchantController,
-                        decoration: const InputDecoration(
-                          labelText: 'Merchant',
-                          prefixIcon: Icon(Icons.store_outlined, size: 20),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      TextField(
-                        controller: _amountController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: const InputDecoration(
-                          labelText: 'Amount',
-                          prefixIcon: Icon(
-                            Icons.attach_money_rounded,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      TextField(
-                        controller: _dateController,
-                        decoration: const InputDecoration(
-                          labelText: 'Date (YYYY-MM-DD)',
-                          prefixIcon: Icon(
-                            Icons.calendar_today_outlined,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      DropdownButtonFormField<String>(
-                        initialValue: _categoryId,
-                        decoration: const InputDecoration(
-                          labelText: 'Category',
-                          prefixIcon: Icon(Icons.category_outlined, size: 20),
-                        ),
-                        items: defaultCategories
-                            .map(
-                              (category) => DropdownMenuItem<String>(
-                                value: category.id,
-                                child: Text(
-                                  '${category.icon} ${category.name}',
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          if (value == null) return;
-                          setState(() => _categoryId = value);
-                        },
-                      ),
-                      const SizedBox(height: 14),
-                      TextField(
-                        controller: _notesController,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
-                          labelText: 'Notes',
-                          prefixIcon: Padding(
-                            padding: EdgeInsets.only(bottom: 40),
-                            child: Icon(Icons.notes_outlined, size: 20),
-                          ),
-                          alignLabelWithHint: true,
-                        ),
-                      ),
-                    ],
+              // ── Details card ──
+              Container(
+                padding: const EdgeInsets.all(22),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF151520) : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : Colors.grey.shade200,
                   ),
+                  boxShadow: isDark
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 20,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: cs.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(Icons.edit_note_rounded,
+                              size: 18, color: cs.primary),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Details',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    TextField(
+                      controller: _merchantController,
+                      decoration: InputDecoration(
+                        labelText: 'Merchant',
+                        prefixIcon: Icon(Icons.store_outlined,
+                            size: 20,
+                            color: cs.onSurface.withValues(alpha: 0.4)),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: _amountController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Amount',
+                        prefixIcon: Icon(
+                          Icons.attach_money_rounded,
+                          size: 20,
+                          color: cs.onSurface.withValues(alpha: 0.4),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: _dateController,
+                      decoration: InputDecoration(
+                        labelText: 'Date (YYYY-MM-DD)',
+                        prefixIcon: Icon(
+                          Icons.calendar_today_outlined,
+                          size: 20,
+                          color: cs.onSurface.withValues(alpha: 0.4),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    DropdownButtonFormField<String>(
+                      initialValue: _categoryId,
+                      decoration: InputDecoration(
+                        labelText: 'Category',
+                        prefixIcon: Icon(Icons.category_outlined,
+                            size: 20,
+                            color: cs.onSurface.withValues(alpha: 0.4)),
+                      ),
+                      items: defaultCategories
+                          .map(
+                            (category) => DropdownMenuItem<String>(
+                              value: category.id,
+                              child: Text(
+                                '${category.icon} ${category.name}',
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setState(() => _categoryId = value);
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: _notesController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        labelText: 'Notes',
+                        prefixIcon: Padding(
+                          padding: const EdgeInsets.only(bottom: 40),
+                          child: Icon(Icons.notes_outlined,
+                              size: 20,
+                              color: cs.onSurface.withValues(alpha: 0.4)),
+                        ),
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
               if (_error != null) ...[
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: cs.error.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _error!,
-                    style: TextStyle(color: cs.error, fontSize: 13),
-                  ),
-                ),
+                const SizedBox(height: 14),
+                _statusBanner(_error!, isError: true),
+              ],
+              if (_success != null) ...[
+                const SizedBox(height: 14),
+                _statusBanner(_success!, isError: false),
               ],
 
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: _saving ? null : () => _save(receipt),
-                icon: _saving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.check_rounded, size: 20),
-                label: Text(_saving ? 'Saving...' : 'Save changes'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: _saving ? null : () => _delete(receipt),
-                icon: Icon(Icons.delete_outline, size: 20, color: cs.error),
-                label: Text(
-                  'Delete receipt',
-                  style: TextStyle(color: cs.error),
+              const SizedBox(height: 20),
+
+              // ── Save button ──
+              SizedBox(
+                height: 50,
+                child: FilledButton.icon(
+                  onPressed: _saving ? null : () => _save(receipt),
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.check_rounded, size: 20),
+                  label: Text(
+                    _saving ? 'Saving...' : 'Save changes',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  style: FilledButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
                 ),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: cs.error.withValues(alpha: 0.3)),
+              ),
+
+              const SizedBox(height: 10),
+
+              // ── Delete button ──
+              SizedBox(
+                height: 50,
+                child: OutlinedButton.icon(
+                  onPressed: _saving ? null : () => _delete(receipt),
+                  icon: Icon(Icons.delete_outline, size: 20, color: cs.error),
+                  label: Text(
+                    'Delete receipt',
+                    style: TextStyle(
+                      color: cs.error,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    side: BorderSide(color: cs.error.withValues(alpha: 0.3)),
+                  ),
                 ),
               ),
             ],
@@ -651,7 +957,13 @@ class _InAppDocumentPreviewState extends State<_InAppDocumentPreview> {
     return Stack(
       children: [
         WebViewWidget(controller: _controller),
-        if (_loading) const Center(child: CircularProgressIndicator()),
+        if (_loading)
+          Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
       ],
     );
   }
@@ -669,28 +981,53 @@ class _InlinePreviewError extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.visibility_off_outlined,
-              color: cs.onSurface.withValues(alpha: 0.45),
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: cs.onSurface.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                Icons.visibility_off_outlined,
+                color: cs.onSurface.withValues(alpha: 0.35),
+                size: 24,
+              ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 14),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(color: cs.onSurface.withValues(alpha: 0.65)),
+              style: TextStyle(
+                color: cs.onSurface.withValues(alpha: 0.5),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
             ),
             if (onOpenExternally != null) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 14),
               OutlinedButton.icon(
                 onPressed: onOpenExternally,
                 icon: const Icon(Icons.open_in_new_rounded, size: 16),
                 label: const Text('Open in browser'),
+                style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  side: BorderSide(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : Colors.grey.shade300,
+                  ),
+                ),
               ),
             ],
           ],

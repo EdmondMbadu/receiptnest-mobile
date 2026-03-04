@@ -80,7 +80,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return error.message;
       }
     }
-
     final raw = error.toString();
     if (raw.contains('wrong-password') || raw.contains('invalid-credential')) {
       return 'Current password is incorrect.';
@@ -112,11 +111,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _settingsSaving = true;
       _clearGeneralMessages();
     });
-
     try {
-      await ref
-          .read(authRepositoryProvider)
-          .updateProfileInfo(
+      await ref.read(authRepositoryProvider).updateProfileInfo(
             firstName: _firstNameController.text,
             lastName: _lastNameController.text,
           );
@@ -124,16 +120,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       setState(() => _settingsSuccess = 'Profile saved.');
     } catch (error) {
       if (!mounted) return;
-      setState(
-        () => _settingsError = _errorMessage(
-          error,
-          'Unable to save profile details.',
-        ),
-      );
+      setState(() => _settingsError =
+          _errorMessage(error, 'Unable to save profile details.'));
     } finally {
-      if (mounted) {
-        setState(() => _settingsSaving = false);
-      }
+      if (mounted) setState(() => _settingsSaving = false);
     }
   }
 
@@ -142,7 +132,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _notificationSaving = true;
       _clearNotificationMessages();
     });
-
     try {
       await ref
           .read(authRepositoryProvider)
@@ -151,51 +140,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       setState(() => _notificationSuccess = 'Notification settings updated.');
     } catch (error) {
       if (!mounted) return;
-      setState(
-        () => _notificationError = _errorMessage(
-          error,
-          'Unable to update notification settings.',
-        ),
-      );
+      setState(() => _notificationError =
+          _errorMessage(error, 'Unable to update notification settings.'));
     } finally {
-      if (mounted) {
-        setState(() => _notificationSaving = false);
-      }
+      if (mounted) setState(() => _notificationSaving = false);
     }
   }
 
   Future<void> _changePassword(bool usesPasswordAuth) async {
     setState(_clearAccountMessages);
-
     if (!usesPasswordAuth) {
-      setState(() {
-        _passwordError =
-            'Password updates are only available for email/password accounts.';
-      });
+      setState(() => _passwordError =
+          'Password updates are only available for email/password accounts.');
       return;
     }
-
     final newPassword = _passwordNextController.text.trim();
     final confirmPassword = _passwordConfirmController.text.trim();
-
     if (newPassword.length < 6) {
-      setState(
-        () => _passwordError = 'New password must be at least 6 characters.',
-      );
+      setState(() =>
+          _passwordError = 'New password must be at least 6 characters.');
       return;
     }
     if (newPassword != confirmPassword) {
-      setState(
-        () => _passwordError = 'New password and confirmation do not match.',
-      );
+      setState(() =>
+          _passwordError = 'New password and confirmation do not match.');
       return;
     }
-
     setState(() => _passwordSaving = true);
     try {
-      await ref
-          .read(authRepositoryProvider)
-          .changePassword(
+      await ref.read(authRepositoryProvider).changePassword(
             currentPassword: _passwordCurrentController.text,
             newPassword: newPassword,
           );
@@ -208,53 +181,43 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       });
     } catch (error) {
       if (!mounted) return;
-      setState(
-        () =>
-            _passwordError = _errorMessage(error, 'Unable to change password.'),
-      );
+      setState(() =>
+          _passwordError = _errorMessage(error, 'Unable to change password.'));
     } finally {
-      if (mounted) {
-        setState(() => _passwordSaving = false);
-      }
+      if (mounted) setState(() => _passwordSaving = false);
     }
   }
 
   Future<void> _deleteAccount(bool usesPasswordAuth) async {
     if (!_canConfirmDelete(usesPasswordAuth)) return;
-
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Delete account?'),
-          content: const Text(
-            'This permanently deletes your profile, receipts, chats, folders, and shared data. This cannot be undone.',
+      builder: (context) => AlertDialog(
+        title: const Text('Delete account?'),
+        content: const Text(
+          'This permanently deletes your profile, receipts, chats, folders, and shared data. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
             ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error,
-                foregroundColor: Theme.of(context).colorScheme.onError,
-              ),
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Delete'),
-            ),
-          ],
-        );
-      },
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
-
     if (confirmed != true) return;
-
     setState(() {
       _deletePending = true;
       _deleteError = null;
     });
-
     try {
       await ref
           .read(authRepositoryProvider)
@@ -263,29 +226,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       context.go('/login');
     } catch (error) {
       if (!mounted) return;
-      setState(
-        () => _deleteError = _errorMessage(
-          error,
-          'Unable to delete account right now.',
-        ),
-      );
+      setState(() => _deleteError =
+          _errorMessage(error, 'Unable to delete account right now.'));
     } finally {
-      if (mounted) {
-        setState(() => _deletePending = false);
-      }
+      if (mounted) setState(() => _deletePending = false);
     }
   }
 
-  Widget _statusMessage(String message, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Text(
-        message,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-          color: color,
-        ),
+  Widget _statusBanner(String message, Color color, IconData icon) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(message,
+                style: TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w500, color: color)),
+          ),
+        ],
       ),
     );
   }
@@ -293,6 +260,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final authRepo = ref.watch(authRepositoryProvider);
     final profile = ref.watch(currentUserProfileProvider).valueOrNull;
     final themeMode = ref.watch(themeModeProvider);
@@ -307,378 +275,564 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      backgroundColor:
+          isDark ? const Color(0xFF0D0D14) : const Color(0xFFF6F7F9),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        title: const Text('Settings'),
+      ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
-          SegmentedButton<_SettingsTab>(
-            segments: const [
-              ButtonSegment<_SettingsTab>(
-                value: _SettingsTab.general,
-                label: Text('General'),
+          // ── Tab toggle ──
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.grey.shade200,
               ),
-              ButtonSegment<_SettingsTab>(
-                value: _SettingsTab.account,
-                label: Text('Account'),
-              ),
-              ButtonSegment<_SettingsTab>(
-                value: _SettingsTab.notifications,
-                label: Text('Notifications'),
-              ),
-            ],
-            selected: {_activeTab},
-            showSelectedIcon: false,
-            onSelectionChanged: (selection) {
-              setState(() {
-                _activeTab = selection.first;
-                _clearGeneralMessages();
-                _clearAccountMessages();
-                _clearNotificationMessages();
-              });
-            },
+            ),
+            child: Row(
+              children: _SettingsTab.values.map((tab) {
+                final selected = tab == _activeTab;
+                final label = switch (tab) {
+                  _SettingsTab.general => 'General',
+                  _SettingsTab.account => 'Account',
+                  _SettingsTab.notifications => 'Alerts',
+                };
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() {
+                      _activeTab = tab;
+                      _clearGeneralMessages();
+                      _clearAccountMessages();
+                      _clearNotificationMessages();
+                    }),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOut,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? (isDark
+                                ? Colors.white.withValues(alpha: 0.12)
+                                : Colors.white)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: selected
+                            ? [
+                                BoxShadow(
+                                  color: Colors.black.withValues(
+                                      alpha: isDark ? 0.3 : 0.06),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Center(
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight:
+                                selected ? FontWeight.w700 : FontWeight.w500,
+                            color: selected
+                                ? cs.onSurface
+                                : cs.onSurface.withValues(alpha: 0.45),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
+
+          // ── General ──
           if (_activeTab == _SettingsTab.general) ...[
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Profile',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _firstNameController,
-                      decoration: const InputDecoration(
-                        labelText: 'First name',
-                        hintText: 'Enter first name',
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: _lastNameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Last name',
-                        hintText: 'Enter last name',
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: _emailController,
-                      readOnly: true,
-                      decoration: const InputDecoration(labelText: 'Email'),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Appearance',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    SegmentedButton<ThemeMode>(
-                      segments: const [
-                        ButtonSegment<ThemeMode>(
-                          value: ThemeMode.light,
-                          label: Text('Light'),
-                        ),
-                        ButtonSegment<ThemeMode>(
-                          value: ThemeMode.dark,
-                          label: Text('Dark'),
-                        ),
-                      ],
-                      selected: {
-                        themeMode == ThemeMode.light
-                            ? ThemeMode.light
-                            : ThemeMode.dark,
-                      },
-                      showSelectedIcon: false,
-                      onSelectionChanged: (selection) {
-                        ref
-                            .read(themeModeProvider.notifier)
-                            .setMode(selection.first);
-                      },
-                    ),
-                    if (_settingsError != null)
-                      _statusMessage(_settingsError!, cs.error),
-                    if (_settingsSuccess != null)
-                      _statusMessage(
-                        _settingsSuccess!,
-                        const Color(0xFF00C805),
-                      ),
-                    const SizedBox(height: 14),
-                    FilledButton(
-                      onPressed: _settingsSaving ? null : _saveGeneral,
-                      child: Text(
-                        _settingsSaving ? 'Saving...' : 'Save changes',
-                      ),
-                    ),
-                  ],
+            _SettingsSection(
+              title: 'Profile',
+              icon: Icons.person_outline_rounded,
+              isDark: isDark,
+              children: [
+                Row(children: [
+                  Expanded(
+                      child: TextField(
+                          controller: _firstNameController,
+                          decoration: const InputDecoration(
+                              labelText: 'First name'))),
+                  const SizedBox(width: 12),
+                  Expanded(
+                      child: TextField(
+                          controller: _lastNameController,
+                          decoration:
+                              const InputDecoration(labelText: 'Last name'))),
+                ]),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _emailController,
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    labelText: 'Email',
+                    suffixIcon: Icon(Icons.lock_outline_rounded,
+                        size: 16,
+                        color: cs.onSurface.withValues(alpha: 0.25)),
+                  ),
                 ),
-              ),
+                if (_settingsError != null)
+                  _statusBanner(_settingsError!, cs.error,
+                      Icons.error_outline_rounded),
+                if (_settingsSuccess != null)
+                  _statusBanner(_settingsSuccess!, const Color(0xFF00C805),
+                      Icons.check_circle_outline_rounded),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: FilledButton(
+                    onPressed: _settingsSaving ? null : _saveGeneral,
+                    style: FilledButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12))),
+                    child:
+                        Text(_settingsSaving ? 'Saving...' : 'Save changes'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _SettingsSection(
+              title: 'Appearance',
+              icon: Icons.palette_outlined,
+              isDark: isDark,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : cs.surfaceContainerHighest.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(children: [
+                    _ThemeOption(
+                      icon: Icons.light_mode_rounded,
+                      label: 'Light',
+                      selected: themeMode == ThemeMode.light,
+                      isDark: isDark,
+                      onTap: () => ref
+                          .read(themeModeProvider.notifier)
+                          .setMode(ThemeMode.light),
+                    ),
+                    const SizedBox(width: 4),
+                    _ThemeOption(
+                      icon: Icons.dark_mode_rounded,
+                      label: 'Dark',
+                      selected: themeMode == ThemeMode.dark,
+                      isDark: isDark,
+                      onTap: () => ref
+                          .read(themeModeProvider.notifier)
+                          .setMode(ThemeMode.dark),
+                    ),
+                  ]),
+                ),
+              ],
             ),
           ],
+
+          // ── Notifications ──
           if (_activeTab == _SettingsTab.notifications) ...[
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Email preferences',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Receipt processing'),
-                      subtitle: const Text(
-                        'Updates when receipt extraction completes.',
-                      ),
-                      value: _notificationSettings.receiptProcessing,
-                      onChanged: (value) {
-                        setState(() {
-                          _notificationSettings = _notificationSettings
-                              .copyWith(receiptProcessing: value);
-                        });
-                      },
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Product updates'),
-                      subtitle: const Text(
-                        'News about features and improvements.',
-                      ),
-                      value: _notificationSettings.productUpdates,
-                      onChanged: (value) {
-                        setState(() {
-                          _notificationSettings = _notificationSettings
-                              .copyWith(productUpdates: value);
-                        });
-                      },
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Security alerts'),
-                      subtitle: const Text(
-                        'Critical account and security notifications.',
-                      ),
-                      value: _notificationSettings.securityAlerts,
-                      onChanged: (value) {
-                        setState(() {
-                          _notificationSettings = _notificationSettings
-                              .copyWith(securityAlerts: value);
-                        });
-                      },
-                    ),
-                    if (_notificationError != null)
-                      _statusMessage(_notificationError!, cs.error),
-                    if (_notificationSuccess != null)
-                      _statusMessage(
-                        _notificationSuccess!,
-                        const Color(0xFF00C805),
-                      ),
-                    const SizedBox(height: 12),
-                    FilledButton(
-                      onPressed: _notificationSaving
-                          ? null
-                          : _saveNotifications,
-                      child: Text(
-                        _notificationSaving ? 'Saving...' : 'Save changes',
-                      ),
-                    ),
-                  ],
+            _SettingsSection(
+              title: 'Email preferences',
+              icon: Icons.notifications_outlined,
+              isDark: isDark,
+              children: [
+                _NotifTile(
+                    title: 'Receipt processing',
+                    subtitle: 'Updates when extraction completes',
+                    value: _notificationSettings.receiptProcessing,
+                    onChanged: (v) => setState(() => _notificationSettings =
+                        _notificationSettings.copyWith(
+                            receiptProcessing: v))),
+                _NotifTile(
+                    title: 'Product updates',
+                    subtitle: 'News about features and improvements',
+                    value: _notificationSettings.productUpdates,
+                    onChanged: (v) => setState(() => _notificationSettings =
+                        _notificationSettings.copyWith(productUpdates: v))),
+                _NotifTile(
+                    title: 'Security alerts',
+                    subtitle: 'Critical account notifications',
+                    value: _notificationSettings.securityAlerts,
+                    onChanged: (v) => setState(() => _notificationSettings =
+                        _notificationSettings.copyWith(
+                            securityAlerts: v))),
+                if (_notificationError != null)
+                  _statusBanner(_notificationError!, cs.error,
+                      Icons.error_outline_rounded),
+                if (_notificationSuccess != null)
+                  _statusBanner(_notificationSuccess!, const Color(0xFF00C805),
+                      Icons.check_circle_outline_rounded),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: FilledButton(
+                    onPressed:
+                        _notificationSaving ? null : _saveNotifications,
+                    style: FilledButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12))),
+                    child: Text(
+                        _notificationSaving ? 'Saving...' : 'Save changes'),
+                  ),
                 ),
-              ),
+              ],
             ),
           ],
+
+          // ── Account ──
           if (_activeTab == _SettingsTab.account) ...[
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Change password',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (!usesPasswordAuth)
-                      Text(
-                        'This account uses a social sign-in provider. Password changes are not available here.',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurface.withValues(alpha: 0.65),
-                        ),
-                      )
-                    else ...[
-                      TextField(
-                        controller: _passwordCurrentController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Current password',
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _passwordNextController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'New password',
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _passwordConfirmController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Confirm password',
-                        ),
-                      ),
-                    ],
-                    if (_passwordError != null)
-                      _statusMessage(_passwordError!, cs.error),
-                    if (_passwordSuccess != null)
-                      _statusMessage(
-                        _passwordSuccess!,
-                        const Color(0xFF00C805),
-                      ),
-                    const SizedBox(height: 12),
-                    FilledButton(
-                      onPressed: _passwordSaving
-                          ? null
-                          : () => _changePassword(usesPasswordAuth),
-                      child: Text(
-                        _passwordSaving ? 'Updating...' : 'Update password',
-                      ),
-                    ),
-                  ],
+            _SettingsSection(
+              title: 'Change password',
+              icon: Icons.lock_outline_rounded,
+              isDark: isDark,
+              children: [
+                if (!usesPasswordAuth)
+                  Text(
+                    'This account uses a social sign-in provider. Password changes are not available here.',
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurface.withValues(alpha: 0.5)),
+                  )
+                else ...[
+                  TextField(
+                      controller: _passwordCurrentController,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                          labelText: 'Current password')),
+                  const SizedBox(height: 12),
+                  TextField(
+                      controller: _passwordNextController,
+                      obscureText: true,
+                      decoration:
+                          const InputDecoration(labelText: 'New password')),
+                  const SizedBox(height: 12),
+                  TextField(
+                      controller: _passwordConfirmController,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                          labelText: 'Confirm password')),
+                ],
+                if (_passwordError != null)
+                  _statusBanner(
+                      _passwordError!, cs.error, Icons.error_outline_rounded),
+                if (_passwordSuccess != null)
+                  _statusBanner(_passwordSuccess!, const Color(0xFF00C805),
+                      Icons.check_circle_outline_rounded),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: FilledButton(
+                    onPressed: _passwordSaving
+                        ? null
+                        : () => _changePassword(usesPasswordAuth),
+                    style: FilledButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12))),
+                    child: Text(
+                        _passwordSaving ? 'Updating...' : 'Update password'),
+                  ),
                 ),
-              ),
+              ],
             ),
-            const SizedBox(height: 12),
-            Card(
-              color: cs.errorContainer.withValues(alpha: 0.25),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Delete account',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: cs.error,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'This permanently deletes your profile, receipts, chats, folders, shares, and linked data.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: cs.onSurface.withValues(alpha: 0.75),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (!_showDeleteConfirmation)
-                      OutlinedButton(
-                        onPressed: () {
-                          setState(() {
-                            _showDeleteConfirmation = true;
-                            _deleteError = null;
-                          });
-                        },
+            const SizedBox(height: 16),
+
+            // Danger zone
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                color: cs.error.withValues(alpha: isDark ? 0.08 : 0.04),
+                border: Border.all(color: cs.error.withValues(alpha: 0.15)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Icon(Icons.warning_amber_rounded,
+                        size: 20, color: cs.error),
+                    const SizedBox(width: 10),
+                    Text('Danger zone',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: cs.error)),
+                  ]),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Permanently deletes your profile, receipts, chats, folders, shares, and linked data.',
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurface.withValues(alpha: 0.6)),
+                  ),
+                  const SizedBox(height: 14),
+                  if (!_showDeleteConfirmation)
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: OutlinedButton(
+                        onPressed: () => setState(() {
+                          _showDeleteConfirmation = true;
+                          _deleteError = null;
+                        }),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: cs.error,
                           side: BorderSide(
-                            color: cs.error.withValues(alpha: 0.5),
-                          ),
+                              color: cs.error.withValues(alpha: 0.4)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                         child: const Text('Delete account'),
-                      )
-                    else ...[
+                      ),
+                    )
+                  else ...[
+                    TextField(
+                      controller: _deleteConfirmController,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: const InputDecoration(
+                          labelText: 'Type DELETE to confirm'),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    if (usesPasswordAuth) ...[
+                      const SizedBox(height: 12),
                       TextField(
-                        controller: _deleteConfirmController,
-                        textCapitalization: TextCapitalization.characters,
+                        controller: _deletePasswordController,
+                        obscureText: true,
                         decoration: const InputDecoration(
-                          labelText: 'Type DELETE to confirm',
-                        ),
+                            labelText: 'Current password'),
                         onChanged: (_) => setState(() {}),
                       ),
-                      if (usesPasswordAuth) ...[
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: _deletePasswordController,
-                          obscureText: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Current password',
-                          ),
-                          onChanged: (_) => setState(() {}),
-                        ),
-                      ],
-                      if (_deleteError != null)
-                        _statusMessage(_deleteError!, cs.error),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: FilledButton(
-                              style: FilledButton.styleFrom(
-                                backgroundColor: cs.error,
-                                foregroundColor: cs.onError,
-                              ),
-                              onPressed: _canConfirmDelete(usesPasswordAuth)
-                                  ? () => _deleteAccount(usesPasswordAuth)
-                                  : null,
-                              child: Text(
-                                _deletePending
-                                    ? 'Deleting...'
-                                    : 'Confirm delete',
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          TextButton(
-                            onPressed: _deletePending
-                                ? null
-                                : () {
-                                    setState(() {
-                                      _showDeleteConfirmation = false;
-                                      _deleteConfirmController.clear();
-                                      _deletePasswordController.clear();
-                                      _deleteError = null;
-                                    });
-                                  },
-                            child: const Text('Cancel'),
-                          ),
-                        ],
-                      ),
                     ],
+                    if (_deleteError != null)
+                      _statusBanner(_deleteError!, cs.error,
+                          Icons.error_outline_rounded),
+                    const SizedBox(height: 14),
+                    Row(children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 44,
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: cs.error,
+                              foregroundColor: cs.onError,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: _canConfirmDelete(usesPasswordAuth)
+                                ? () => _deleteAccount(usesPasswordAuth)
+                                : null,
+                            child: Text(_deletePending
+                                ? 'Deleting...'
+                                : 'Confirm delete'),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: _deletePending
+                            ? null
+                            : () => setState(() {
+                                  _showDeleteConfirmation = false;
+                                  _deleteConfirmController.clear();
+                                  _deletePasswordController.clear();
+                                  _deleteError = null;
+                                }),
+                        child: const Text('Cancel'),
+                      ),
+                    ]),
                   ],
-                ),
+                ],
               ),
             ),
           ],
           if (profile == null && !_initializedFromProfile)
             Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Text(
-                'Loading account settings...',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: cs.onSurface.withValues(alpha: 0.55),
-                ),
+              padding: const EdgeInsets.only(top: 24),
+              child: Center(
+                child: Text('Loading account settings...',
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurface.withValues(alpha: 0.4))),
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _SettingsSection extends StatelessWidget {
+  const _SettingsSection({
+    required this.title,
+    required this.icon,
+    required this.isDark,
+    required this.children,
+  });
+  final String title;
+  final IconData icon;
+  final bool isDark;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: isDark ? const Color(0xFF151520) : Colors.white,
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.grey.shade200,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: cs.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 18, color: cs.primary),
+            ),
+            const SizedBox(width: 12),
+            Text(title,
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                    color: cs.onSurface)),
+          ]),
+          const SizedBox(height: 18),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _ThemeOption extends StatelessWidget {
+  const _ThemeOption({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.isDark,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? (isDark
+                    ? Colors.white.withValues(alpha: 0.12)
+                    : Colors.white)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color:
+                          Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon,
+                  size: 18,
+                  color: selected
+                      ? cs.onSurface
+                      : cs.onSurface.withValues(alpha: 0.35)),
+              const SizedBox(width: 8),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      color: selected
+                          ? cs.onSurface
+                          : cs.onSurface.withValues(alpha: 0.45))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NotifTile extends StatelessWidget {
+  const _NotifTile({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(title,
+            style: TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface)),
+        subtitle: Text(subtitle,
+            style: TextStyle(
+                fontSize: 12.5,
+                color: cs.onSurface.withValues(alpha: 0.45))),
+        value: value,
+        onChanged: onChanged,
       ),
     );
   }
