@@ -19,7 +19,6 @@ enum _GraphViewMode { month, histogram }
 
 enum _TimeRange { oneDay, oneWeek, oneMonth, threeMonths, oneYear, all }
 
-
 String _timeRangeLabel(_TimeRange range) {
   switch (range) {
     case _TimeRange.oneDay:
@@ -54,7 +53,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _latestFilteredCount = 0;
   _GraphViewMode _graphViewMode = _GraphViewMode.month;
   _TimeRange _timeRange = _TimeRange.oneMonth;
-
 
   bool _loadingForwarding = false;
   String? _forwardingAddress;
@@ -138,8 +136,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     setState(() => _timeRange = range);
   }
 
-
-
   /// Builds daily spending points for the selected time range.
   List<DailySpendingPoint> _buildTimeRangeData(List<Receipt> receipts) {
     final now = DateTime.now();
@@ -221,13 +217,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   static const _shortMonthLabels = <String>[
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
 
   static const _longMonthLabels = <String>[
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
 
   String _histogramRangeTitle(_TimeRange range) {
@@ -348,8 +364,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final short = _shortMonthLabels[cursor.month - 1];
       final long = _longMonthLabels[cursor.month - 1];
       final shortYear = (cursor.year % 100).toString().padLeft(2, '0');
-      final showYear = _timeRange == _TimeRange.all ||
-          _timeRange == _TimeRange.oneYear;
+      final showYear =
+          _timeRange == _TimeRange.all || _timeRange == _TimeRange.oneYear;
       final label = showYear ? '$short $shortYear' : short;
       final fullLabel = '$long ${cursor.year}';
 
@@ -451,10 +467,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ColorScheme cs,
     bool isDark,
   ) {
+    // Keep month sections chronologically stable regardless of backend order.
+    final sortedReceipts = [...receipts]
+      ..sort((a, b) {
+        final aDate = a.effectiveDate;
+        final bDate = b.effectiveDate;
+
+        if (aDate != null && bDate != null) {
+          final byEffectiveDate = bDate.compareTo(aDate);
+          if (byEffectiveDate != 0) return byEffectiveDate;
+        } else if (aDate == null && bDate != null) {
+          return 1;
+        } else if (aDate != null && bDate == null) {
+          return -1;
+        }
+
+        final aCreated = a.createdAt;
+        final bCreated = b.createdAt;
+        if (aCreated != null && bCreated != null) {
+          final byCreatedAt = bCreated.compareTo(aCreated);
+          if (byCreatedAt != 0) return byCreatedAt;
+        } else if (aCreated == null && bCreated != null) {
+          return 1;
+        } else if (aCreated != null && bCreated == null) {
+          return -1;
+        }
+
+        return b.id.compareTo(a.id);
+      });
+
     final grouped = <String, List<Receipt>>{};
     final monthOrder = <String>[];
 
-    for (final receipt in receipts) {
+    for (final receipt in sortedReceipts) {
       final date = receipt.effectiveDate;
       final key = date != null
           ? DateFormat('MMMM yyyy').format(date)
@@ -549,7 +594,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Failed to load receipts: $err')),
         data: (receipts) {
-          final histogramMonthlyData = _buildHistogramMonthlyData(receipts, month, year);
+          final histogramMonthlyData = _buildHistogramMonthlyData(
+            receipts,
+            month,
+            year,
+          );
           final histogramTotalSpend = histogramMonthlyData.fold<double>(
             0,
             (sum, point) => sum + point.amount,
@@ -594,14 +643,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: isDark
-                          ? [
-                              const Color(0xFF1A1A2E),
-                              const Color(0xFF16161F),
-                            ]
-                          : [
-                              Colors.white,
-                              const Color(0xFFF8FAFE),
-                            ],
+                          ? [const Color(0xFF1A1A2E), const Color(0xFF16161F)]
+                          : [Colors.white, const Color(0xFFF8FAFE)],
                     ),
                     border: Border.all(
                       color: isDark
@@ -639,7 +682,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   child: GestureDetector(
                                     onTap: () => _setGraphViewMode(mode),
                                     child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 200),
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
                                       curve: Curves.easeOut,
                                       padding: const EdgeInsets.symmetric(
                                         vertical: 10,
@@ -647,14 +692,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                       decoration: BoxDecoration(
                                         color: _graphViewMode == mode
                                             ? (isDark
-                                                ? Colors.white.withValues(alpha: 0.12)
-                                                : Colors.white)
+                                                  ? Colors.white.withValues(
+                                                      alpha: 0.12,
+                                                    )
+                                                  : Colors.white)
                                             : Colors.transparent,
                                         borderRadius: BorderRadius.circular(11),
-                                        boxShadow: _graphViewMode == mode && !isDark
+                                        boxShadow:
+                                            _graphViewMode == mode && !isDark
                                             ? [
                                                 BoxShadow(
-                                                  color: Colors.black.withValues(alpha: 0.06),
+                                                  color: Colors.black
+                                                      .withValues(alpha: 0.06),
                                                   blurRadius: 8,
                                                   offset: const Offset(0, 2),
                                                 ),
@@ -662,7 +711,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                             : null,
                                       ),
                                       child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: [
                                           Icon(
                                             mode == _GraphViewMode.month
@@ -671,7 +721,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                             size: 16,
                                             color: _graphViewMode == mode
                                                 ? cs.primary
-                                                : cs.onSurface.withValues(alpha: 0.4),
+                                                : cs.onSurface.withValues(
+                                                    alpha: 0.4,
+                                                  ),
                                           ),
                                           const SizedBox(width: 6),
                                           Text(
@@ -685,7 +737,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                   : FontWeight.w500,
                                               color: _graphViewMode == mode
                                                   ? cs.onSurface
-                                                  : cs.onSurface.withValues(alpha: 0.45),
+                                                  : cs.onSurface.withValues(
+                                                      alpha: 0.45,
+                                                    ),
                                             ),
                                           ),
                                         ],
@@ -969,14 +1023,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: isDark
-                          ? [
-                              const Color(0xFF1A1A2E),
-                              const Color(0xFF16161F),
-                            ]
-                          : [
-                              Colors.white,
-                              const Color(0xFFF8FAFE),
-                            ],
+                          ? [const Color(0xFF1A1A2E), const Color(0xFF16161F)]
+                          : [Colors.white, const Color(0xFFF8FAFE)],
                     ),
                     border: Border.all(
                       color: isDark
@@ -1027,7 +1075,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     'Forward receipts to auto-track',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: cs.onSurface.withValues(alpha: 0.45),
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.45,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -1041,7 +1091,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             borderRadius: BorderRadius.circular(4),
                             child: LinearProgressIndicator(
                               minHeight: 3,
-                              backgroundColor: cs.primary.withValues(alpha: 0.08),
+                              backgroundColor: cs.primary.withValues(
+                                alpha: 0.08,
+                              ),
                             ),
                           )
                         else if (_forwardingError != null)
@@ -1263,11 +1315,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   )
                 else
-                  ..._buildGroupedReceiptList(
-                    visibleReceipts,
-                    cs,
-                    isDark,
-                  ),
+                  ..._buildGroupedReceiptList(visibleReceipts, cs, isDark),
                 if (hasMoreVisible)
                   const Padding(
                     padding: EdgeInsets.only(top: 12),
@@ -1520,10 +1568,7 @@ class _ReceiptTile extends StatelessWidget {
                       Row(
                         children: [
                           Text(
-                            formatDate(
-                              receipt.effectiveDate,
-                              pattern: 'MMM d',
-                            ),
+                            formatDate(receipt.effectiveDate, pattern: 'MMM d'),
                             style: TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w400,
@@ -1653,11 +1698,13 @@ class _RobinhoodMonthlyChartState extends State<_RobinhoodMonthlyChart> {
         final amount = amountByDay[day];
         if (amount != null && amount > 0) {
           cumulative += amount;
-          active.add(DailySpendingPoint(
-            day: day,
-            amount: amount,
-            cumulative: cumulative,
-          ));
+          active.add(
+            DailySpendingPoint(
+              day: day,
+              amount: amount,
+              cumulative: cumulative,
+            ),
+          );
         }
       }
       if (active.isEmpty) {
@@ -1875,10 +1922,7 @@ class _RobinhoodTimeRangeChartState extends State<_RobinhoodTimeRangeChart> {
       if (point.amount > peak.amount) peak = point;
     }
 
-    final totalSpend = condensed.fold<double>(
-      0,
-      (sum, p) => sum + p.amount,
-    );
+    final totalSpend = condensed.fold<double>(0, (sum, p) => sum + p.amount);
     final selectedPoint = _selectedIndex == null
         ? null
         : condensed[_selectedIndex!.clamp(0, condensed.length - 1)];
