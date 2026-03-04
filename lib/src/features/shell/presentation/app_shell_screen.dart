@@ -49,7 +49,7 @@ class AppShellScreen extends ConsumerWidget {
           elevation: 0,
           scrolledUnderElevation: 0,
           title: Text(
-            profile?.displayName ?? 'ReceiptNest AI',
+            'ReceiptNest AI',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
