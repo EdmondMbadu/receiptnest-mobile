@@ -342,4 +342,8 @@ class Receipt {
   bool get isPdf =>
       file.mimeType == 'application/pdf' ||
       file.originalName.toLowerCase().endsWith('.pdf');
+
+  bool get isProcessing =>
+      status == ReceiptStatuses.uploaded ||
+      status == ReceiptStatuses.processing;
 }

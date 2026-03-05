@@ -1506,6 +1506,10 @@ class _ReceiptTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (receipt.isProcessing) {
+      return _ProcessingReceiptTile(receipt: receipt);
+    }
+
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final merchant =
@@ -1616,6 +1620,154 @@ class _ReceiptTile extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                     letterSpacing: -0.4,
                     color: cs.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Processing receipt tile with shimmer + pulse animation ──
+class _ProcessingReceiptTile extends StatefulWidget {
+  const _ProcessingReceiptTile({required this.receipt});
+
+  final Receipt receipt;
+
+  @override
+  State<_ProcessingReceiptTile> createState() => _ProcessingReceiptTileState();
+}
+
+class _ProcessingReceiptTileState extends State<_ProcessingReceiptTile>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _shimmer;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+    _shimmer = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => context.push('/app/receipt/${widget.receipt.id}'),
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 11),
+            child: Row(
+              children: [
+                // ── Pulsing avatar with scan icon ──
+                AnimatedBuilder(
+                  animation: _shimmer,
+                  builder: (context, child) {
+                    final pulse = 0.5 + (_shimmer.value * 0.5);
+                    return Opacity(
+                      opacity: pulse,
+                      child: child,
+                    );
+                  },
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          cs.primary.withValues(alpha: isDark ? 0.3 : 0.15),
+                          cs.primary.withValues(alpha: isDark ? 0.15 : 0.08),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.document_scanner_outlined,
+                        size: 20,
+                        color: cs.primary.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                // ── Processing info ──
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Processing receipt...',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          letterSpacing: -0.2,
+                          color: cs.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      // ── Shimmer progress bar ──
+                      AnimatedBuilder(
+                        animation: _shimmer,
+                        builder: (context, _) {
+                          return ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: SizedBox(
+                              height: 4,
+                              child: LinearProgressIndicator(
+                                value: null,
+                                backgroundColor: cs.primary.withValues(
+                                  alpha: isDark ? 0.1 : 0.08,
+                                ),
+                                color: cs.primary.withValues(alpha: 0.5),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Extracting details',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: cs.primary.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // ── Spinning indicator ──
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: cs.primary.withValues(alpha: 0.5),
                   ),
                 ),
               ],

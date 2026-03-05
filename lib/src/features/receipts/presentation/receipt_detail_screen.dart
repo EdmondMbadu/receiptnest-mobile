@@ -541,9 +541,17 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
 
           _loadForm(receipt);
 
+          final isProcessing = receipt.isProcessing;
+
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
             children: [
+              // ── Processing banner ──
+              if (isProcessing) ...[
+                _ProcessingBanner(),
+                const SizedBox(height: 14),
+              ],
+
               // ── File card ──
               Container(
                 decoration: BoxDecoration(
@@ -965,6 +973,123 @@ class _InAppDocumentPreviewState extends State<_InAppDocumentPreview> {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _ProcessingBanner extends StatefulWidget {
+  @override
+  State<_ProcessingBanner> createState() => _ProcessingBannerState();
+}
+
+class _ProcessingBannerState extends State<_ProcessingBanner>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+    _pulse = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF151520) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: cs.primary.withValues(alpha: 0.2),
+        ),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: cs.primary.withValues(alpha: 0.06),
+                  blurRadius: 20,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+      ),
+      child: Column(
+        children: [
+          AnimatedBuilder(
+            animation: _pulse,
+            builder: (context, child) {
+              final opacity = 0.5 + (_pulse.value * 0.5);
+              return Opacity(opacity: opacity, child: child);
+            },
+            child: Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    cs.primary.withValues(alpha: 0.15),
+                    cs.primary.withValues(alpha: 0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                Icons.document_scanner_outlined,
+                size: 28,
+                color: cs.primary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Processing your receipt',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: cs.onSurface,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'We\'re extracting the merchant, amount, date, and category. This usually takes a few seconds.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w400,
+              color: cs.onSurface.withValues(alpha: 0.5),
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 18),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: SizedBox(
+              height: 5,
+              child: LinearProgressIndicator(
+                value: null,
+                backgroundColor:
+                    cs.primary.withValues(alpha: isDark ? 0.1 : 0.08),
+                color: cs.primary.withValues(alpha: 0.6),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
