@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../auth/data/auth_repository.dart';
@@ -168,17 +169,28 @@ class AiRepository {
   Future<List<String>> generateInitialInsights({
     required Map<String, dynamic> insightData,
   }) async {
-    final callable = _functions.httpsCallable('generateAiInsights');
-    final response = await callable.call({
-      'type': 'initial_insights',
-      'data': insightData,
-    });
+    try {
+      final callable = _functions.httpsCallable('generateAiInsights');
+      final response = await callable.call({
+        'type': 'initial_insights',
+        'data': insightData,
+      });
 
-    final result = response.data;
-    if (result is Map && result['insights'] is List) {
-      return (result['insights'] as List).map((e) => e.toString()).toList();
+      final result = response.data;
+      if (result is Map && result['insights'] is List) {
+        final insights = (result['insights'] as List)
+            .map((e) => e.toString())
+            .toList();
+        if (insights.isNotEmpty) {
+          return insights;
+        }
+      }
+    } on FirebaseFunctionsException {
+      return _generateFallbackInsights(insightData);
+    } catch (_) {
+      return _generateFallbackInsights(insightData);
     }
-    return const [];
+    return _generateFallbackInsights(insightData);
   }
 
   Future<void> persistChat(
@@ -423,5 +435,116 @@ class AiRepository {
     return normalized.length <= 56
         ? normalized
         : '${normalized.substring(0, 56)}...';
+  }
+
+  List<String> _generateFallbackInsights(Map<String, dynamic> insightData) {
+    final monthLabel = insightData['monthLabel']?.toString() ?? 'this month';
+    final totalSpend = _asDouble(insightData['totalSpend']);
+    final receiptCount = _asInt(insightData['receiptCount']);
+    final dailyAverage = _asDouble(insightData['dailyAverage']);
+    final topCategories = _asMapList(insightData['topCategories']);
+    final allTime = _asMap(insightData['allTime']);
+    final topMerchants = _asMapList(allTime['topMerchants']);
+    final monthChange = _asMap(insightData['monthOverMonthChange']);
+    final highestSpendDay = _asMap(insightData['highestSpendDay']);
+    final monthsCount = _asInt(allTime['monthsCount']);
+    final allTimeSpend = _asDouble(allTime['totalSpend']);
+    final allTimeReceiptCount = _asInt(allTime['receiptCount']);
+
+    if (receiptCount == 0) {
+      if (allTimeReceiptCount == 0) {
+        return [
+          'No receipts were found for $monthLabel yet. Upload a few receipts first, then tap Insights again.',
+          'Once receipts are available, this page will highlight your top categories, biggest spend days, and month-over-month changes.',
+        ];
+      }
+
+      return [
+        'No receipts were found for $monthLabel, but your account already has $allTimeReceiptCount receipts overall totaling ${_formatCurrency(allTimeSpend)}.',
+        if (topMerchants.isNotEmpty)
+          '${topMerchants.first['name']} is your top merchant overall at ${_formatCurrency(_asDouble(topMerchants.first['total']))}.',
+        'Try switching to a month with activity or upload more receipts for $monthLabel to generate month-specific insights.',
+      ];
+    }
+
+    final insights = <String>[
+      'You spent ${_formatCurrency(totalSpend)} across $receiptCount receipts in $monthLabel${dailyAverage > 0 ? ', or about ${_formatCurrency(dailyAverage)} on each spending day.' : '.'}',
+    ];
+
+    if (topCategories.isNotEmpty) {
+      final topCategory = topCategories.first;
+      insights.add(
+        '${topCategory['name']} was your biggest category at ${_formatCurrency(_asDouble(topCategory['total']))}, about ${_asInt(topCategory['percentage'])}% of your spending for $monthLabel.',
+      );
+    }
+
+    if (monthChange.isNotEmpty) {
+      final percent = _asInt(monthChange['percent']);
+      if (percent > 0) {
+        final direction = _asBool(monthChange['isIncrease']) ? 'up' : 'down';
+        insights.add(
+          'Your spending was $percent% $direction compared with last month, which is a useful signal for whether your current habits are accelerating or settling down.',
+        );
+      }
+    } else if (highestSpendDay.isNotEmpty) {
+      insights.add(
+        'Your highest spending day was day ${_asInt(highestSpendDay['day'])}, when you spent ${_formatCurrency(_asDouble(highestSpendDay['amount']))}.',
+      );
+    }
+
+    if (topMerchants.isNotEmpty) {
+      final merchant = topMerchants.first;
+      insights.add(
+        '${merchant['name']} is your top merchant overall at ${_formatCurrency(_asDouble(merchant['total']))}, so repeated spend there is worth reviewing first.',
+      );
+    } else if (monthsCount > 1) {
+      insights.add(
+        'You now have $monthsCount months of receipt history and ${_formatCurrency(allTimeSpend)} in tracked spending overall, which is enough data to compare patterns over time.',
+      );
+    }
+
+    return insights.take(4).toList();
+  }
+
+  Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return value.map((key, value) => MapEntry(key.toString(), value));
+    }
+    return const <String, dynamic>{};
+  }
+
+  List<Map<String, dynamic>> _asMapList(dynamic value) {
+    if (value is! List) {
+      return const <Map<String, dynamic>>[];
+    }
+    return value.map(_asMap).toList();
+  }
+
+  double _asDouble(dynamic value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  int _asInt(dynamic value) {
+    if (value is num) {
+      return value.round();
+    }
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  bool _asBool(dynamic value) {
+    if (value is bool) {
+      return value;
+    }
+    return value?.toString().toLowerCase() == 'true';
+  }
+
+  String _formatCurrency(double amount) {
+    return NumberFormat.currency(symbol: '\$', decimalDigits: 2).format(amount);
   }
 }

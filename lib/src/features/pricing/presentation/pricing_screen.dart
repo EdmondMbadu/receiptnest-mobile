@@ -140,7 +140,7 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Start free, upgrade when you need more',
+                  'Upgrade to Pro for unlimited access and faster workflows',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w400,
@@ -257,26 +257,6 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
           ],
 
           // ── Plan cards ──
-          // Free plan
-          _PlanCard(
-            planName: 'Free',
-            tagline: 'For getting started',
-            price: '\$0',
-            cadence: 'forever',
-            isActive: !isPro,
-            isPrimary: false,
-            isDark: isDark,
-            features: const [
-              _Feature('Up to 200 receipts', Icons.receipt_long_rounded),
-              _Feature('Smart auto-tagging', Icons.label_rounded),
-              _Feature('Email & PDF uploads', Icons.upload_file_rounded),
-              _Feature('Single workspace', Icons.person_rounded),
-            ],
-            buttonLabel: !isPro ? 'Current plan' : null,
-            onButtonPressed: null,
-          ),
-          const SizedBox(height: 16),
-
           // Pro plan
           _PlanCard(
             planName: 'Pro',
@@ -298,6 +278,26 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
             isProcessing: _processingCheckout,
             onButtonPressed:
                 isPro || _processingCheckout ? null : _startCheckout,
+          ),
+          const SizedBox(height: 16),
+
+          // Free plan
+          _PlanCard(
+            planName: 'Free',
+            tagline: 'For getting started',
+            price: '\$0',
+            cadence: 'forever',
+            isActive: !isPro,
+            isPrimary: false,
+            isDark: isDark,
+            features: const [
+              _Feature('Up to 200 receipts', Icons.receipt_long_rounded),
+              _Feature('Smart auto-tagging', Icons.label_rounded),
+              _Feature('Email & PDF uploads', Icons.upload_file_rounded),
+              _Feature('Single workspace', Icons.person_rounded),
+            ],
+            buttonLabel: !isPro ? 'Current plan' : null,
+            onButtonPressed: null,
           ),
           const SizedBox(height: 24),
 
