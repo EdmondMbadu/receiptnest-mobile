@@ -149,6 +149,7 @@ final dailySpendingDataProvider = Provider<List<DailySpendingPoint>>((ref) {
       day: index + 1,
       amount: totals[index],
       cumulative: cumulative,
+      pointDate: DateTime(year, month, index + 1),
     );
   });
 });
@@ -188,11 +189,13 @@ class DailySpendingPoint {
     required this.day,
     required this.amount,
     required this.cumulative,
+    required this.pointDate,
   });
 
   final int day;
   final double amount;
   final double cumulative;
+  final DateTime pointDate;
 }
 
 class UploadFileData {

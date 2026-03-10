@@ -36,6 +36,31 @@ String _timeRangeLabel(_TimeRange range) {
   }
 }
 
+String _formatChartPointDate(
+  DailySpendingPoint point, {
+  bool includeHour = false,
+}) {
+  final pattern = includeHour ? 'MMM d, y h a' : 'MMM d, y';
+  return DateFormat(pattern).format(point.pointDate);
+}
+
+List<_TimeAxisLabel> _buildHourlyAxisLabels(List<DailySpendingPoint> points) {
+  if (points.isEmpty) {
+    return const [];
+  }
+
+  const indexes = [0, 6, 12, 18, 23];
+  return indexes
+      .where((index) => index >= 0 && index < points.length)
+      .map(
+        (index) => _TimeAxisLabel(
+          label: DateFormat('h a').format(points[index].pointDate),
+          alignment: points.length <= 1 ? 0.5 : index / (points.length - 1),
+        ),
+      )
+      .toList(growable: false);
+}
+
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -141,6 +166,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
+    if (_timeRange == _TimeRange.oneDay) {
+      final hourlyAmounts = <int, double>{};
+
+      for (final receipt in receipts) {
+        final amount = receipt.effectiveTotalAmount;
+        final dateTime = receipt.effectiveDateTime;
+        if (amount == null || dateTime == null) continue;
+        if (dateTime.year != today.year ||
+            dateTime.month != today.month ||
+            dateTime.day != today.day) {
+          continue;
+        }
+
+        final hour = dateTime.hour;
+        hourlyAmounts[hour] = (hourlyAmounts[hour] ?? 0) + amount;
+      }
+
+      var cumulative = 0.0;
+      return List.generate(24, (hour) {
+        final amount = hourlyAmounts[hour] ?? 0;
+        cumulative += amount;
+        final pointDate = DateTime(
+          today.year,
+          today.month,
+          today.day,
+          hour,
+        );
+        return DailySpendingPoint(
+          day: today.day,
+          amount: amount,
+          cumulative: cumulative,
+          pointDate: pointDate,
+        );
+      });
+    }
+
     late DateTime startDate;
     switch (_timeRange) {
       case _TimeRange.oneDay:
@@ -187,10 +248,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return List.generate(math.max(1, totalDays), (index) {
       final amount = dayAmounts[index] ?? 0;
       cumulative += amount;
+      final pointDate = DateTime(
+        startDate.year,
+        startDate.month,
+        startDate.day + index,
+      );
       return DailySpendingPoint(
         day: index + 1,
         amount: amount,
         cumulative: cumulative,
+        pointDate: pointDate,
       );
     });
   }
@@ -890,6 +957,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             _RobinhoodTimeRangeChart(
                               points: timeRangePoints,
                               lineColor: trendColor,
+                              timeRange: _timeRange,
                             ),
                         ],
 
@@ -1821,46 +1889,22 @@ class _RobinhoodMonthlyChartState extends State<_RobinhoodMonthlyChart> {
   /// looks like a timeline. For past months, condense to only days
   /// with spending so the graph is focused (Robinhood-style).
   List<DailySpendingPoint> _normalizedPoints() {
-    final totalDays = math.max(1, widget.totalDays);
-    final amountByDay = <int, double>{};
-    for (final point in widget.points) {
-      if (point.day >= 1 && point.day <= totalDays) {
-        amountByDay[point.day] = point.amount;
-      }
-    }
-
     if (widget.isCurrentMonth) {
-      // Current month: show all days (timeline view)
-      var cumulative = 0.0;
-      return List.generate(totalDays, (index) {
-        final day = index + 1;
-        final amount = amountByDay[day] ?? 0;
-        cumulative += amount;
-        return DailySpendingPoint(
-          day: day,
-          amount: amount,
-          cumulative: cumulative,
-        );
-      });
+      return widget.points;
     } else {
-      // Past months: only days with spending (condensed view)
-      final active = <DailySpendingPoint>[];
-      var cumulative = 0.0;
-      for (var day = 1; day <= totalDays; day++) {
-        final amount = amountByDay[day];
-        if (amount != null && amount > 0) {
-          cumulative += amount;
-          active.add(
-            DailySpendingPoint(
-              day: day,
-              amount: amount,
-              cumulative: cumulative,
-            ),
-          );
-        }
-      }
+      final active = widget.points.where((point) => point.amount > 0).toList();
       if (active.isEmpty) {
-        return [const DailySpendingPoint(day: 1, amount: 0, cumulative: 0)];
+        final fallbackDate = widget.points.isNotEmpty
+            ? widget.points.first.pointDate
+            : DateTime.now();
+        return [
+          DailySpendingPoint(
+            day: fallbackDate.day,
+            amount: 0,
+            cumulative: 0,
+            pointDate: fallbackDate,
+          ),
+        ];
       }
       return active;
     }
@@ -1925,8 +1969,8 @@ class _RobinhoodMonthlyChartState extends State<_RobinhoodMonthlyChart> {
                   ),
                 )
               : Text(
-                  'Day ${selectedPoint.day}: ${formatCurrency(selectedPoint.amount)}',
-                  key: ValueKey<int>(selectedPoint.day),
+                  '${_formatChartPointDate(selectedPoint)}: ${formatCurrency(selectedPoint.amount)}',
+                  key: ValueKey<int>(selectedPoint.pointDate.millisecondsSinceEpoch),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: widget.lineColor,
@@ -2002,7 +2046,7 @@ class _RobinhoodMonthlyChartState extends State<_RobinhoodMonthlyChart> {
             const SizedBox(width: 8),
             _ChartPill(
               label: 'Peak',
-              value: 'Day ${peak.day}: ${formatCurrency(peak.amount)}',
+              value: '${_formatChartPointDate(peak)}: ${formatCurrency(peak.amount)}',
               color: cs.secondary,
             ),
           ],
@@ -2017,10 +2061,12 @@ class _RobinhoodTimeRangeChart extends StatefulWidget {
   const _RobinhoodTimeRangeChart({
     required this.points,
     required this.lineColor,
+    required this.timeRange,
   });
 
   final List<DailySpendingPoint> points;
   final Color lineColor;
+  final _TimeRange timeRange;
 
   @override
   State<_RobinhoodTimeRangeChart> createState() =>
@@ -2040,10 +2086,24 @@ class _RobinhoodTimeRangeChartState extends State<_RobinhoodTimeRangeChart> {
 
   /// Filter to only days that have spending, keeping the chart condensed.
   List<DailySpendingPoint> _condensedPoints() {
+    if (widget.timeRange == _TimeRange.oneDay) {
+      return widget.points;
+    }
+
     final active = widget.points.where((p) => p.amount > 0).toList();
     if (active.isEmpty) {
       // Return at least one zero point so the chart doesn't crash
-      return [const DailySpendingPoint(day: 1, amount: 0, cumulative: 0)];
+      final fallbackDate = widget.points.isNotEmpty
+          ? widget.points.last.pointDate
+          : DateTime.now();
+      return [
+        DailySpendingPoint(
+          day: fallbackDate.day,
+          amount: 0,
+          cumulative: 0,
+          pointDate: fallbackDate,
+        ),
+      ];
     }
     return active;
   }
@@ -2086,15 +2146,17 @@ class _RobinhoodTimeRangeChartState extends State<_RobinhoodTimeRangeChart> {
           duration: const Duration(milliseconds: 120),
           child: selectedPoint == null
               ? Text(
-                  'Touch and slide to inspect spending',
+                  widget.timeRange == _TimeRange.oneDay
+                      ? 'Touch and slide to inspect hourly spend'
+                      : 'Touch and slide to inspect spending',
                   key: const ValueKey('hint'),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: cs.onSurface.withValues(alpha: 0.55),
                   ),
                 )
               : Text(
-                  'Day ${selectedPoint.day}: ${formatCurrency(selectedPoint.amount)}',
-                  key: ValueKey<int>(selectedPoint.day),
+                  '${_formatChartPointDate(selectedPoint, includeHour: widget.timeRange == _TimeRange.oneDay)}: ${formatCurrency(selectedPoint.amount)}',
+                  key: ValueKey<int>(selectedPoint.pointDate.millisecondsSinceEpoch),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: widget.lineColor,
@@ -2159,6 +2221,38 @@ class _RobinhoodTimeRangeChartState extends State<_RobinhoodTimeRangeChart> {
             ),
           ),
         ),
+        if (widget.timeRange == _TimeRange.oneDay) ...[
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 14,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                return Stack(
+                  children: _buildHourlyAxisLabels(condensed)
+                      .map(
+                        (tick) => Positioned(
+                          left: (width * tick.alignment) - 16,
+                          child: SizedBox(
+                            width: 32,
+                            child: Text(
+                              tick.label,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    fontSize: 10,
+                                    color: cs.onSurface.withValues(alpha: 0.45),
+                                  ),
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(growable: false),
+                );
+              },
+            ),
+          ),
+        ],
         const SizedBox(height: 10),
         Row(
           children: [
@@ -2170,7 +2264,8 @@ class _RobinhoodTimeRangeChartState extends State<_RobinhoodTimeRangeChart> {
             const SizedBox(width: 8),
             _ChartPill(
               label: 'Peak',
-              value: 'Day ${peak.day}: ${formatCurrency(peak.amount)}',
+              value:
+                  '${_formatChartPointDate(peak, includeHour: widget.timeRange == _TimeRange.oneDay)}: ${formatCurrency(peak.amount)}',
               color: cs.secondary,
             ),
           ],
@@ -2197,6 +2292,13 @@ class _HistogramMonthPoint {
   final String label;
   final String fullLabel;
   final double amount;
+}
+
+class _TimeAxisLabel {
+  const _TimeAxisLabel({required this.label, required this.alignment});
+
+  final String label;
+  final double alignment;
 }
 
 class _HistogramYAxisTick {

@@ -72,6 +72,10 @@ DateTime? _parseDateValue(dynamic value) {
   return null;
 }
 
+bool _isSameCalendarDay(DateTime a, DateTime b) {
+  return a.year == b.year && a.month == b.month && a.day == b.day;
+}
+
 String? _coerceDateString(dynamic value) {
   if (value == null) return null;
   if (value is String) return value;
@@ -337,6 +341,36 @@ class Receipt {
     if (extractedDate != null) return extractedDate;
 
     return createdAt;
+  }
+
+  DateTime? get effectiveDateTime {
+    final parsedDate = _parseDateValue(date);
+    final extractedDate = _parseDateValue(extraction?.date?.value);
+    final timestamp = createdAt ?? file.uploadedAt;
+    final baseDate = parsedDate ?? extractedDate ?? timestamp;
+
+    if (baseDate == null) {
+      return null;
+    }
+
+    if (timestamp == null || (parsedDate == null && extractedDate == null)) {
+      return baseDate;
+    }
+
+    if (!_isSameCalendarDay(baseDate, timestamp)) {
+      return baseDate;
+    }
+
+    return DateTime(
+      baseDate.year,
+      baseDate.month,
+      baseDate.day,
+      timestamp.hour,
+      timestamp.minute,
+      timestamp.second,
+      timestamp.millisecond,
+      timestamp.microsecond,
+    );
   }
 
   bool get isPdf =>
