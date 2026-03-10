@@ -21,6 +21,7 @@ class AiInsightsScreen extends ConsumerStatefulWidget {
 }
 
 class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
 
@@ -448,13 +449,40 @@ class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
       );
     }
 
+    final isCompactLayout = MediaQuery.of(context).size.width < 860;
+
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor:
           isDark ? const Color(0xFF0D0D14) : const Color(0xFFF6F7F9),
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
+        leading: isCompactLayout
+            ? Padding(
+                padding: const EdgeInsets.only(left: 12),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: cs.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: IconButton(
+                    onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                    icon: Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      size: 18,
+                      color: cs.primary,
+                    ),
+                    padding: EdgeInsets.zero,
+                    tooltip: 'Conversation history',
+                  ),
+                ),
+              )
+            : null,
         title: const Text('AI Insights'),
         titleTextStyle: TextStyle(
           fontSize: 18,
@@ -1176,7 +1204,7 @@ class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
           ),
         ],
       ),
-      drawer: MediaQuery.of(context).size.width < 860
+      drawer: isCompactLayout
           ? Drawer(
               backgroundColor:
                   isDark ? const Color(0xFF0D0D14) : const Color(0xFFF6F7F9),
