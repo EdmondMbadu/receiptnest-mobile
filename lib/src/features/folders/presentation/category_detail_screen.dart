@@ -22,6 +22,7 @@ class CategoryDetailScreen extends ConsumerStatefulWidget {
 
 class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
   _TimeRange _range = _TimeRange.month;
+  String? _selectedPeriod;
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +45,31 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
         return db.compareTo(da);
       });
 
-    final total = receipts.fold<double>(
+    final allTimeTotal = receipts.fold<double>(
+      0,
+      (sum, r) => sum + (r.effectiveTotalAmount ?? 0),
+    );
+
+    final periods = _buildPeriods(receipts);
+
+    if (_selectedPeriod == null && periods.isNotEmpty) {
+      _selectedPeriod = periods.first.key;
+    }
+    if (_selectedPeriod != null &&
+        _range != _TimeRange.allTime &&
+        !periods.any((p) => p.key == _selectedPeriod)) {
+      _selectedPeriod = periods.isNotEmpty ? periods.first.key : null;
+    }
+
+    final filtered = _range == _TimeRange.allTime
+        ? receipts
+        : receipts.where((r) {
+            final date = r.effectiveDate;
+            if (date == null) return false;
+            return _periodKey(date) == _selectedPeriod;
+          }).toList();
+
+    final filteredTotal = filtered.fold<double>(
       0,
       (sum, r) => sum + (r.effectiveTotalAmount ?? 0),
     );
@@ -57,89 +82,181 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+      body: Column(
         children: [
-          // ── Summary card ──
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF151520) : Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.grey.shade200,
-              ),
-            ),
-            child: Row(
+          // ── Fixed header ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+            child: Column(
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                // Summary card
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF151520) : Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.06)
+                          : Colors.grey.shade200,
+                    ),
+                  ),
+                  child: Row(
                     children: [
-                      Text(
-                        '${receipts.length} receipts',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: cs.onSurface.withValues(alpha: 0.5),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${filtered.length} receipt${filtered.length == 1 ? '' : 's'}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: cs.onSurface.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              formatCurrency(filteredTotal),
+                              style: TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.5,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                            if (_range != _TimeRange.allTime) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                'All time: ${formatCurrency(allTimeTotal)}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: cs.onSurface.withValues(alpha: 0.35),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        formatCurrency(total),
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.5,
-                          color: cs.onSurface,
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: cs.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Center(
+                          child: Text(
+                            category.icon,
+                            style: const TextStyle(fontSize: 24),
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: cs.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Center(
-                    child: Text(
-                      category.icon,
-                      style: const TextStyle(fontSize: 24),
+                const SizedBox(height: 14),
+
+                // Time range selector
+                _segmentedControl(cs, isDark),
+
+                // Period chips
+                if (_range != _TimeRange.allTime && periods.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 38,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: periods.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (context, i) {
+                        final p = periods[i];
+                        final selected = p.key == _selectedPeriod;
+                        return GestureDetector(
+                          onTap: () =>
+                              setState(() => _selectedPeriod = p.key),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 0),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? cs.primary
+                                  : (isDark
+                                      ? const Color(0xFF1E1E30)
+                                      : Colors.white),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: selected
+                                    ? cs.primary
+                                    : (isDark
+                                        ? Colors.white.withValues(alpha: 0.08)
+                                        : Colors.grey.shade300),
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                p.label,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: selected
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: selected
+                                      ? Colors.white
+                                      : cs.onSurface.withValues(alpha: 0.6),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
-                ),
+                ],
+                const SizedBox(height: 14),
               ],
             ),
           ),
-          const SizedBox(height: 14),
 
-          // ── Time range selector ──
-          Container(
-            height: 44,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF151520) : Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                _tabButton('Month', _TimeRange.month, cs, isDark),
-                _tabButton('Year', _TimeRange.year, cs, isDark),
-                _tabButton('All Time', _TimeRange.allTime, cs, isDark),
-              ],
-            ),
+          // ── Scrollable receipt list ──
+          Expanded(
+            child: filtered.isEmpty
+                ? Center(
+                    child: Text(
+                      'No receipts for this period',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: cs.onSurface.withValues(alpha: 0.4),
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, i) =>
+                        _receiptTile(filtered[i], cs),
+                  ),
           ),
-          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
 
-          // ── Content ──
-          if (receipts.isEmpty)
-            _emptyState(cs, isDark)
-          else
-            ..._buildContent(receipts, cs, isDark),
+  // ── Helpers ──
+
+  Widget _segmentedControl(ColorScheme cs, bool isDark) {
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF151520) : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          _tabButton('Month', _TimeRange.month, cs, isDark),
+          _tabButton('Year', _TimeRange.year, cs, isDark),
+          _tabButton('All Time', _TimeRange.allTime, cs, isDark),
         ],
       ),
     );
@@ -150,7 +267,10 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
     final selected = _range == range;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _range = range),
+        onTap: () => setState(() {
+          _range = range;
+          _selectedPeriod = null;
+        }),
         child: Container(
           margin: const EdgeInsets.all(3),
           decoration: BoxDecoration(
@@ -185,128 +305,42 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
     );
   }
 
-  List<Widget> _buildContent(
-      List<Receipt> receipts, ColorScheme cs, bool isDark) {
+  String _periodKey(DateTime date) {
     switch (_range) {
       case _TimeRange.month:
-        return _buildGrouped(
-          receipts,
-          cs,
-          isDark,
-          keyFn: (d) => '${d.year}-${d.month.toString().padLeft(2, '0')}',
-          labelFn: (d) => DateFormat('MMMM yyyy').format(d),
-          sortDescending: true,
-        );
+        return '${date.year}-${date.month.toString().padLeft(2, '0')}';
       case _TimeRange.year:
-        return _buildGrouped(
-          receipts,
-          cs,
-          isDark,
-          keyFn: (d) => '${d.year}',
-          labelFn: (d) => '${d.year}',
-          sortDescending: true,
-        );
+        return '${date.year}';
       case _TimeRange.allTime:
-        return receipts.map((r) => _receiptTile(r, cs)).toList();
+        return 'all';
     }
   }
 
-  List<Widget> _buildGrouped(
-    List<Receipt> receipts,
-    ColorScheme cs,
-    bool isDark, {
-    required String Function(DateTime) keyFn,
-    required String Function(DateTime) labelFn,
-    required bool sortDescending,
-  }) {
-    final groups = <String, _Group>{};
-
-    for (final receipt in receipts) {
-      final date = receipt.effectiveDate;
-      if (date == null) continue;
-      final key = keyFn(date);
-      groups.putIfAbsent(key, () => _Group(key: key, label: labelFn(date)));
-      groups[key]!.receipts.add(receipt);
-      groups[key]!.total += receipt.effectiveTotalAmount ?? 0;
-    }
-
-    // Add receipts without dates to a special group
-    final noDate =
-        receipts.where((r) => r.effectiveDate == null).toList();
-    if (noDate.isNotEmpty) {
-      final g = _Group(key: 'no-date', label: 'No Date');
-      g.receipts.addAll(noDate);
-      g.total = noDate.fold<double>(
-          0, (s, r) => s + (r.effectiveTotalAmount ?? 0));
-      groups['no-date'] = g;
-    }
-
-    final sorted = groups.values.toList()
-      ..sort((a, b) => sortDescending
-          ? b.key.compareTo(a.key)
-          : a.key.compareTo(b.key));
-
-    final widgets = <Widget>[];
-    for (final group in sorted) {
-      widgets.add(
-        Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF151520) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.06)
-                  : Colors.grey.shade200,
-            ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      group.label,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${group.receipts.length} receipt${group.receipts.length == 1 ? '' : 's'}',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: cs.onSurface.withValues(alpha: 0.45),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Text(
-                formatCurrency(group.total),
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.3,
-                  color: cs.onSurface,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-
-      for (final receipt in group.receipts) {
-        widgets.add(_receiptTile(receipt, cs));
+  List<_Period> _buildPeriods(List<Receipt> receipts) {
+    final seen = <String, _Period>{};
+    for (final r in receipts) {
+      final d = r.effectiveDate;
+      if (d == null) continue;
+      final key = _periodKey(d);
+      if (!seen.containsKey(key)) {
+        String label;
+        switch (_range) {
+          case _TimeRange.month:
+            label = DateFormat('MMM yyyy').format(d);
+            break;
+          case _TimeRange.year:
+            label = '${d.year}';
+            break;
+          case _TimeRange.allTime:
+            label = 'All Time';
+            break;
+        }
+        seen[key] = _Period(key: key, label: label);
       }
-
-      widgets.add(const SizedBox(height: 12));
     }
-    return widgets;
+    final list = seen.values.toList()
+      ..sort((a, b) => b.key.compareTo(a.key));
+    return list;
   }
 
   Widget _receiptTile(Receipt receipt, ColorScheme cs) {
@@ -391,30 +425,6 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
     );
   }
 
-  Widget _emptyState(ColorScheme cs, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF151520) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.grey.shade200,
-        ),
-      ),
-      child: Center(
-        child: Text(
-          'No receipts in this category',
-          style: TextStyle(
-            fontSize: 14,
-            color: cs.onSurface.withValues(alpha: 0.4),
-          ),
-        ),
-      ),
-    );
-  }
-
   String _initials(String name) {
     final parts = name.trim().split(RegExp(r'\s+'));
     if (parts.length >= 2) {
@@ -426,11 +436,8 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
   }
 }
 
-class _Group {
-  _Group({required this.key, required this.label});
-
+class _Period {
+  const _Period({required this.key, required this.label});
   final String key;
   final String label;
-  final List<Receipt> receipts = [];
-  double total = 0;
 }

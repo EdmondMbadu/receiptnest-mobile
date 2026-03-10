@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/utils/formatters.dart';
 import '../../auth/data/auth_repository.dart';
@@ -9,6 +10,8 @@ import '../../receipts/models/category.dart';
 import '../../receipts/models/receipt.dart';
 import '../data/folder_repository.dart';
 import '../models/folder.dart';
+
+enum _CatTimeRange { month, year, allTime }
 
 class FoldersScreen extends ConsumerStatefulWidget {
   const FoldersScreen({super.key});
@@ -451,18 +454,80 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
 // Categories Tab
 // ────────────────────────────────────────────────────────────────────────────
 
-class _CategoriesTab extends StatelessWidget {
+class _CategoriesTab extends StatefulWidget {
   const _CategoriesTab({required this.receipts});
 
   final List<Receipt> receipts;
+
+  @override
+  State<_CategoriesTab> createState() => _CategoriesTabState();
+}
+
+class _CategoriesTabState extends State<_CategoriesTab> {
+  _CatTimeRange _range = _CatTimeRange.allTime;
+  String? _selectedPeriod;
+
+  String _periodKey(DateTime d) {
+    switch (_range) {
+      case _CatTimeRange.month:
+        return '${d.year}-${d.month.toString().padLeft(2, '0')}';
+      case _CatTimeRange.year:
+        return '${d.year}';
+      case _CatTimeRange.allTime:
+        return 'all';
+    }
+  }
+
+  List<_PeriodChip> _buildPeriods(List<Receipt> receipts) {
+    final seen = <String, _PeriodChip>{};
+    for (final r in receipts) {
+      final d = r.effectiveDate;
+      if (d == null) continue;
+      final key = _periodKey(d);
+      if (!seen.containsKey(key)) {
+        String label;
+        switch (_range) {
+          case _CatTimeRange.month:
+            label = DateFormat('MMM yyyy').format(d);
+            break;
+          case _CatTimeRange.year:
+            label = '${d.year}';
+            break;
+          case _CatTimeRange.allTime:
+            label = 'All';
+            break;
+        }
+        seen[key] = _PeriodChip(key: key, label: label);
+      }
+    }
+    return seen.values.toList()..sort((a, b) => b.key.compareTo(a.key));
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final periods = _buildPeriods(widget.receipts);
+    if (_selectedPeriod == null && periods.isNotEmpty) {
+      _selectedPeriod = periods.first.key;
+    }
+    if (_selectedPeriod != null &&
+        _range != _CatTimeRange.allTime &&
+        !periods.any((p) => p.key == _selectedPeriod)) {
+      _selectedPeriod = periods.isNotEmpty ? periods.first.key : null;
+    }
+
+    final filtered = _range == _CatTimeRange.allTime
+        ? widget.receipts
+        : widget.receipts.where((r) {
+            final d = r.effectiveDate;
+            if (d == null) return false;
+            return _periodKey(d) == _selectedPeriod;
+          }).toList();
+
     final byCategory = <String, List<Receipt>>{};
-    for (final receipt in receipts) {
+    for (final receipt in filtered) {
       final catId = receipt.category?.id ?? 'other';
       byCategory.putIfAbsent(catId, () => []).add(receipt);
     }
@@ -475,220 +540,391 @@ class _CategoriesTab extends StatelessWidget {
     }).where((e) => e.receipts.isNotEmpty).toList()
       ..sort((a, b) => b.total.compareTo(a.total));
 
-    if (entries.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: cs.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(
-                Icons.category_outlined,
-                size: 28,
-                color: cs.onSurface.withValues(alpha: 0.25),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'No categorized receipts yet',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
-                color: cs.onSurface.withValues(alpha: 0.5),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Upload receipts to see categories',
-              style: TextStyle(
-                fontSize: 13,
-                color: cs.onSurface.withValues(alpha: 0.3),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     final grandTotal = entries.fold<double>(0, (s, e) => s + e.total);
+    final allTimeTotal = widget.receipts.fold<double>(
+        0, (s, r) => s + (r.effectiveTotalAmount ?? 0));
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+    return Column(
       children: [
-        // ── Summary card ──
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF151520) : Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.06)
-                  : Colors.grey.shade200,
-            ),
-          ),
-          child: Row(
+        // ── Fixed header (segmented + chips) ──
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              // Segmented control
+              Container(
+                height: 44,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF151520)
+                      : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
                   children: [
-                    Text(
-                      '${entries.length} categories',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: cs.onSurface.withValues(alpha: 0.45),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      formatCurrency(grandTotal),
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                        color: cs.onSurface,
-                      ),
-                    ),
+                    _catTabButton('Month', _CatTimeRange.month, cs, isDark),
+                    _catTabButton('Year', _CatTimeRange.year, cs, isDark),
+                    _catTabButton(
+                        'All Time', _CatTimeRange.allTime, cs, isDark),
                   ],
                 ),
               ),
-              Text(
-                '${receipts.length} receipts',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: cs.onSurface.withValues(alpha: 0.4),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
 
-        // ── Category cards ──
-        ...entries.map((entry) {
-          final pct =
-              grandTotal > 0 ? (entry.total / grandTotal * 100).round() : 0;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Container(
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF151520) : Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.06)
-                      : Colors.grey.shade200,
-                ),
-                boxShadow: isDark
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
-                          blurRadius: 12,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () =>
-                      context.push('/app/categories/${entry.category.id}'),
-                  borderRadius: BorderRadius.circular(18),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
+              // Period chips
+              if (_range != _CatTimeRange.allTime &&
+                  periods.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 38,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: periods.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (context, i) {
+                      final p = periods[i];
+                      final selected = p.key == _selectedPeriod;
+                      return GestureDetector(
+                        onTap: () =>
+                            setState(() => _selectedPeriod = p.key),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16),
                           decoration: BoxDecoration(
-                            color: cs.primary.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(14),
+                            color: selected
+                                ? cs.primary
+                                : (isDark
+                                    ? const Color(0xFF1E1E30)
+                                    : Colors.white),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: selected
+                                  ? cs.primary
+                                  : (isDark
+                                      ? Colors.white
+                                          .withValues(alpha: 0.08)
+                                      : Colors.grey.shade300),
+                            ),
                           ),
                           child: Center(
                             child: Text(
-                              entry.category.icon,
-                              style: const TextStyle(fontSize: 22),
+                              p.label,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: selected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: selected
+                                    ? Colors.white
+                                    : cs.onSurface
+                                        .withValues(alpha: 0.6),
+                              ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                entry.category.name,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 15,
-                                  color: cs.onSurface,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Text(
-                                    '${entry.receipts.length} receipts',
-                                    style: TextStyle(
-                                      fontSize: 12.5,
-                                      color: cs.onSurface
-                                          .withValues(alpha: 0.45),
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 6),
-                                    child: Text(
-                                      '\u00B7',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: cs.onSurface
-                                            .withValues(alpha: 0.2),
-                                      ),
-                                    ),
-                                  ),
-                                  Text(
-                                    '$pct%',
-                                    style: TextStyle(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: cs.primary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+              const SizedBox(height: 14),
+            ],
+          ),
+        ),
+
+        // ── Scrollable content ──
+        Expanded(
+          child: entries.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: cs.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(16),
                         ),
+                        child: Icon(
+                          Icons.category_outlined,
+                          size: 28,
+                          color: cs.onSurface.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        _range == _CatTimeRange.allTime
+                            ? 'No categorized receipts yet'
+                            : 'No receipts for this period',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                          color: cs.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      if (_range == _CatTimeRange.allTime) ...[
+                        const SizedBox(height: 4),
                         Text(
-                          formatCurrency(entry.total),
+                          'Upload receipts to see categories',
                           style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.3,
-                            color: cs.onSurface,
+                            fontSize: 13,
+                            color: cs.onSurface.withValues(alpha: 0.3),
                           ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
+                )
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  children: [
+                    // Summary card
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF151520)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.06)
+                              : Colors.grey.shade200,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${entries.length} categories',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: cs.onSurface
+                                        .withValues(alpha: 0.45),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  formatCurrency(grandTotal),
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.5,
+                                    color: cs.onSurface,
+                                  ),
+                                ),
+                                if (_range !=
+                                    _CatTimeRange.allTime) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'All time: ${formatCurrency(allTimeTotal)}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: cs.onSurface
+                                          .withValues(alpha: 0.35),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          Text(
+                            '${filtered.length} receipts',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color:
+                                  cs.onSurface.withValues(alpha: 0.4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Category cards
+                    ...entries.map((entry) {
+                      final pct = grandTotal > 0
+                          ? (entry.total / grandTotal * 100).round()
+                          : 0;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? const Color(0xFF151520)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: isDark
+                                  ? Colors.white
+                                      .withValues(alpha: 0.06)
+                                  : Colors.grey.shade200,
+                            ),
+                            boxShadow: isDark
+                                ? null
+                                : [
+                                    BoxShadow(
+                                      color: Colors.black
+                                          .withValues(alpha: 0.03),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => context.push(
+                                  '/app/categories/${entry.category.id}'),
+                              borderRadius: BorderRadius.circular(18),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: cs.primary
+                                            .withValues(alpha: 0.08),
+                                        borderRadius:
+                                            BorderRadius.circular(14),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          entry.category.icon,
+                                          style: const TextStyle(
+                                              fontSize: 22),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            entry.category.name,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 15,
+                                              color: cs.onSurface,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Text(
+                                                '${entry.receipts.length} receipts',
+                                                style: TextStyle(
+                                                  fontSize: 12.5,
+                                                  color: cs.onSurface
+                                                      .withValues(
+                                                          alpha: 0.45),
+                                                ),
+                                              ),
+                                              Padding(
+                                                padding: const EdgeInsets
+                                                    .symmetric(
+                                                    horizontal: 6),
+                                                child: Text(
+                                                  '\u00B7',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight:
+                                                        FontWeight.w700,
+                                                    color: cs.onSurface
+                                                        .withValues(
+                                                            alpha: 0.2),
+                                                  ),
+                                                ),
+                                              ),
+                                              Text(
+                                                '$pct%',
+                                                style: TextStyle(
+                                                  fontSize: 12.5,
+                                                  fontWeight:
+                                                      FontWeight.w600,
+                                                  color: cs.primary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Text(
+                                      formatCurrency(entry.total),
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: -0.3,
+                                        color: cs.onSurface,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
                 ),
+        ),
+      ],
+    );
+  }
+
+  Widget _catTabButton(
+      String label, _CatTimeRange range, ColorScheme cs, bool isDark) {
+    final selected = _range == range;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() {
+          _range = range;
+          _selectedPeriod = null;
+        }),
+        child: Container(
+          margin: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            color: selected
+                ? (isDark ? const Color(0xFF252538) : Colors.white)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: selected && !isDark
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected
+                    ? cs.onSurface
+                    : cs.onSurface.withValues(alpha: 0.4),
               ),
             ),
-          );
-        }),
-      ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -703,6 +939,12 @@ class _CategoryEntry {
   final ExpenseCategory category;
   final List<Receipt> receipts;
   final double total;
+}
+
+class _PeriodChip {
+  const _PeriodChip({required this.key, required this.label});
+  final String key;
+  final String label;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
