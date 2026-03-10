@@ -160,57 +160,52 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                 // Time range selector
                 _segmentedControl(cs, isDark),
 
-                // Period chips
+                // Period dropdown
                 if (_range != _TimeRange.allTime && periods.isNotEmpty) ...[
                   const SizedBox(height: 10),
-                  SizedBox(
-                    height: 38,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: periods.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: 8),
-                      itemBuilder: (context, i) {
-                        final p = periods[i];
-                        final selected = p.key == _selectedPeriod;
-                        return GestureDetector(
-                          onTap: () =>
-                              setState(() => _selectedPeriod = p.key),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 0),
-                            decoration: BoxDecoration(
-                              color: selected
-                                  ? cs.primary
-                                  : (isDark
-                                      ? const Color(0xFF1E1E30)
-                                      : Colors.white),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: selected
-                                    ? cs.primary
-                                    : (isDark
-                                        ? Colors.white.withValues(alpha: 0.08)
-                                        : Colors.grey.shade300),
-                              ),
-                            ),
-                            child: Center(
-                              child: Text(
-                                p.label,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: selected
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                  color: selected
-                                      ? Colors.white
-                                      : cs.onSurface.withValues(alpha: 0.6),
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
+                  Container(
+                    height: 44,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF1E1E30)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : Colors.grey.shade300,
+                      ),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedPeriod,
+                        isExpanded: true,
+                        icon: Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: cs.onSurface.withValues(alpha: 0.5),
+                        ),
+                        dropdownColor: isDark
+                            ? const Color(0xFF1E1E30)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface,
+                        ),
+                        items: periods
+                            .map((p) => DropdownMenuItem(
+                                  value: p.key,
+                                  child: Text(p.label),
+                                ))
+                            .toList(),
+                        onChanged: (v) {
+                          if (v != null) {
+                            setState(() => _selectedPeriod = v);
+                          }
+                        },
+                      ),
                     ),
                   ),
                 ],
