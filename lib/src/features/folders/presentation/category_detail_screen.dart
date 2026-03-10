@@ -160,53 +160,14 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                 // Time range selector
                 _segmentedControl(cs, isDark),
 
-                // Period dropdown
+                // Period navigator
                 if (_range != _TimeRange.allTime && periods.isNotEmpty) ...[
                   const SizedBox(height: 10),
-                  Container(
-                    height: 44,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF1E1E30)
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.08)
-                            : Colors.grey.shade300,
-                      ),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _selectedPeriod,
-                        isExpanded: true,
-                        icon: Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          color: cs.onSurface.withValues(alpha: 0.5),
-                        ),
-                        dropdownColor: isDark
-                            ? const Color(0xFF1E1E30)
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: cs.onSurface,
-                        ),
-                        items: periods
-                            .map((p) => DropdownMenuItem(
-                                  value: p.key,
-                                  child: Text(p.label),
-                                ))
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) {
-                            setState(() => _selectedPeriod = v);
-                          }
-                        },
-                      ),
-                    ),
+                  _PeriodNavigator(
+                    periods: periods,
+                    selectedKey: _selectedPeriod,
+                    onChanged: (key) =>
+                        setState(() => _selectedPeriod = key),
                   ),
                 ],
                 const SizedBox(height: 14),
@@ -435,4 +396,232 @@ class _Period {
   const _Period({required this.key, required this.label});
   final String key;
   final String label;
+}
+
+class _PeriodNavigator extends StatelessWidget {
+  const _PeriodNavigator({
+    required this.periods,
+    required this.selectedKey,
+    required this.onChanged,
+  });
+
+  final List<_Period> periods;
+  final String? selectedKey;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final idx = periods.indexWhere((p) => p.key == selectedKey);
+    final hasPrev = idx < periods.length - 1;
+    final hasNext = idx > 0;
+    final label =
+        idx >= 0 ? periods[idx].label : (periods.isNotEmpty ? periods.first.label : '');
+
+    return Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E30) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.grey.shade200,
+        ),
+      ),
+      child: Row(
+        children: [
+          _arrowButton(
+            icon: Icons.chevron_left_rounded,
+            enabled: hasPrev,
+            onTap: () => onChanged(periods[idx + 1].key),
+            cs: cs,
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _showPicker(context, cs, isDark),
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      transitionBuilder: (child, animation) =>
+                          FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0, 0.15),
+                            end: Offset.zero,
+                          ).animate(animation),
+                          child: child,
+                        ),
+                      ),
+                      child: Text(
+                        label,
+                        key: ValueKey(label),
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.2,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.unfold_more_rounded,
+                      size: 18,
+                      color: cs.onSurface.withValues(alpha: 0.35),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          _arrowButton(
+            icon: Icons.chevron_right_rounded,
+            enabled: hasNext,
+            onTap: () => onChanged(periods[idx - 1].key),
+            cs: cs,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _arrowButton({
+    required IconData icon,
+    required bool enabled,
+    required VoidCallback onTap,
+    required ColorScheme cs,
+  }) {
+    return SizedBox(
+      width: 48,
+      height: 48,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(14),
+          child: Center(
+            child: Icon(
+              icon,
+              size: 24,
+              color: enabled
+                  ? cs.onSurface.withValues(alpha: 0.7)
+                  : cs.onSurface.withValues(alpha: 0.12),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showPicker(BuildContext context, ColorScheme cs, bool isDark) {
+    final idx = periods.indexWhere((p) => p.key == selectedKey);
+
+    showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.5,
+          ),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1A1A2A) : Colors.white,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Select period',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                ),
+              ),
+              Flexible(
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
+                  shrinkWrap: true,
+                  itemCount: periods.length,
+                  itemBuilder: (_, i) {
+                    final p = periods[i];
+                    final selected = i == idx;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Material(
+                        color: selected
+                            ? cs.primary.withValues(alpha: 0.1)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => Navigator.of(ctx).pop(p.key),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    p.label,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: selected
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      color: selected
+                                          ? cs.primary
+                                          : cs.onSurface,
+                                    ),
+                                  ),
+                                ),
+                                if (selected)
+                                  Icon(
+                                    Icons.check_rounded,
+                                    size: 20,
+                                    color: cs.primary,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    ).then((value) {
+      if (value != null) onChanged(value);
+    });
+  }
 }
