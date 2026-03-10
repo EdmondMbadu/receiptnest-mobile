@@ -234,18 +234,6 @@ class FolderRepository {
         label: _cleanLabel(receipt.merchant?.canonicalName ?? receipt.merchant?.rawName),
         receiptId: receipt.id,
       );
-      _addBucket(
-        buckets,
-        type: 'category',
-        label: _cleanLabel(receipt.category?.name),
-        receiptId: receipt.id,
-      );
-      _addBucket(
-        buckets,
-        type: 'title',
-        label: _titleLabel(receipt.file.originalName),
-        receiptId: receipt.id,
-      );
     }
 
     return buckets.values
@@ -253,7 +241,7 @@ class FolderRepository {
         .map((bucket) => _AutoFolderGroup(
               type: bucket.type,
               key: bucket.key,
-              name: '${bucket.type[0].toUpperCase()}${bucket.type.substring(1)}: ${bucket.label}',
+              name: bucket.label,
               receiptIds: bucket.receiptIds.toList()..sort(),
             ))
         .toList()
@@ -292,16 +280,6 @@ class FolderRepository {
     final cleaned = value.trim();
     if (cleaned.isEmpty) return null;
     return cleaned.length > 60 ? cleaned.substring(0, 60).trim() : cleaned;
-  }
-
-  String? _titleLabel(String originalName) {
-    final withoutExt = originalName.replaceAll(RegExp(r'\.[^./]+$'), '');
-    final normalized = withoutExt.replaceAll(RegExp(r'[_-]+'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (normalized.isEmpty) return null;
-
-    final generic = RegExp(r'^(img|image|scan|scanned|photo|receipt|document)[\s_-]*\d*$', caseSensitive: false);
-    if (generic.hasMatch(normalized)) return null;
-    return _cleanLabel(normalized);
   }
 
   bool _sameIds(List<String> a, List<String> b) {

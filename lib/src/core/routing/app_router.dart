@@ -11,6 +11,7 @@ import '../../features/auth/data/auth_repository.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/verify_email_screen.dart';
+import '../../features/folders/presentation/category_detail_screen.dart';
 import '../../features/folders/presentation/folder_detail_screen.dart';
 import '../../features/folders/presentation/folders_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
@@ -124,6 +125,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/app/folders/:id',
         builder: (context, state) =>
             FolderDetailScreen(folderId: state.pathParameters['id'] ?? ''),
+      ),
+      GoRoute(
+        path: '/app/categories/:id',
+        builder: (context, state) =>
+            CategoryDetailScreen(categoryId: state.pathParameters['id'] ?? ''),
       ),
       GoRoute(
         path: '/app/pricing',
