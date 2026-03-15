@@ -43,7 +43,7 @@ class FolderRepository {
   ) async {
     final cleanName = name.trim();
     if (cleanName.isEmpty) {
-      throw Exception('Folder name is required.');
+      throw Exception('Collection name is required.');
     }
 
     await _db.collection('users').doc(userId).collection('folders').add({
@@ -59,7 +59,7 @@ class FolderRepository {
   Future<void> renameFolder(String userId, String folderId, String name) async {
     final clean = name.trim();
     if (clean.isEmpty) {
-      throw Exception('Folder name is required.');
+      throw Exception('Collection name is required.');
     }
 
     await _db.collection('users').doc(userId).collection('folders').doc(folderId).update({
@@ -89,7 +89,7 @@ class FolderRepository {
     required Folder target,
   }) async {
     if (source.id == target.id) {
-      throw Exception('Choose two different folders to merge.');
+      throw Exception('Choose two different collections to merge.');
     }
 
     final targetReceiptSet = target.receiptIds.toSet();

@@ -195,7 +195,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Delete account?'),
         content: const Text(
-          'This permanently deletes your profile, receipts, chats, folders, and shared data. This cannot be undone.',
+          'This permanently deletes your profile, receipts, chats, collections, and shared data. This cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -583,7 +583,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ]),
                   const SizedBox(height: 10),
                   Text(
-                    'Permanently deletes your profile, receipts, chats, folders, shares, and linked data.',
+                    'Permanently deletes your profile, receipts, chats, collections, shares, and linked data.',
                     style: TextStyle(
                         fontSize: 13,
                         color: cs.onSurface.withValues(alpha: 0.6)),

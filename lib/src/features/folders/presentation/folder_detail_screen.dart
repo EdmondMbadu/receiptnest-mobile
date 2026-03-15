@@ -44,7 +44,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
             borderRadius: BorderRadius.circular(20),
           ),
           backgroundColor: isDark ? const Color(0xFF1A1A28) : Colors.white,
-          title: const Text('Rename folder'),
+          title: const Text('Rename collection'),
           content: TextField(controller: controller),
           actions: [
             TextButton(
@@ -98,7 +98,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                     size: 20, color: cs.error),
               ),
               const SizedBox(width: 12),
-              const Text('Delete folder'),
+              const Text('Delete collection'),
             ],
           ),
           content: Text('Delete "${folder.name}"?'),
@@ -267,7 +267,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        title: const Text('Folder'),
+        title: const Text('Collection'),
         titleTextStyle: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w700,
@@ -282,7 +282,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
           ),
         ),
         error: (err, _) =>
-            Center(child: Text('Failed to load folder: $err')),
+            Center(child: Text('Failed to load collection: $err')),
         data: (folders) {
           final folder = _folderById(folders);
           if (folder == null) {
@@ -295,7 +295,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                       color: cs.onSurface.withValues(alpha: 0.15)),
                   const SizedBox(height: 12),
                   Text(
-                    'Folder not found',
+                    'Collection not found',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       color: cs.onSurface.withValues(alpha: 0.5),
@@ -610,7 +610,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'No receipts in this folder',
+                        'No receipts in this collection',
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           color: cs.onSurface

@@ -62,7 +62,7 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
               ),
               backgroundColor:
                   isDark ? const Color(0xFF1A1A28) : Colors.white,
-              title: const Text('Create folder'),
+              title: const Text('Create collection'),
               content: SizedBox(
                 width: 420,
                 child: Column(
@@ -71,7 +71,7 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
                     TextField(
                       controller: nameController,
                       decoration: const InputDecoration(
-                        labelText: 'Folder name',
+                        labelText: 'Collection name',
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -141,7 +141,9 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Failed to create folder: $e')));
+          .showSnackBar(
+            SnackBar(content: Text('Failed to create collection: $e')),
+          );
     }
   }
 
@@ -159,11 +161,13 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
           .syncAutoFolders(uid, folders, receipts);
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Auto folders synced.')));
+          .showSnackBar(
+            const SnackBar(content: Text('Auto collections synced.')),
+          );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to sync auto folders: $e')),
+        SnackBar(content: Text('Failed to sync auto collections: $e')),
       );
     } finally {
       if (mounted) {
@@ -186,10 +190,10 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
             borderRadius: BorderRadius.circular(20),
           ),
           backgroundColor: isDark ? const Color(0xFF1A1A28) : Colors.white,
-          title: const Text('Rename folder'),
+          title: const Text('Rename collection'),
           content: TextField(
             controller: controller,
-            decoration: const InputDecoration(labelText: 'Folder name'),
+            decoration: const InputDecoration(labelText: 'Collection name'),
           ),
           actions: [
             TextButton(
@@ -219,7 +223,9 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Failed to rename folder: $e')));
+          .showSnackBar(
+            SnackBar(content: Text('Failed to rename collection: $e')),
+          );
     }
   }
 
@@ -250,7 +256,7 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
                     size: 20, color: cs.error),
               ),
               const SizedBox(width: 12),
-              const Text('Delete folder'),
+              const Text('Delete collection'),
             ],
           ),
           content: Text('Delete "${folder.name}"?'),
@@ -278,7 +284,9 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Failed to delete folder: $e')));
+          .showSnackBar(
+            SnackBar(content: Text('Failed to delete collection: $e')),
+          );
     }
   }
 
@@ -303,7 +311,7 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
               ),
               backgroundColor:
                   isDark ? const Color(0xFF1A1A28) : Colors.white,
-              title: const Text('Merge folders'),
+              title: const Text('Merge collections'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -361,7 +369,9 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Failed to merge folders: $e')));
+          .showSnackBar(
+            SnackBar(content: Text('Failed to merge collections: $e')),
+          );
     }
   }
 
@@ -416,7 +426,7 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
               ),
               tabs: const [
                 Tab(text: 'Categories'),
-                Tab(text: 'My Folders'),
+                Tab(text: 'My Collections'),
               ],
             ),
           ),
@@ -1170,7 +1180,8 @@ class _MyFoldersTab extends StatelessWidget {
           color: cs.primary,
         ),
       ),
-      error: (err, _) => Center(child: Text('Failed to load folders: $err')),
+      error: (err, _) =>
+          Center(child: Text('Failed to load collections: $err')),
       data: (folders) {
         final receiptMap = {
           for (final receipt in receipts) receipt.id: receipt,
@@ -1209,7 +1220,7 @@ class _MyFoldersTab extends StatelessWidget {
                           color: cs.onSurface.withValues(alpha: 0.35),
                           size: 20,
                         ),
-                        hintText: 'Search folders...',
+                        hintText: 'Search collections...',
                         hintStyle: TextStyle(
                           color: cs.onSurface.withValues(alpha: 0.3),
                           fontSize: 14,
@@ -1307,7 +1318,7 @@ class _MyFoldersTab extends StatelessWidget {
                     ),
                     const SizedBox(height: 14),
                     Text(
-                      'No folders yet',
+                      'No collections yet',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 15,

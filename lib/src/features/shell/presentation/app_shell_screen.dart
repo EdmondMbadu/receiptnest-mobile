@@ -160,7 +160,7 @@ class AppShellScreen extends ConsumerWidget {
                     color: cs.onSurface.withValues(alpha: 0.4)),
                 selectedIcon: Icon(Icons.folder_rounded,
                     color: cs.primary),
-                label: 'Folders',
+                label: 'Collections',
               ),
             ],
           ),

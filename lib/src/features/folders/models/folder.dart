@@ -83,7 +83,7 @@ class Folder {
     return Folder(
       id: id,
       userId: (data['userId'] as String?) ?? '',
-      name: (data['name'] as String?) ?? 'Folder',
+      name: (data['name'] as String?) ?? 'Collection',
       receiptIds: (data['receiptIds'] as List<dynamic>? ?? const []).whereType<String>().toList(),
       isAuto: (data['isAuto'] as bool?) ?? false,
       autoType: data['autoType'] as String?,
