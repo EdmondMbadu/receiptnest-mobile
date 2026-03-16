@@ -60,8 +60,7 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
               ),
-              backgroundColor:
-                  isDark ? const Color(0xFF1A1A28) : Colors.white,
+              backgroundColor: isDark ? const Color(0xFF1A1A28) : Colors.white,
               title: const Text('Create collection'),
               content: SizedBox(
                 width: 420,
@@ -140,10 +139,9 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
           .createFolder(uid, nameController.text, selected.toList());
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-            SnackBar(content: Text('Failed to create collection: $e')),
-          );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to create collection: $e')),
+      );
     }
   }
 
@@ -160,10 +158,9 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
           .read(folderRepositoryProvider)
           .syncAutoFolders(uid, folders, receipts);
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-            const SnackBar(content: Text('Auto collections synced.')),
-          );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Auto collections synced.')));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -222,10 +219,9 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
           .renameFolder(uid, folder.id, controller.text);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-            SnackBar(content: Text('Failed to rename collection: $e')),
-          );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to rename collection: $e')),
+      );
     }
   }
 
@@ -252,8 +248,11 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
                   color: cs.error.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.warning_amber_rounded,
-                    size: 20, color: cs.error),
+                child: Icon(
+                  Icons.warning_amber_rounded,
+                  size: 20,
+                  color: cs.error,
+                ),
               ),
               const SizedBox(width: 12),
               const Text('Delete collection'),
@@ -267,9 +266,7 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              style: FilledButton.styleFrom(
-                backgroundColor: cs.error,
-              ),
+              style: FilledButton.styleFrom(backgroundColor: cs.error),
               child: const Text('Delete'),
             ),
           ],
@@ -283,10 +280,9 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
       await ref.read(folderRepositoryProvider).deleteFolder(uid, folder.id);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-            SnackBar(content: Text('Failed to delete collection: $e')),
-          );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete collection: $e')),
+      );
     }
   }
 
@@ -309,8 +305,7 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
               ),
-              backgroundColor:
-                  isDark ? const Color(0xFF1A1A28) : Colors.white,
+              backgroundColor: isDark ? const Color(0xFF1A1A28) : Colors.white,
               title: const Text('Merge collections'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -368,10 +363,9 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen>
           .mergeFolders(uid, source: source, target: target);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-            SnackBar(content: Text('Failed to merge collections: $e')),
-          );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to merge collections: $e')),
+      );
     }
   }
 
@@ -542,17 +536,29 @@ class _CategoriesTabState extends State<_CategoriesTab> {
       byCategory.putIfAbsent(catId, () => []).add(receipt);
     }
 
-    final entries = defaultCategories.map((cat) {
-      final list = byCategory[cat.id] ?? [];
-      final total = list.fold<double>(
-          0, (sum, r) => sum + (r.effectiveTotalAmount ?? 0));
-      return _CategoryEntry(category: cat, receipts: list, total: total);
-    }).where((e) => e.receipts.isNotEmpty).toList()
-      ..sort((a, b) => b.total.compareTo(a.total));
+    final entries =
+        defaultCategories
+            .map((cat) {
+              final list = byCategory[cat.id] ?? [];
+              final total = list.fold<double>(
+                0,
+                (sum, r) => sum + (r.effectiveTotalAmount ?? 0),
+              );
+              return _CategoryEntry(
+                category: cat,
+                receipts: list,
+                total: total,
+              );
+            })
+            .where((e) => e.receipts.isNotEmpty)
+            .toList()
+          ..sort((a, b) => b.total.compareTo(a.total));
 
     final grandTotal = entries.fold<double>(0, (s, e) => s + e.total);
     final allTimeTotal = widget.receipts.fold<double>(
-        0, (s, r) => s + (r.effectiveTotalAmount ?? 0));
+      0,
+      (s, r) => s + (r.effectiveTotalAmount ?? 0),
+    );
 
     return Column(
       children: [
@@ -575,20 +581,22 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                     _catTabButton('Month', _CatTimeRange.month, cs, isDark),
                     _catTabButton('Year', _CatTimeRange.year, cs, isDark),
                     _catTabButton(
-                        'All Time', _CatTimeRange.allTime, cs, isDark),
+                      'All Time',
+                      _CatTimeRange.allTime,
+                      cs,
+                      isDark,
+                    ),
                   ],
                 ),
               ),
 
               // Period navigator
-              if (_range != _CatTimeRange.allTime &&
-                  periods.isNotEmpty) ...[
+              if (_range != _CatTimeRange.allTime && periods.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 _CatPeriodNavigator(
                   periods: periods,
                   selectedKey: _selectedPeriod,
-                  onChanged: (key) =>
-                      setState(() => _selectedPeriod = key),
+                  onChanged: (key) => setState(() => _selectedPeriod = key),
                 ),
               ],
               const SizedBox(height: 14),
@@ -647,9 +655,7 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF151520)
-                            : Colors.white,
+                        color: isDark ? const Color(0xFF151520) : Colors.white,
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
                           color: isDark
@@ -661,16 +667,14 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                         children: [
                           Expanded(
                             child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   '${entries.length} categories',
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500,
-                                    color: cs.onSurface
-                                        .withValues(alpha: 0.45),
+                                    color: cs.onSurface.withValues(alpha: 0.45),
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -683,15 +687,15 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                                     color: cs.onSurface,
                                   ),
                                 ),
-                                if (_range !=
-                                    _CatTimeRange.allTime) ...[
+                                if (_range != _CatTimeRange.allTime) ...[
                                   const SizedBox(height: 2),
                                   Text(
                                     'All time: ${formatCurrency(allTimeTotal)}',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: cs.onSurface
-                                          .withValues(alpha: 0.35),
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.35,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -703,8 +707,7 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color:
-                                  cs.onSurface.withValues(alpha: 0.4),
+                              color: cs.onSurface.withValues(alpha: 0.4),
                             ),
                           ),
                         ],
@@ -727,16 +730,16 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                             borderRadius: BorderRadius.circular(18),
                             border: Border.all(
                               color: isDark
-                                  ? Colors.white
-                                      .withValues(alpha: 0.06)
+                                  ? Colors.white.withValues(alpha: 0.06)
                                   : Colors.grey.shade200,
                             ),
                             boxShadow: isDark
                                 ? null
                                 : [
                                     BoxShadow(
-                                      color: Colors.black
-                                          .withValues(alpha: 0.03),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.03,
+                                      ),
                                       blurRadius: 12,
                                       offset: const Offset(0, 3),
                                     ),
@@ -746,7 +749,8 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                             color: Colors.transparent,
                             child: InkWell(
                               onTap: () => context.push(
-                                  '/app/categories/${entry.category.id}'),
+                                '/app/categories/${entry.category.id}',
+                              ),
                               borderRadius: BorderRadius.circular(18),
                               child: Padding(
                                 padding: const EdgeInsets.all(16),
@@ -756,16 +760,15 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                                       width: 48,
                                       height: 48,
                                       decoration: BoxDecoration(
-                                        color: cs.primary
-                                            .withValues(alpha: 0.08),
-                                        borderRadius:
-                                            BorderRadius.circular(14),
+                                        color: cs.primary.withValues(
+                                          alpha: 0.08,
+                                        ),
+                                        borderRadius: BorderRadius.circular(14),
                                       ),
                                       child: Center(
                                         child: Text(
                                           entry.category.icon,
-                                          style: const TextStyle(
-                                              fontSize: 22),
+                                          style: const TextStyle(fontSize: 22),
                                         ),
                                       ),
                                     ),
@@ -791,23 +794,21 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                                                 style: TextStyle(
                                                   fontSize: 12.5,
                                                   color: cs.onSurface
-                                                      .withValues(
-                                                          alpha: 0.45),
+                                                      .withValues(alpha: 0.45),
                                                 ),
                                               ),
                                               Padding(
-                                                padding: const EdgeInsets
-                                                    .symmetric(
-                                                    horizontal: 6),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                    ),
                                                 child: Text(
                                                   '\u00B7',
                                                   style: TextStyle(
                                                     fontSize: 12,
-                                                    fontWeight:
-                                                        FontWeight.w700,
+                                                    fontWeight: FontWeight.w700,
                                                     color: cs.onSurface
-                                                        .withValues(
-                                                            alpha: 0.2),
+                                                        .withValues(alpha: 0.2),
                                                   ),
                                                 ),
                                               ),
@@ -815,8 +816,7 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                                                 '$pct%',
                                                 style: TextStyle(
                                                   fontSize: 12.5,
-                                                  fontWeight:
-                                                      FontWeight.w600,
+                                                  fontWeight: FontWeight.w600,
                                                   color: cs.primary,
                                                 ),
                                               ),
@@ -850,7 +850,11 @@ class _CategoriesTabState extends State<_CategoriesTab> {
   }
 
   Widget _catTabButton(
-      String label, _CatTimeRange range, ColorScheme cs, bool isDark) {
+    String label,
+    _CatTimeRange range,
+    ColorScheme cs,
+    bool isDark,
+  ) {
     final selected = _range == range;
     return Expanded(
       child: GestureDetector(
@@ -930,8 +934,9 @@ class _CatPeriodNavigator extends StatelessWidget {
     final idx = periods.indexWhere((p) => p.key == selectedKey);
     final hasPrev = idx < periods.length - 1;
     final hasNext = idx > 0;
-    final label =
-        idx >= 0 ? periods[idx].label : (periods.isNotEmpty ? periods.first.label : '');
+    final label = idx >= 0
+        ? periods[idx].label
+        : (periods.isNotEmpty ? periods.first.label : '');
 
     return Container(
       height: 48,
@@ -961,8 +966,7 @@ class _CatPeriodNavigator extends StatelessWidget {
                   children: [
                     AnimatedSwitcher(
                       duration: const Duration(milliseconds: 250),
-                      transitionBuilder: (child, animation) =>
-                          FadeTransition(
+                      transitionBuilder: (child, animation) => FadeTransition(
                         opacity: animation,
                         child: SlideTransition(
                           position: Tween<Offset>(
@@ -1047,8 +1051,7 @@ class _CatPeriodNavigator extends StatelessWidget {
           ),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1A1A2A) : Colors.white,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1097,7 +1100,9 @@ class _CatPeriodNavigator extends StatelessWidget {
                           onTap: () => Navigator.of(ctx).pop(p.key),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 14),
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
                             child: Row(
                               children: [
                                 Expanded(
@@ -1175,10 +1180,7 @@ class _MyFoldersTab extends StatelessWidget {
 
     return foldersAsync.when(
       loading: () => Center(
-        child: CircularProgressIndicator(
-          strokeWidth: 2.5,
-          color: cs.primary,
-        ),
+        child: CircularProgressIndicator(strokeWidth: 2.5, color: cs.primary),
       ),
       error: (err, _) =>
           Center(child: Text('Failed to load collections: $err')),
@@ -1226,8 +1228,9 @@ class _MyFoldersTab extends StatelessWidget {
                           fontSize: 14,
                         ),
                         border: InputBorder.none,
-                        contentPadding:
-                            const EdgeInsets.symmetric(vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 14,
+                        ),
                       ),
                     ),
                   ),
@@ -1237,8 +1240,10 @@ class _MyFoldersTab extends StatelessWidget {
                   height: 48,
                   child: FilledButton.icon(
                     onPressed: onCreateFolder,
-                    icon:
-                        const Icon(Icons.create_new_folder_outlined, size: 20),
+                    icon: const Icon(
+                      Icons.create_new_folder_outlined,
+                      size: 20,
+                    ),
                     label: const Text('New'),
                     style: FilledButton.styleFrom(
                       shape: RoundedRectangleBorder(
@@ -1269,9 +1274,7 @@ class _MyFoldersTab extends StatelessWidget {
                   size: 18,
                 ),
                 label: Text(
-                  syncingAutoFolders
-                      ? 'Syncing...'
-                      : 'Group by merchant',
+                  syncingAutoFolders ? 'Syncing...' : 'Group by merchant',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 style: OutlinedButton.styleFrom(
@@ -1351,8 +1354,7 @@ class _MyFoldersTab extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Container(
                     decoration: BoxDecoration(
-                      color:
-                          isDark ? const Color(0xFF151520) : Colors.white,
+                      color: isDark ? const Color(0xFF151520) : Colors.white,
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
                         color: isDark
@@ -1363,8 +1365,7 @@ class _MyFoldersTab extends StatelessWidget {
                           ? null
                           : [
                               BoxShadow(
-                                color:
-                                    Colors.black.withValues(alpha: 0.03),
+                                color: Colors.black.withValues(alpha: 0.03),
                                 blurRadius: 12,
                                 offset: const Offset(0, 3),
                               ),
@@ -1373,8 +1374,7 @@ class _MyFoldersTab extends StatelessWidget {
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
-                        onTap: () =>
-                            context.push('/app/folders/${folder.id}'),
+                        onTap: () => context.push('/app/folders/${folder.id}'),
                         borderRadius: BorderRadius.circular(18),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
@@ -1389,20 +1389,19 @@ class _MyFoldersTab extends StatelessWidget {
                                     end: Alignment.bottomRight,
                                     colors: folder.autoType != null
                                         ? [
-                                            Colors.amber
-                                                .withValues(alpha: 0.15),
-                                            Colors.orange
-                                                .withValues(alpha: 0.05),
+                                            Colors.amber.withValues(
+                                              alpha: 0.15,
+                                            ),
+                                            Colors.orange.withValues(
+                                              alpha: 0.05,
+                                            ),
                                           ]
                                         : [
-                                            cs.primary
-                                                .withValues(alpha: 0.15),
-                                            cs.primary
-                                                .withValues(alpha: 0.05),
+                                            cs.primary.withValues(alpha: 0.15),
+                                            cs.primary.withValues(alpha: 0.05),
                                           ],
                                   ),
-                                  borderRadius:
-                                      BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(14),
                                 ),
                                 child: Icon(
                                   folder.autoType != null
@@ -1417,8 +1416,7 @@ class _MyFoldersTab extends StatelessWidget {
                               const SizedBox(width: 14),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       folder.name,
@@ -1433,8 +1431,9 @@ class _MyFoldersTab extends StatelessWidget {
                                       '${folder.receiptIds.length} receipts \u2022 ${formatCurrency(total)}',
                                       style: TextStyle(
                                         fontSize: 13,
-                                        color: cs.onSurface
-                                            .withValues(alpha: 0.45),
+                                        color: cs.onSurface.withValues(
+                                          alpha: 0.45,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -1443,13 +1442,11 @@ class _MyFoldersTab extends StatelessWidget {
                               PopupMenuButton<String>(
                                 icon: Icon(
                                   Icons.more_vert_rounded,
-                                  color: cs.onSurface
-                                      .withValues(alpha: 0.35),
+                                  color: cs.onSurface.withValues(alpha: 0.35),
                                   size: 20,
                                 ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(14),
                                 ),
                                 onSelected: (value) {
                                   switch (value) {

@@ -42,8 +42,9 @@ class AppShellScreen extends ConsumerWidget {
         }
       },
       child: Scaffold(
-        backgroundColor:
-            isDark ? const Color(0xFF0D0D14) : const Color(0xFFF6F7F9),
+        backgroundColor: isDark
+            ? const Color(0xFF0D0D14)
+            : const Color(0xFFF6F7F9),
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -68,16 +69,13 @@ class AppShellScreen extends ConsumerWidget {
               ),
               child: IconButton(
                 icon: Icon(
-                  isDark
-                      ? Icons.light_mode_rounded
-                      : Icons.dark_mode_rounded,
+                  isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
                   size: 18,
                   color: cs.primary,
                 ),
                 padding: EdgeInsets.zero,
                 tooltip: isDark ? 'Light mode' : 'Dark mode',
-                onPressed: () =>
-                    ref.read(themeModeProvider.notifier).toggle(),
+                onPressed: () => ref.read(themeModeProvider.notifier).toggle(),
               ),
             ),
             Container(
@@ -89,12 +87,10 @@ class AppShellScreen extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: IconButton(
-                icon: Icon(Icons.logout_rounded,
-                    size: 18, color: cs.error),
+                icon: Icon(Icons.logout_rounded, size: 18, color: cs.error),
                 padding: EdgeInsets.zero,
                 tooltip: 'Sign out',
-                onPressed: () =>
-                    ref.read(authRepositoryProvider).logout(),
+                onPressed: () => ref.read(authRepositoryProvider).logout(),
               ),
             ),
           ],
@@ -125,8 +121,7 @@ class AppShellScreen extends ConsumerWidget {
             elevation: 0,
             indicatorColor: cs.primary.withValues(alpha: 0.1),
             selectedIndex: currentIndex,
-            labelBehavior:
-                NavigationDestinationLabelBehavior.alwaysShow,
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
             onDestinationSelected: (index) {
               switch (index) {
                 case 0:
@@ -142,32 +137,37 @@ class AppShellScreen extends ConsumerWidget {
             },
             destinations: [
               NavigationDestination(
-                icon: Icon(Icons.home_outlined,
-                    color: cs.onSurface.withValues(alpha: 0.4)),
-                selectedIcon:
-                    Icon(Icons.home_rounded, color: cs.primary),
+                icon: Icon(
+                  Icons.home_outlined,
+                  color: cs.onSurface.withValues(alpha: 0.4),
+                ),
+                selectedIcon: Icon(Icons.home_rounded, color: cs.primary),
                 label: 'Home',
               ),
               NavigationDestination(
-                icon: Icon(Icons.auto_awesome_outlined,
-                    color: cs.onSurface.withValues(alpha: 0.4)),
-                selectedIcon: Icon(Icons.auto_awesome_rounded,
-                    color: cs.primary),
+                icon: Icon(
+                  Icons.auto_awesome_outlined,
+                  color: cs.onSurface.withValues(alpha: 0.4),
+                ),
+                selectedIcon: Icon(
+                  Icons.auto_awesome_rounded,
+                  color: cs.primary,
+                ),
                 label: 'Insights',
               ),
               NavigationDestination(
-                icon: Icon(Icons.folder_outlined,
-                    color: cs.onSurface.withValues(alpha: 0.4)),
-                selectedIcon: Icon(Icons.folder_rounded,
-                    color: cs.primary),
+                icon: Icon(
+                  Icons.folder_outlined,
+                  color: cs.onSurface.withValues(alpha: 0.4),
+                ),
+                selectedIcon: Icon(Icons.folder_rounded, color: cs.primary),
                 label: 'Collections',
               ),
             ],
           ),
         ),
         drawer: Drawer(
-          backgroundColor:
-              isDark ? const Color(0xFF0D0D14) : Colors.white,
+          backgroundColor: isDark ? const Color(0xFF0D0D14) : Colors.white,
           child: Column(
             children: [
               // ── Premium drawer header ──
@@ -188,10 +188,7 @@ class AppShellScreen extends ConsumerWidget {
                             cs.primary.withValues(alpha: 0.12),
                             const Color(0xFF0D0D14),
                           ]
-                        : [
-                            cs.primary.withValues(alpha: 0.06),
-                            Colors.white,
-                          ],
+                        : [cs.primary.withValues(alpha: 0.06), Colors.white],
                   ),
                 ),
                 child: Column(
@@ -212,8 +209,7 @@ class AppShellScreen extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color:
-                                cs.primary.withValues(alpha: 0.15),
+                            color: cs.primary.withValues(alpha: 0.15),
                             blurRadius: 16,
                             offset: const Offset(0, 4),
                           ),
@@ -235,15 +231,13 @@ class AppShellScreen extends ConsumerWidget {
                         color: cs.onSurface,
                       ),
                     ),
-                    if (profile != null &&
-                        profile.email.isNotEmpty) ...[
+                    if (profile != null && profile.email.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
                         profile.email,
                         style: TextStyle(
                           fontSize: 13,
-                          color:
-                              cs.onSurface.withValues(alpha: 0.45),
+                          color: cs.onSurface.withValues(alpha: 0.45),
                         ),
                       ),
                     ],
@@ -251,18 +245,21 @@ class AppShellScreen extends ConsumerWidget {
                       const SizedBox(height: 10),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                          color:
-                              cs.primary.withValues(alpha: 0.1),
-                          borderRadius:
-                              BorderRadius.circular(20),
+                          color: cs.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.diamond_outlined,
-                                size: 14, color: cs.primary),
+                            Icon(
+                              Icons.diamond_outlined,
+                              size: 14,
+                              color: cs.primary,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               'Pro',
@@ -320,8 +317,7 @@ class AppShellScreen extends ConsumerWidget {
                     Text(
                       'ReceiptNest AI',
                       style: TextStyle(
-                        color:
-                            cs.onSurface.withValues(alpha: 0.25),
+                        color: cs.onSurface.withValues(alpha: 0.25),
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
                         letterSpacing: 0.3,
@@ -362,8 +358,7 @@ class _DrawerTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
                 Container(
@@ -375,10 +370,11 @@ class _DrawerTile extends StatelessWidget {
                         : Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(icon,
-                      size: 18,
-                      color:
-                          cs.onSurface.withValues(alpha: 0.6)),
+                  child: Icon(
+                    icon,
+                    size: 18,
+                    color: cs.onSurface.withValues(alpha: 0.6),
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Text(

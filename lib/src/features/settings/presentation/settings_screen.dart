@@ -112,7 +112,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _clearGeneralMessages();
     });
     try {
-      await ref.read(authRepositoryProvider).updateProfileInfo(
+      await ref
+          .read(authRepositoryProvider)
+          .updateProfileInfo(
             firstName: _firstNameController.text,
             lastName: _lastNameController.text,
           );
@@ -120,8 +122,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       setState(() => _settingsSuccess = 'Profile saved.');
     } catch (error) {
       if (!mounted) return;
-      setState(() => _settingsError =
-          _errorMessage(error, 'Unable to save profile details.'));
+      setState(
+        () => _settingsError = _errorMessage(
+          error,
+          'Unable to save profile details.',
+        ),
+      );
     } finally {
       if (mounted) setState(() => _settingsSaving = false);
     }
@@ -140,8 +146,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       setState(() => _notificationSuccess = 'Notification settings updated.');
     } catch (error) {
       if (!mounted) return;
-      setState(() => _notificationError =
-          _errorMessage(error, 'Unable to update notification settings.'));
+      setState(
+        () => _notificationError = _errorMessage(
+          error,
+          'Unable to update notification settings.',
+        ),
+      );
     } finally {
       if (mounted) setState(() => _notificationSaving = false);
     }
@@ -150,25 +160,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _changePassword(bool usesPasswordAuth) async {
     setState(_clearAccountMessages);
     if (!usesPasswordAuth) {
-      setState(() => _passwordError =
-          'Password updates are only available for email/password accounts.');
+      setState(
+        () => _passwordError =
+            'Password updates are only available for email/password accounts.',
+      );
       return;
     }
     final newPassword = _passwordNextController.text.trim();
     final confirmPassword = _passwordConfirmController.text.trim();
     if (newPassword.length < 6) {
-      setState(() =>
-          _passwordError = 'New password must be at least 6 characters.');
+      setState(
+        () => _passwordError = 'New password must be at least 6 characters.',
+      );
       return;
     }
     if (newPassword != confirmPassword) {
-      setState(() =>
-          _passwordError = 'New password and confirmation do not match.');
+      setState(
+        () => _passwordError = 'New password and confirmation do not match.',
+      );
       return;
     }
     setState(() => _passwordSaving = true);
     try {
-      await ref.read(authRepositoryProvider).changePassword(
+      await ref
+          .read(authRepositoryProvider)
+          .changePassword(
             currentPassword: _passwordCurrentController.text,
             newPassword: newPassword,
           );
@@ -181,8 +197,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() =>
-          _passwordError = _errorMessage(error, 'Unable to change password.'));
+      setState(
+        () =>
+            _passwordError = _errorMessage(error, 'Unable to change password.'),
+      );
     } finally {
       if (mounted) setState(() => _passwordSaving = false);
     }
@@ -226,8 +244,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       context.go('/login');
     } catch (error) {
       if (!mounted) return;
-      setState(() => _deleteError =
-          _errorMessage(error, 'Unable to delete account right now.'));
+      setState(
+        () => _deleteError = _errorMessage(
+          error,
+          'Unable to delete account right now.',
+        ),
+      );
     } finally {
       if (mounted) setState(() => _deletePending = false);
     }
@@ -248,9 +270,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Icon(icon, size: 16, color: color),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(message,
-                style: TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w500, color: color)),
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: color,
+              ),
+            ),
           ),
         ],
       ),
@@ -275,8 +302,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF0D0D14) : const Color(0xFFF6F7F9),
+      backgroundColor: isDark
+          ? const Color(0xFF0D0D14)
+          : const Color(0xFFF6F7F9),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -323,15 +351,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       decoration: BoxDecoration(
                         color: selected
                             ? (isDark
-                                ? Colors.white.withValues(alpha: 0.12)
-                                : Colors.white)
+                                  ? Colors.white.withValues(alpha: 0.12)
+                                  : Colors.white)
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
                         boxShadow: selected
                             ? [
                                 BoxShadow(
                                   color: Colors.black.withValues(
-                                      alpha: isDark ? 0.3 : 0.06),
+                                    alpha: isDark ? 0.3 : 0.06,
+                                  ),
                                   blurRadius: 8,
                                   offset: const Offset(0, 2),
                                 ),
@@ -343,8 +372,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           label,
                           style: TextStyle(
                             fontSize: 13.5,
-                            fontWeight:
-                                selected ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight: selected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
                             color: selected
                                 ? cs.onSurface
                                 : cs.onSurface.withValues(alpha: 0.45),
@@ -366,36 +396,52 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: Icons.person_outline_rounded,
               isDark: isDark,
               children: [
-                Row(children: [
-                  Expanded(
+                Row(
+                  children: [
+                    Expanded(
                       child: TextField(
-                          controller: _firstNameController,
-                          decoration: const InputDecoration(
-                              labelText: 'First name'))),
-                  const SizedBox(width: 12),
-                  Expanded(
+                        controller: _firstNameController,
+                        decoration: const InputDecoration(
+                          labelText: 'First name',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
                       child: TextField(
-                          controller: _lastNameController,
-                          decoration:
-                              const InputDecoration(labelText: 'Last name'))),
-                ]),
+                        controller: _lastNameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Last name',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 14),
                 TextField(
                   controller: _emailController,
                   readOnly: true,
                   decoration: InputDecoration(
                     labelText: 'Email',
-                    suffixIcon: Icon(Icons.lock_outline_rounded,
-                        size: 16,
-                        color: cs.onSurface.withValues(alpha: 0.25)),
+                    suffixIcon: Icon(
+                      Icons.lock_outline_rounded,
+                      size: 16,
+                      color: cs.onSurface.withValues(alpha: 0.25),
+                    ),
                   ),
                 ),
                 if (_settingsError != null)
-                  _statusBanner(_settingsError!, cs.error,
-                      Icons.error_outline_rounded),
+                  _statusBanner(
+                    _settingsError!,
+                    cs.error,
+                    Icons.error_outline_rounded,
+                  ),
                 if (_settingsSuccess != null)
-                  _statusBanner(_settingsSuccess!, const Color(0xFF00C805),
-                      Icons.check_circle_outline_rounded),
+                  _statusBanner(
+                    _settingsSuccess!,
+                    const Color(0xFF00C805),
+                    Icons.check_circle_outline_rounded,
+                  ),
                 const SizedBox(height: 18),
                 SizedBox(
                   width: double.infinity,
@@ -403,10 +449,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: FilledButton(
                     onPressed: _settingsSaving ? null : _saveGeneral,
                     style: FilledButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12))),
-                    child:
-                        Text(_settingsSaving ? 'Saving...' : 'Save changes'),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(_settingsSaving ? 'Saving...' : 'Save changes'),
                   ),
                 ),
               ],
@@ -425,27 +472,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         : cs.surfaceContainerHighest.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Row(children: [
-                    _ThemeOption(
-                      icon: Icons.light_mode_rounded,
-                      label: 'Light',
-                      selected: themeMode == ThemeMode.light,
-                      isDark: isDark,
-                      onTap: () => ref
-                          .read(themeModeProvider.notifier)
-                          .setMode(ThemeMode.light),
-                    ),
-                    const SizedBox(width: 4),
-                    _ThemeOption(
-                      icon: Icons.dark_mode_rounded,
-                      label: 'Dark',
-                      selected: themeMode == ThemeMode.dark,
-                      isDark: isDark,
-                      onTap: () => ref
-                          .read(themeModeProvider.notifier)
-                          .setMode(ThemeMode.dark),
-                    ),
-                  ]),
+                  child: Row(
+                    children: [
+                      _ThemeOption(
+                        icon: Icons.light_mode_rounded,
+                        label: 'Light',
+                        selected: themeMode == ThemeMode.light,
+                        isDark: isDark,
+                        onTap: () => ref
+                            .read(themeModeProvider.notifier)
+                            .setMode(ThemeMode.light),
+                      ),
+                      const SizedBox(width: 4),
+                      _ThemeOption(
+                        icon: Icons.dark_mode_rounded,
+                        label: 'Dark',
+                        selected: themeMode == ThemeMode.dark,
+                        isDark: isDark,
+                        onTap: () => ref
+                            .read(themeModeProvider.notifier)
+                            .setMode(ThemeMode.dark),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -459,43 +508,58 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               isDark: isDark,
               children: [
                 _NotifTile(
-                    title: 'Receipt processing',
-                    subtitle: 'Updates when extraction completes',
-                    value: _notificationSettings.receiptProcessing,
-                    onChanged: (v) => setState(() => _notificationSettings =
-                        _notificationSettings.copyWith(
-                            receiptProcessing: v))),
+                  title: 'Receipt processing',
+                  subtitle: 'Updates when extraction completes',
+                  value: _notificationSettings.receiptProcessing,
+                  onChanged: (v) => setState(
+                    () => _notificationSettings = _notificationSettings
+                        .copyWith(receiptProcessing: v),
+                  ),
+                ),
                 _NotifTile(
-                    title: 'Product updates',
-                    subtitle: 'News about features and improvements',
-                    value: _notificationSettings.productUpdates,
-                    onChanged: (v) => setState(() => _notificationSettings =
-                        _notificationSettings.copyWith(productUpdates: v))),
+                  title: 'Product updates',
+                  subtitle: 'News about features and improvements',
+                  value: _notificationSettings.productUpdates,
+                  onChanged: (v) => setState(
+                    () => _notificationSettings = _notificationSettings
+                        .copyWith(productUpdates: v),
+                  ),
+                ),
                 _NotifTile(
-                    title: 'Security alerts',
-                    subtitle: 'Critical account notifications',
-                    value: _notificationSettings.securityAlerts,
-                    onChanged: (v) => setState(() => _notificationSettings =
-                        _notificationSettings.copyWith(
-                            securityAlerts: v))),
+                  title: 'Security alerts',
+                  subtitle: 'Critical account notifications',
+                  value: _notificationSettings.securityAlerts,
+                  onChanged: (v) => setState(
+                    () => _notificationSettings = _notificationSettings
+                        .copyWith(securityAlerts: v),
+                  ),
+                ),
                 if (_notificationError != null)
-                  _statusBanner(_notificationError!, cs.error,
-                      Icons.error_outline_rounded),
+                  _statusBanner(
+                    _notificationError!,
+                    cs.error,
+                    Icons.error_outline_rounded,
+                  ),
                 if (_notificationSuccess != null)
-                  _statusBanner(_notificationSuccess!, const Color(0xFF00C805),
-                      Icons.check_circle_outline_rounded),
+                  _statusBanner(
+                    _notificationSuccess!,
+                    const Color(0xFF00C805),
+                    Icons.check_circle_outline_rounded,
+                  ),
                 const SizedBox(height: 18),
                 SizedBox(
                   width: double.infinity,
                   height: 46,
                   child: FilledButton(
-                    onPressed:
-                        _notificationSaving ? null : _saveNotifications,
+                    onPressed: _notificationSaving ? null : _saveNotifications,
                     style: FilledButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12))),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                     child: Text(
-                        _notificationSaving ? 'Saving...' : 'Save changes'),
+                      _notificationSaving ? 'Saving...' : 'Save changes',
+                    ),
                   ),
                 ),
               ],
@@ -513,34 +577,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   Text(
                     'This account uses a social sign-in provider. Password changes are not available here.',
                     style: TextStyle(
-                        fontSize: 13,
-                        color: cs.onSurface.withValues(alpha: 0.5)),
+                      fontSize: 13,
+                      color: cs.onSurface.withValues(alpha: 0.5),
+                    ),
                   )
                 else ...[
                   TextField(
-                      controller: _passwordCurrentController,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                          labelText: 'Current password')),
+                    controller: _passwordCurrentController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Current password',
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   TextField(
-                      controller: _passwordNextController,
-                      obscureText: true,
-                      decoration:
-                          const InputDecoration(labelText: 'New password')),
+                    controller: _passwordNextController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'New password',
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   TextField(
-                      controller: _passwordConfirmController,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                          labelText: 'Confirm password')),
+                    controller: _passwordConfirmController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm password',
+                    ),
+                  ),
                 ],
                 if (_passwordError != null)
                   _statusBanner(
-                      _passwordError!, cs.error, Icons.error_outline_rounded),
+                    _passwordError!,
+                    cs.error,
+                    Icons.error_outline_rounded,
+                  ),
                 if (_passwordSuccess != null)
-                  _statusBanner(_passwordSuccess!, const Color(0xFF00C805),
-                      Icons.check_circle_outline_rounded),
+                  _statusBanner(
+                    _passwordSuccess!,
+                    const Color(0xFF00C805),
+                    Icons.check_circle_outline_rounded,
+                  ),
                 const SizedBox(height: 18),
                 SizedBox(
                   width: double.infinity,
@@ -550,10 +627,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ? null
                         : () => _changePassword(usesPasswordAuth),
                     style: FilledButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12))),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                     child: Text(
-                        _passwordSaving ? 'Updating...' : 'Update password'),
+                      _passwordSaving ? 'Updating...' : 'Update password',
+                    ),
                   ),
                 ),
               ],
@@ -571,22 +651,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(children: [
-                    Icon(Icons.warning_amber_rounded,
-                        size: 20, color: cs.error),
-                    const SizedBox(width: 10),
-                    Text('Danger zone',
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 20,
+                        color: cs.error,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Danger zone',
                         style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: cs.error)),
-                  ]),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: cs.error,
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 10),
                   Text(
                     'Permanently deletes your profile, receipts, chats, collections, shares, and linked data.',
                     style: TextStyle(
-                        fontSize: 13,
-                        color: cs.onSurface.withValues(alpha: 0.6)),
+                      fontSize: 13,
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                    ),
                   ),
                   const SizedBox(height: 14),
                   if (!_showDeleteConfirmation)
@@ -601,9 +690,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: cs.error,
                           side: BorderSide(
-                              color: cs.error.withValues(alpha: 0.4)),
+                            color: cs.error.withValues(alpha: 0.4),
+                          ),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         child: const Text('Delete account'),
                       ),
@@ -613,7 +704,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       controller: _deleteConfirmController,
                       textCapitalization: TextCapitalization.characters,
                       decoration: const InputDecoration(
-                          labelText: 'Type DELETE to confirm'),
+                        labelText: 'Type DELETE to confirm',
+                      ),
                       onChanged: (_) => setState(() {}),
                     ),
                     if (usesPasswordAuth) ...[
@@ -622,47 +714,56 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         controller: _deletePasswordController,
                         obscureText: true,
                         decoration: const InputDecoration(
-                            labelText: 'Current password'),
+                          labelText: 'Current password',
+                        ),
                         onChanged: (_) => setState(() {}),
                       ),
                     ],
                     if (_deleteError != null)
-                      _statusBanner(_deleteError!, cs.error,
-                          Icons.error_outline_rounded),
+                      _statusBanner(
+                        _deleteError!,
+                        cs.error,
+                        Icons.error_outline_rounded,
+                      ),
                     const SizedBox(height: 14),
-                    Row(children: [
-                      Expanded(
-                        child: SizedBox(
-                          height: 44,
-                          child: FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: cs.error,
-                              foregroundColor: cs.onError,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 44,
+                            child: FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: cs.error,
+                                foregroundColor: cs.onError,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: _canConfirmDelete(usesPasswordAuth)
+                                  ? () => _deleteAccount(usesPasswordAuth)
+                                  : null,
+                              child: Text(
+                                _deletePending
+                                    ? 'Deleting...'
+                                    : 'Confirm delete',
+                              ),
                             ),
-                            onPressed: _canConfirmDelete(usesPasswordAuth)
-                                ? () => _deleteAccount(usesPasswordAuth)
-                                : null,
-                            child: Text(_deletePending
-                                ? 'Deleting...'
-                                : 'Confirm delete'),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      TextButton(
-                        onPressed: _deletePending
-                            ? null
-                            : () => setState(() {
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: _deletePending
+                              ? null
+                              : () => setState(() {
                                   _showDeleteConfirmation = false;
                                   _deleteConfirmController.clear();
                                   _deletePasswordController.clear();
                                   _deleteError = null;
                                 }),
-                        child: const Text('Cancel'),
-                      ),
-                    ]),
+                          child: const Text('Cancel'),
+                        ),
+                      ],
+                    ),
                   ],
                 ],
               ),
@@ -672,10 +773,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 24),
               child: Center(
-                child: Text('Loading account settings...',
-                    style: TextStyle(
-                        fontSize: 13,
-                        color: cs.onSurface.withValues(alpha: 0.4))),
+                child: Text(
+                  'Loading account settings...',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.onSurface.withValues(alpha: 0.4),
+                  ),
+                ),
               ),
             ),
         ],
@@ -713,23 +817,28 @@ class _SettingsSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: cs.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: cs.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 18, color: cs.primary),
               ),
-              child: Icon(icon, size: 18, color: cs.primary),
-            ),
-            const SizedBox(width: 12),
-            Text(title,
+              const SizedBox(width: 12),
+              Text(
+                title,
                 style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.2,
-                    color: cs.onSurface)),
-          ]),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2,
+                  color: cs.onSurface,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 18),
           ...children,
         ],
@@ -763,16 +872,15 @@ class _ThemeOption extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             color: selected
-                ? (isDark
-                    ? Colors.white.withValues(alpha: 0.12)
-                    : Colors.white)
+                ? (isDark ? Colors.white.withValues(alpha: 0.12) : Colors.white)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
             boxShadow: selected
                 ? [
                     BoxShadow(
-                      color:
-                          Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
+                      color: Colors.black.withValues(
+                        alpha: isDark ? 0.3 : 0.06,
+                      ),
                       blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
@@ -782,19 +890,24 @@ class _ThemeOption extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon,
-                  size: 18,
+              Icon(
+                icon,
+                size: 18,
+                color: selected
+                    ? cs.onSurface
+                    : cs.onSurface.withValues(alpha: 0.35),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                   color: selected
                       ? cs.onSurface
-                      : cs.onSurface.withValues(alpha: 0.35)),
-              const SizedBox(width: 8),
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                      color: selected
-                          ? cs.onSurface
-                          : cs.onSurface.withValues(alpha: 0.45))),
+                      : cs.onSurface.withValues(alpha: 0.45),
+                ),
+              ),
             ],
           ),
         ),
@@ -822,15 +935,21 @@ class _NotifTile extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 4),
       child: SwitchListTile(
         contentPadding: EdgeInsets.zero,
-        title: Text(title,
-            style: TextStyle(
-                fontSize: 14.5,
-                fontWeight: FontWeight.w600,
-                color: cs.onSurface)),
-        subtitle: Text(subtitle,
-            style: TextStyle(
-                fontSize: 12.5,
-                color: cs.onSurface.withValues(alpha: 0.45))),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontSize: 14.5,
+            fontWeight: FontWeight.w600,
+            color: cs.onSurface,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: 12.5,
+            color: cs.onSurface.withValues(alpha: 0.45),
+          ),
+        ),
         value: value,
         onChanged: onChanged,
       ),

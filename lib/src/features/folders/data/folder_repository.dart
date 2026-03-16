@@ -30,10 +30,10 @@ class FolderRepository {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => Folder.fromDoc(doc.id, doc.data()))
-          .toList();
-    });
+          return snapshot.docs
+              .map((doc) => Folder.fromDoc(doc.id, doc.data()))
+              .toList();
+        });
   }
 
   Future<void> createFolder(
@@ -62,22 +62,37 @@ class FolderRepository {
       throw Exception('Collection name is required.');
     }
 
-    await _db.collection('users').doc(userId).collection('folders').doc(folderId).update({
-      'name': clean,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    await _db
+        .collection('users')
+        .doc(userId)
+        .collection('folders')
+        .doc(folderId)
+        .update({'name': clean, 'updatedAt': FieldValue.serverTimestamp()});
   }
 
   Future<void> deleteFolder(String userId, String folderId) {
-    return _db.collection('users').doc(userId).collection('folders').doc(folderId).delete();
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('folders')
+        .doc(folderId)
+        .delete();
   }
 
-  Future<void> addReceipts(String userId, Folder folder, List<String> receiptIds) async {
+  Future<void> addReceipts(
+    String userId,
+    Folder folder,
+    List<String> receiptIds,
+  ) async {
     final next = {...folder.receiptIds, ...receiptIds}.toList();
     await _updateFolderReceipts(userId, folder.id, next);
   }
 
-  Future<void> removeReceipts(String userId, Folder folder, List<String> receiptIds) async {
+  Future<void> removeReceipts(
+    String userId,
+    Folder folder,
+    List<String> receiptIds,
+  ) async {
     final remove = receiptIds.toSet();
     final next = folder.receiptIds.where((id) => !remove.contains(id)).toList();
     await _updateFolderReceipts(userId, folder.id, next);
@@ -94,9 +109,14 @@ class FolderRepository {
 
     final targetReceiptSet = target.receiptIds.toSet();
     final sourceReceiptIds = source.receiptIds.toSet().toList();
-    final sourceOnly = sourceReceiptIds.where((id) => !targetReceiptSet.contains(id)).toList();
+    final sourceOnly = sourceReceiptIds
+        .where((id) => !targetReceiptSet.contains(id))
+        .toList();
 
-    final merged = <String>{...target.receiptIds, ...source.receiptIds}.toList();
+    final merged = <String>{
+      ...target.receiptIds,
+      ...source.receiptIds,
+    }.toList();
     final mergeEntry = {
       'mergeId': '${source.id}-${DateTime.now().millisecondsSinceEpoch}',
       'sourceFolderId': source.id,
@@ -110,12 +130,23 @@ class FolderRepository {
     };
 
     final batch = _db.batch();
-    final targetRef = _db.collection('users').doc(userId).collection('folders').doc(target.id);
-    final sourceRef = _db.collection('users').doc(userId).collection('folders').doc(source.id);
+    final targetRef = _db
+        .collection('users')
+        .doc(userId)
+        .collection('folders')
+        .doc(target.id);
+    final sourceRef = _db
+        .collection('users')
+        .doc(userId)
+        .collection('folders')
+        .doc(source.id);
 
     batch.update(targetRef, {
       'receiptIds': merged,
-      'mergedSources': [...target.mergedSources.map((e) => e.toMap()), mergeEntry],
+      'mergedSources': [
+        ...target.mergedSources.map((e) => e.toMap()),
+        mergeEntry,
+      ],
       'updatedAt': FieldValue.serverTimestamp(),
     });
     batch.delete(sourceRef);
@@ -128,7 +159,9 @@ class FolderRepository {
     required FolderMergeEntry mergeEntry,
   }) async {
     final sourceOnlySet = mergeEntry.sourceOnlyReceiptIds.toSet();
-    final nextReceipts = target.receiptIds.where((id) => !sourceOnlySet.contains(id)).toList();
+    final nextReceipts = target.receiptIds
+        .where((id) => !sourceOnlySet.contains(id))
+        .toList();
 
     final nextMerged = target.mergedSources
         .where((entry) => entry.mergeId != mergeEntry.mergeId)
@@ -136,7 +169,11 @@ class FolderRepository {
         .toList();
 
     final batch = _db.batch();
-    final targetRef = _db.collection('users').doc(userId).collection('folders').doc(target.id);
+    final targetRef = _db
+        .collection('users')
+        .doc(userId)
+        .collection('folders')
+        .doc(target.id);
     final restoredRef = _db
         .collection('users')
         .doc(userId)
@@ -163,15 +200,22 @@ class FolderRepository {
     await batch.commit();
   }
 
-  Future<void> syncAutoFolders(String userId, List<Folder> currentFolders, List<Receipt> receipts) async {
+  Future<void> syncAutoFolders(
+    String userId,
+    List<Folder> currentFolders,
+    List<Receipt> receipts,
+  ) async {
     final groups = _buildAutoGroups(receipts);
     final desired = {
       for (final group in groups) '${group.type}:${group.key}': group,
     };
 
-    final currentAuto = currentFolders.where((f) => f.isAuto && f.autoType != null && f.autoKey != null).toList();
+    final currentAuto = currentFolders
+        .where((f) => f.isAuto && f.autoType != null && f.autoKey != null)
+        .toList();
     final currentByKey = {
-      for (final folder in currentAuto) '${folder.autoType}:${folder.autoKey}': folder,
+      for (final folder in currentAuto)
+        '${folder.autoType}:${folder.autoKey}': folder,
     };
 
     final tasks = <Future<void>>[];
@@ -181,34 +225,55 @@ class FolderRepository {
       final value = entry.value;
 
       if (existing == null) {
-        tasks.add(_db.collection('users').doc(userId).collection('folders').add({
-          'userId': userId,
-          'name': value.name,
-          'receiptIds': value.receiptIds,
-          'isAuto': true,
-          'autoType': value.type,
-          'autoKey': value.key,
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        }).then((_) {}));
+        tasks.add(
+          _db
+              .collection('users')
+              .doc(userId)
+              .collection('folders')
+              .add({
+                'userId': userId,
+                'name': value.name,
+                'receiptIds': value.receiptIds,
+                'isAuto': true,
+                'autoType': value.type,
+                'autoKey': value.key,
+                'createdAt': FieldValue.serverTimestamp(),
+                'updatedAt': FieldValue.serverTimestamp(),
+              })
+              .then((_) {}),
+        );
         continue;
       }
 
       final changedName = existing.name != value.name;
       final changedReceipts = !_sameIds(existing.receiptIds, value.receiptIds);
       if (changedName || changedReceipts) {
-        tasks.add(_db.collection('users').doc(userId).collection('folders').doc(existing.id).update({
-          'name': value.name,
-          'receiptIds': value.receiptIds,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }));
+        tasks.add(
+          _db
+              .collection('users')
+              .doc(userId)
+              .collection('folders')
+              .doc(existing.id)
+              .update({
+                'name': value.name,
+                'receiptIds': value.receiptIds,
+                'updatedAt': FieldValue.serverTimestamp(),
+              }),
+        );
       }
     }
 
     for (final folder in currentAuto) {
       final composite = '${folder.autoType}:${folder.autoKey}';
       if (!desired.containsKey(composite)) {
-        tasks.add(_db.collection('users').doc(userId).collection('folders').doc(folder.id).delete());
+        tasks.add(
+          _db
+              .collection('users')
+              .doc(userId)
+              .collection('folders')
+              .doc(folder.id)
+              .delete(),
+        );
       }
     }
 
@@ -217,11 +282,20 @@ class FolderRepository {
     }
   }
 
-  Future<void> _updateFolderReceipts(String userId, String folderId, List<String> receiptIds) async {
-    await _db.collection('users').doc(userId).collection('folders').doc(folderId).update({
-      'receiptIds': receiptIds.toSet().toList(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+  Future<void> _updateFolderReceipts(
+    String userId,
+    String folderId,
+    List<String> receiptIds,
+  ) async {
+    await _db
+        .collection('users')
+        .doc(userId)
+        .collection('folders')
+        .doc(folderId)
+        .update({
+          'receiptIds': receiptIds.toSet().toList(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
   }
 
   List<_AutoFolderGroup> _buildAutoGroups(List<Receipt> receipts) {
@@ -231,19 +305,23 @@ class FolderRepository {
       _addBucket(
         buckets,
         type: 'merchant',
-        label: _cleanLabel(receipt.merchant?.canonicalName ?? receipt.merchant?.rawName),
+        label: _cleanLabel(
+          receipt.merchant?.canonicalName ?? receipt.merchant?.rawName,
+        ),
         receiptId: receipt.id,
       );
     }
 
     return buckets.values
         .where((bucket) => bucket.receiptIds.length >= 2)
-        .map((bucket) => _AutoFolderGroup(
-              type: bucket.type,
-              key: bucket.key,
-              name: bucket.label,
-              receiptIds: bucket.receiptIds.toList()..sort(),
-            ))
+        .map(
+          (bucket) => _AutoFolderGroup(
+            type: bucket.type,
+            key: bucket.key,
+            name: bucket.label,
+            receiptIds: bucket.receiptIds.toList()..sort(),
+          ),
+        )
         .toList()
       ..sort((a, b) => b.receiptIds.length.compareTo(a.receiptIds.length));
   }
@@ -261,7 +339,12 @@ class FolderRepository {
     final composite = '$type:$key';
     final bucket = buckets.putIfAbsent(
       composite,
-      () => _AutoFolderBucket(type: type, key: key, label: label, receiptIds: <String>{}),
+      () => _AutoFolderBucket(
+        type: type,
+        key: key,
+        label: label,
+        receiptIds: <String>{},
+      ),
     );
 
     bucket.receiptIds.add(receiptId);

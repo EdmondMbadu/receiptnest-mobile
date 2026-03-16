@@ -16,8 +16,7 @@ class FolderDetailScreen extends ConsumerStatefulWidget {
   final String folderId;
 
   @override
-  ConsumerState<FolderDetailScreen> createState() =>
-      _FolderDetailScreenState();
+  ConsumerState<FolderDetailScreen> createState() => _FolderDetailScreenState();
 }
 
 class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
@@ -94,8 +93,11 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                   color: cs.error.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.warning_amber_rounded,
-                    size: 20, color: cs.error),
+                child: Icon(
+                  Icons.warning_amber_rounded,
+                  size: 20,
+                  color: cs.error,
+                ),
               ),
               const SizedBox(width: 12),
               const Text('Delete collection'),
@@ -109,9 +111,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              style: FilledButton.styleFrom(
-                backgroundColor: cs.error,
-              ),
+              style: FilledButton.styleFrom(backgroundColor: cs.error),
               child: const Text('Delete'),
             ),
           ],
@@ -149,8 +149,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
               ),
-              backgroundColor:
-                  isDark ? const Color(0xFF1A1A28) : Colors.white,
+              backgroundColor: isDark ? const Color(0xFF1A1A28) : Colors.white,
               title: const Text('Add receipts'),
               content: SizedBox(
                 width: 420,
@@ -223,8 +222,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
     setState(() => _selectedReceiptIds.clear());
   }
 
-  Future<void> _exportCsv(
-      Folder folder, List<Receipt> receiptsInFolder) async {
+  Future<void> _exportCsv(Folder folder, List<Receipt> receiptsInFolder) async {
     if (receiptsInFolder.isEmpty) return;
 
     final rows = <String>['"Merchant","Date","Amount"'];
@@ -261,8 +259,9 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         ref.watch(receiptsStreamProvider).valueOrNull ?? const <Receipt>[];
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF0D0D14) : const Color(0xFFF6F7F9),
+      backgroundColor: isDark
+          ? const Color(0xFF0D0D14)
+          : const Color(0xFFF6F7F9),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -276,10 +275,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
       ),
       body: foldersAsync.when(
         loading: () => Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.5,
-            color: cs.primary,
-          ),
+          child: CircularProgressIndicator(strokeWidth: 2.5, color: cs.primary),
         ),
         error: (err, _) =>
             Center(child: Text('Failed to load collection: $err')),
@@ -290,9 +286,11 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.folder_off_outlined,
-                      size: 48,
-                      color: cs.onSurface.withValues(alpha: 0.15)),
+                  Icon(
+                    Icons.folder_off_outlined,
+                    size: 48,
+                    color: cs.onSurface.withValues(alpha: 0.15),
+                  ),
                   const SizedBox(height: 12),
                   Text(
                     'Collection not found',
@@ -306,22 +304,21 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
             );
           }
 
-          final receiptsInFolder = receipts
-              .where(
-                  (receipt) => folder.receiptIds.contains(receipt.id))
-              .toList()
-            ..sort((a, b) {
-              final aDate = a.effectiveDate ??
-                  DateTime.fromMillisecondsSinceEpoch(0);
-              final bDate = b.effectiveDate ??
-                  DateTime.fromMillisecondsSinceEpoch(0);
-              return bDate.compareTo(aDate);
-            });
+          final receiptsInFolder =
+              receipts
+                  .where((receipt) => folder.receiptIds.contains(receipt.id))
+                  .toList()
+                ..sort((a, b) {
+                  final aDate =
+                      a.effectiveDate ?? DateTime.fromMillisecondsSinceEpoch(0);
+                  final bDate =
+                      b.effectiveDate ?? DateTime.fromMillisecondsSinceEpoch(0);
+                  return bDate.compareTo(aDate);
+                });
 
           final total = receiptsInFolder.fold<double>(
             0,
-            (sum, receipt) =>
-                sum + (receipt.effectiveTotalAmount ?? 0),
+            (sum, receipt) => sum + (receipt.effectiveTotalAmount ?? 0),
           );
 
           return ListView(
@@ -331,9 +328,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
               Container(
                 padding: const EdgeInsets.all(22),
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF151520)
-                      : Colors.white,
+                  color: isDark ? const Color(0xFF151520) : Colors.white,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: isDark
@@ -344,8 +339,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                       ? null
                       : [
                           BoxShadow(
-                            color: Colors.black
-                                .withValues(alpha: 0.04),
+                            color: Colors.black.withValues(alpha: 0.04),
                             blurRadius: 20,
                             offset: const Offset(0, 4),
                           ),
@@ -364,14 +358,11 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: [
-                                cs.primary
-                                    .withValues(alpha: 0.15),
-                                cs.primary
-                                    .withValues(alpha: 0.05),
+                                cs.primary.withValues(alpha: 0.15),
+                                cs.primary.withValues(alpha: 0.05),
                               ],
                             ),
-                            borderRadius:
-                                BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                           child: Icon(
                             Icons.folder_rounded,
@@ -382,8 +373,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 folder.name,
@@ -399,8 +389,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                                 '${folder.receiptIds.length} receipts \u2022 ${formatCurrency(total)}',
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: cs.onSurface
-                                      .withValues(alpha: 0.45),
+                                  color: cs.onSurface.withValues(alpha: 0.45),
                                 ),
                               ),
                             ],
@@ -422,26 +411,21 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                           _ActionButton(
                             icon: Icons.add_rounded,
                             label: 'Add',
-                            onTap: () =>
-                                _addReceipts(folder, receipts),
+                            onTap: () => _addReceipts(folder, receipts),
                           ),
                           const SizedBox(width: 8),
                           _ActionButton(
                             icon: Icons.remove_circle_outline,
-                            label:
-                                'Remove (${_selectedReceiptIds.length})',
+                            label: 'Remove (${_selectedReceiptIds.length})',
                             onTap: _selectedReceiptIds.isEmpty
                                 ? null
-                                : () =>
-                                    _removeSelected(folder),
+                                : () => _removeSelected(folder),
                           ),
                           const SizedBox(width: 8),
                           _ActionButton(
-                            icon:
-                                Icons.file_download_outlined,
+                            icon: Icons.file_download_outlined,
                             label: 'CSV',
-                            onTap: () => _exportCsv(
-                                folder, receiptsInFolder),
+                            onTap: () => _exportCsv(folder, receiptsInFolder),
                           ),
                           const SizedBox(width: 8),
                           _ActionButton(
@@ -463,20 +447,16 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                 Container(
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF151520)
-                        : Colors.white,
+                    color: isDark ? const Color(0xFF151520) : Colors.white,
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
                       color: isDark
-                          ? Colors.white
-                              .withValues(alpha: 0.06)
+                          ? Colors.white.withValues(alpha: 0.06)
                           : Colors.grey.shade200,
                     ),
                   ),
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
@@ -484,15 +464,14 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                             width: 30,
                             height: 30,
                             decoration: BoxDecoration(
-                              color: Colors.orange
-                                  .withValues(alpha: 0.1),
-                              borderRadius:
-                                  BorderRadius.circular(8),
+                              color: Colors.orange.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: Icon(
-                                Icons.merge_rounded,
-                                size: 16,
-                                color: Colors.orange.shade700),
+                              Icons.merge_rounded,
+                              size: 16,
+                              color: Colors.orange.shade700,
+                            ),
                           ),
                           const SizedBox(width: 10),
                           Text(
@@ -508,21 +487,17 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                       const SizedBox(height: 12),
                       ...folder.mergedSources.map((entry) {
                         return Padding(
-                          padding:
-                              const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.only(bottom: 6),
                           child: Row(
                             children: [
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment
-                                          .start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       entry.sourceFolderName,
                                       style: TextStyle(
-                                        fontWeight:
-                                            FontWeight.w600,
+                                        fontWeight: FontWeight.w600,
                                         fontSize: 14,
                                         color: cs.onSurface,
                                       ),
@@ -531,9 +506,9 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                                       '${entry.sourceFolderReceiptIds.length} receipts',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: cs.onSurface
-                                            .withValues(
-                                                alpha: 0.4),
+                                        color: cs.onSurface.withValues(
+                                          alpha: 0.4,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -541,12 +516,10 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                               ),
                               TextButton(
                                 onPressed: () async {
-                                  final uid = ref.read(
-                                      currentUserIdProvider);
+                                  final uid = ref.read(currentUserIdProvider);
                                   if (uid == null) return;
                                   await ref
-                                      .read(
-                                          folderRepositoryProvider)
+                                      .read(folderRepositoryProvider)
                                       .unmergeFolder(
                                         uid,
                                         target: folder,
@@ -554,15 +527,12 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                                       );
                                 },
                                 style: TextButton.styleFrom(
-                                  textStyle:
-                                      const TextStyle(
+                                  textStyle: const TextStyle(
                                     fontSize: 13,
-                                    fontWeight:
-                                        FontWeight.w600,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                child:
-                                    const Text('Unmerge'),
+                                child: const Text('Unmerge'),
                               ),
                             ],
                           ),
@@ -579,14 +549,11 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                 Container(
                   padding: const EdgeInsets.all(32),
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF151520)
-                        : Colors.white,
+                    color: isDark ? const Color(0xFF151520) : Colors.white,
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
                       color: isDark
-                          ? Colors.white
-                              .withValues(alpha: 0.06)
+                          ? Colors.white.withValues(alpha: 0.06)
                           : Colors.grey.shade200,
                     ),
                   ),
@@ -596,16 +563,13 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                         width: 52,
                         height: 52,
                         decoration: BoxDecoration(
-                          color: cs.primary
-                              .withValues(alpha: 0.08),
-                          borderRadius:
-                              BorderRadius.circular(14),
+                          color: cs.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(14),
                         ),
                         child: Icon(
                           Icons.receipt_long_outlined,
                           size: 24,
-                          color: cs.onSurface
-                              .withValues(alpha: 0.2),
+                          color: cs.onSurface.withValues(alpha: 0.2),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -613,8 +577,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                         'No receipts in this collection',
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
-                          color: cs.onSurface
-                              .withValues(alpha: 0.45),
+                          color: cs.onSurface.withValues(alpha: 0.45),
                         ),
                       ),
                     ],
@@ -626,14 +589,15 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                       receipt.merchant?.canonicalName ??
                       receipt.merchant?.rawName ??
                       receipt.file.originalName;
-                  final isSelected =
-                      _selectedReceiptIds.contains(receipt.id);
+                  final isSelected = _selectedReceiptIds.contains(receipt.id);
 
                   // Generate initials
                   final words = merchant.trim().split(RegExp(r'\s+'));
                   final initials = words.length >= 2
                       ? '${words[0][0]}${words[1][0]}'.toUpperCase()
-                      : merchant.substring(0, merchant.length.clamp(0, 2)).toUpperCase();
+                      : merchant
+                            .substring(0, merchant.length.clamp(0, 2))
+                            .toUpperCase();
 
                   const avatarColors = [
                     Color(0xFF6366F1),
@@ -645,27 +609,22 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                     Color(0xFFEF4444),
                     Color(0xFF14B8A6),
                   ];
-                  final avatarColor = avatarColors[
-                      merchant.hashCode.abs() % avatarColors.length];
+                  final avatarColor =
+                      avatarColors[merchant.hashCode.abs() %
+                          avatarColors.length];
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF151520)
-                            : Colors.white,
-                        borderRadius:
-                            BorderRadius.circular(16),
+                        color: isDark ? const Color(0xFF151520) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: isSelected
-                              ? cs.primary
-                                  .withValues(alpha: 0.3)
+                              ? cs.primary.withValues(alpha: 0.3)
                               : (isDark
-                                  ? Colors.white
-                                      .withValues(
-                                          alpha: 0.06)
-                                  : Colors.grey.shade200),
+                                    ? Colors.white.withValues(alpha: 0.06)
+                                    : Colors.grey.shade200),
                         ),
                       ),
                       child: Material(
@@ -674,41 +633,33 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                           onTap: () {
                             setState(() {
                               if (isSelected) {
-                                _selectedReceiptIds
-                                    .remove(receipt.id);
+                                _selectedReceiptIds.remove(receipt.id);
                               } else {
-                                _selectedReceiptIds
-                                    .add(receipt.id);
+                                _selectedReceiptIds.add(receipt.id);
                               }
                             });
                           },
-                          borderRadius:
-                              BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(16),
                           child: Padding(
-                            padding:
-                                const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
                             child: Row(
                               children: [
                                 Container(
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    color: avatarColor
-                                        .withValues(
-                                            alpha: 0.12),
-                                    borderRadius:
-                                        BorderRadius
-                                            .circular(12),
+                                    color: avatarColor.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Center(
                                     child: Text(
                                       initials,
                                       style: TextStyle(
                                         color: avatarColor,
-                                        fontWeight:
-                                            FontWeight.w700,
+                                        fontWeight: FontWeight.w700,
                                         fontSize: 14,
                                       ),
                                     ),
@@ -718,31 +669,24 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment:
-                                        CrossAxisAlignment
-                                            .start,
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         merchant,
                                         style: TextStyle(
-                                          fontWeight:
-                                              FontWeight
-                                                  .w600,
+                                          fontWeight: FontWeight.w600,
                                           fontSize: 14,
-                                          color: cs
-                                              .onSurface,
+                                          color: cs.onSurface,
                                         ),
                                       ),
-                                      const SizedBox(
-                                          height: 2),
+                                      const SizedBox(height: 2),
                                       Text(
                                         '${formatDate(receipt.effectiveDate)} \u2022 ${formatCurrency(receipt.effectiveTotalAmount)}',
                                         style: TextStyle(
                                           fontSize: 13,
-                                          color: cs
-                                              .onSurface
-                                              .withValues(
-                                                  alpha:
-                                                      0.45),
+                                          color: cs.onSurface.withValues(
+                                            alpha: 0.45,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -750,8 +694,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                                 ),
                                 if (isSelected)
                                   Icon(
-                                    Icons
-                                        .check_circle_rounded,
+                                    Icons.check_circle_rounded,
                                     size: 22,
                                     color: cs.primary,
                                   ),
@@ -760,28 +703,21 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                                   width: 32,
                                   height: 32,
                                   decoration: BoxDecoration(
-                                    color: cs.primary
-                                        .withValues(
-                                            alpha: 0.06),
-                                    borderRadius:
-                                        BorderRadius
-                                            .circular(8),
+                                    color: cs.primary.withValues(alpha: 0.06),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: IconButton(
-                                    onPressed: () =>
-                                        context.push(
-                                            '/app/receipt/${receipt.id}'),
-                                    icon: Icon(
-                                      Icons
-                                          .open_in_new_outlined,
-                                      size: 16,
-                                      color: cs.onSurface
-                                          .withValues(
-                                              alpha:
-                                                  0.4),
+                                    onPressed: () => context.push(
+                                      '/app/receipt/${receipt.id}',
                                     ),
-                                    padding:
-                                        EdgeInsets.zero,
+                                    icon: Icon(
+                                      Icons.open_in_new_outlined,
+                                      size: 16,
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.4,
+                                      ),
+                                    ),
+                                    padding: EdgeInsets.zero,
                                   ),
                                 ),
                               ],
@@ -826,8 +762,7 @@ class _ActionButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: isDisabled
                 ? Colors.transparent
@@ -835,8 +770,8 @@ class _ActionButton extends StatelessWidget {
             border: Border.all(
               color: isDisabled
                   ? (isDark
-                      ? Colors.white.withValues(alpha: 0.06)
-                      : Colors.grey.shade200)
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : Colors.grey.shade200)
                   : color.withValues(alpha: 0.15),
             ),
             borderRadius: BorderRadius.circular(12),
@@ -847,9 +782,7 @@ class _ActionButton extends StatelessWidget {
               Icon(
                 icon,
                 size: 16,
-                color: isDisabled
-                    ? cs.onSurface.withValues(alpha: 0.2)
-                    : color,
+                color: isDisabled ? cs.onSurface.withValues(alpha: 0.2) : color,
               ),
               const SizedBox(width: 6),
               Text(

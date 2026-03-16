@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -100,19 +101,25 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/app/home',
-            builder: (context, state) => const HomeScreen(),
+            pageBuilder: (context, state) =>
+                _noTransitionPage(state: state, child: const HomeScreen()),
           ),
           GoRoute(
             path: '/app/insights',
-            builder: (context, state) => const AiInsightsScreen(),
+            pageBuilder: (context, state) => _noTransitionPage(
+              state: state,
+              child: const AiInsightsScreen(),
+            ),
           ),
           GoRoute(
             path: '/app/folders',
-            builder: (context, state) => const FoldersScreen(),
+            pageBuilder: (context, state) =>
+                _noTransitionPage(state: state, child: const FoldersScreen()),
           ),
           GoRoute(
             path: '/app/settings',
-            builder: (context, state) => const SettingsScreen(),
+            pageBuilder: (context, state) =>
+                _noTransitionPage(state: state, child: const SettingsScreen()),
           ),
         ],
       ),
@@ -142,6 +149,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+NoTransitionPage<void> _noTransitionPage({
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return NoTransitionPage<void>(key: state.pageKey, child: child);
+}
 
 class GoRouterRefreshStream extends ChangeNotifier {
   GoRouterRefreshStream(Stream<User?> stream) {

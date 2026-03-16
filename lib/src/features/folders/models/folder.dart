@@ -29,9 +29,13 @@ class FolderMergeEntry {
       sourceFolderId: (data['sourceFolderId'] as String?) ?? '',
       sourceFolderName: (data['sourceFolderName'] as String?) ?? '',
       sourceFolderReceiptIds:
-          (data['sourceFolderReceiptIds'] as List<dynamic>? ?? const []).whereType<String>().toList(),
+          (data['sourceFolderReceiptIds'] as List<dynamic>? ?? const [])
+              .whereType<String>()
+              .toList(),
       sourceOnlyReceiptIds:
-          (data['sourceOnlyReceiptIds'] as List<dynamic>? ?? const []).whereType<String>().toList(),
+          (data['sourceOnlyReceiptIds'] as List<dynamic>? ?? const [])
+              .whereType<String>()
+              .toList(),
       sourceIsAuto: data['sourceIsAuto'] as bool?,
       sourceAutoType: data['sourceAutoType'] as String?,
       sourceAutoKey: data['sourceAutoKey'] as String?,
@@ -84,7 +88,9 @@ class Folder {
       id: id,
       userId: (data['userId'] as String?) ?? '',
       name: (data['name'] as String?) ?? 'Collection',
-      receiptIds: (data['receiptIds'] as List<dynamic>? ?? const []).whereType<String>().toList(),
+      receiptIds: (data['receiptIds'] as List<dynamic>? ?? const [])
+          .whereType<String>()
+          .toList(),
       isAuto: (data['isAuto'] as bool?) ?? false,
       autoType: data['autoType'] as String?,
       autoKey: data['autoKey'] as String?,
