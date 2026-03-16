@@ -3,7 +3,6 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher_string.dart';
 
 import '../../auth/data/auth_repository.dart';
 import '../../receipts/data/receipt_repository.dart';
@@ -221,40 +220,6 @@ class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to share chat: $e')),
-      );
-    }
-  }
-
-  Future<void> _connectTelegram() async {
-    try {
-      final deepLink =
-          await ref.read(aiRepositoryProvider).generateTelegramLinkToken();
-      if (deepLink == null || deepLink.isEmpty) {
-        throw Exception('No Telegram link returned by server.');
-      }
-      await launchUrlString(deepLink, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to connect Telegram: $e')),
-      );
-    }
-  }
-
-  Future<void> _unlinkTelegram() async {
-    final uid = ref.read(currentUserIdProvider);
-    if (uid == null) return;
-
-    try {
-      await ref.read(aiRepositoryProvider).unlinkTelegram(uid);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Telegram unlinked.')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to unlink Telegram: $e')),
       );
     }
   }
@@ -530,12 +495,6 @@ class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
             ),
             onSelected: (value) {
               switch (value) {
-                case 'connect_telegram':
-                  _connectTelegram();
-                  break;
-                case 'unlink_telegram':
-                  _unlinkTelegram();
-                  break;
                 case 'pricing':
                   context.push('/app/pricing');
                   break;
@@ -543,12 +502,6 @@ class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
             },
             itemBuilder: (context) {
               return const [
-                PopupMenuItem(
-                    value: 'connect_telegram',
-                    child: Text('Connect Telegram')),
-                PopupMenuItem(
-                    value: 'unlink_telegram',
-                    child: Text('Unlink Telegram')),
                 PopupMenuItem(
                     value: 'pricing', child: Text('Open Pricing')),
               ];
