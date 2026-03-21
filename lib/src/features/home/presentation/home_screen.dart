@@ -187,12 +187,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       return List.generate(24, (hour) {
         final amount = hourlyAmounts[hour] ?? 0;
         cumulative += amount;
-        final pointDate = DateTime(
-          today.year,
-          today.month,
-          today.day,
-          hour,
-        );
+        final pointDate = DateTime(today.year, today.month, today.day, hour);
         return DailySpendingPoint(
           day: today.day,
           amount: amount,
@@ -1751,10 +1746,7 @@ class _ProcessingReceiptTileState extends State<_ProcessingReceiptTile>
                   animation: _shimmer,
                   builder: (context, child) {
                     final pulse = 0.5 + (_shimmer.value * 0.5);
-                    return Opacity(
-                      opacity: pulse,
-                      child: child,
-                    );
+                    return Opacity(opacity: pulse, child: child);
                   },
                   child: Container(
                     width: 42,
@@ -1970,7 +1962,9 @@ class _RobinhoodMonthlyChartState extends State<_RobinhoodMonthlyChart> {
                 )
               : Text(
                   '${_formatChartPointDate(selectedPoint)}: ${formatCurrency(selectedPoint.amount)}',
-                  key: ValueKey<int>(selectedPoint.pointDate.millisecondsSinceEpoch),
+                  key: ValueKey<int>(
+                    selectedPoint.pointDate.millisecondsSinceEpoch,
+                  ),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: widget.lineColor,
@@ -2036,17 +2030,19 @@ class _RobinhoodMonthlyChartState extends State<_RobinhoodMonthlyChart> {
           ),
         ),
         const SizedBox(height: 10),
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
             _ChartPill(
               label: 'Spent',
               value: formatCurrency(totalSoFar),
               color: widget.lineColor,
             ),
-            const SizedBox(width: 8),
             _ChartPill(
               label: 'Peak',
-              value: '${_formatChartPointDate(peak)}: ${formatCurrency(peak.amount)}',
+              value:
+                  '${_formatChartPointDate(peak)}: ${formatCurrency(peak.amount)}',
               color: cs.secondary,
             ),
           ],
@@ -2156,7 +2152,9 @@ class _RobinhoodTimeRangeChartState extends State<_RobinhoodTimeRangeChart> {
                 )
               : Text(
                   '${_formatChartPointDate(selectedPoint, includeHour: widget.timeRange == _TimeRange.oneDay)}: ${formatCurrency(selectedPoint.amount)}',
-                  key: ValueKey<int>(selectedPoint.pointDate.millisecondsSinceEpoch),
+                  key: ValueKey<int>(
+                    selectedPoint.pointDate.millisecondsSinceEpoch,
+                  ),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: widget.lineColor,
@@ -2254,14 +2252,15 @@ class _RobinhoodTimeRangeChartState extends State<_RobinhoodTimeRangeChart> {
           ),
         ],
         const SizedBox(height: 10),
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
             _ChartPill(
               label: 'Spent',
               value: formatCurrency(totalSpend),
               color: widget.lineColor,
             ),
-            const SizedBox(width: 8),
             _ChartPill(
               label: 'Peak',
               value:
@@ -2577,14 +2576,15 @@ class _HistogramSpendingChartState extends State<_HistogramSpendingChart> {
           ),
         ),
         const SizedBox(height: 10),
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
             _ChartPill(
               label: 'Total',
               value: formatCurrency(totalSpend),
               color: widget.lineColor,
             ),
-            const SizedBox(width: 8),
             _ChartPill(
               label: 'Peak',
               value: '${peak.label}: ${formatCurrency(peak.amount)}',
@@ -2618,6 +2618,7 @@ class _ChartPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
       ),
       child: RichText(
+        softWrap: true,
         text: TextSpan(
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: Theme.of(context).colorScheme.onSurface,
