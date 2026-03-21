@@ -255,6 +255,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  Future<void> _logout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sign out?'),
+        content: const Text(
+          'You will need to sign in again to access your receipts and settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Sign out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(authRepositoryProvider).logout();
+  }
+
   Widget _statusBanner(String message, Color color, IconData icon) {
     return Container(
       width: double.infinity,
@@ -634,6 +658,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: Text(
                       _passwordSaving ? 'Updating...' : 'Update password',
                     ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _SettingsSection(
+              title: 'Session',
+              icon: Icons.manage_accounts_outlined,
+              isDark: isDark,
+              children: [
+                Text(
+                  'Sign out from this device when you are done or when you need to switch accounts.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: OutlinedButton.icon(
+                    onPressed: _logout,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: cs.error,
+                      side: BorderSide(color: cs.error.withValues(alpha: 0.35)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.logout_rounded, size: 18),
+                    label: const Text('Sign out'),
                   ),
                 ),
               ],

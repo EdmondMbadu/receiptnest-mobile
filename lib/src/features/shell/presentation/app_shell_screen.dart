@@ -78,21 +78,7 @@ class AppShellScreen extends ConsumerWidget {
                 onPressed: () => ref.read(themeModeProvider.notifier).toggle(),
               ),
             ),
-            Container(
-              width: 36,
-              height: 36,
-              margin: const EdgeInsets.only(right: 12),
-              decoration: BoxDecoration(
-                color: cs.error.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: IconButton(
-                icon: Icon(Icons.logout_rounded, size: 18, color: cs.error),
-                padding: EdgeInsets.zero,
-                tooltip: 'Sign out',
-                onPressed: () => ref.read(authRepositoryProvider).logout(),
-              ),
-            ),
+            const SizedBox(width: 12),
           ],
         ),
         body: child,
