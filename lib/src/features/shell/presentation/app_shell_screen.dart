@@ -34,6 +34,31 @@ class AppShellScreen extends ConsumerWidget {
       context.push(route);
     }
 
+    Future<void> logoutFromDrawer() async {
+      Navigator.of(context).pop();
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Sign out?'),
+          content: const Text(
+            'You will need to sign in again to access your receipts and settings.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Sign out'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      await ref.read(authRepositoryProvider).logout();
+    }
+
     return PopScope<void>(
       canPop: isHomeTab,
       onPopInvokedWithResult: (didPop, result) {
@@ -289,6 +314,12 @@ class AppShellScreen extends ConsumerWidget {
                 label: 'Terms',
                 onTap: () => openFromDrawer('/terms'),
               ),
+              _DrawerTile(
+                icon: Icons.logout_rounded,
+                label: 'Sign out',
+                onTap: logoutFromDrawer,
+                color: cs.error,
+              ),
               const Spacer(),
               Padding(
                 padding: const EdgeInsets.all(24),
@@ -325,16 +356,19 @@ class _DrawerTile extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.color,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accentColor = color ?? cs.onSurface;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
@@ -351,7 +385,9 @@ class _DrawerTile extends StatelessWidget {
                   width: 34,
                   height: 34,
                   decoration: BoxDecoration(
-                    color: isDark
+                    color: color != null
+                        ? accentColor.withValues(alpha: isDark ? 0.12 : 0.08)
+                        : isDark
                         ? Colors.white.withValues(alpha: 0.04)
                         : Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(10),
@@ -359,7 +395,9 @@ class _DrawerTile extends StatelessWidget {
                   child: Icon(
                     icon,
                     size: 18,
-                    color: cs.onSurface.withValues(alpha: 0.6),
+                    color: color != null
+                        ? accentColor
+                        : cs.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -368,7 +406,7 @@ class _DrawerTile extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 15,
-                    color: cs.onSurface,
+                    color: color != null ? accentColor : cs.onSurface,
                   ),
                 ),
               ],
