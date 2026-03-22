@@ -68,6 +68,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   String _errorMessage(Object error, String fallback) {
+    if (error is PushNotificationException) {
+      return error.message;
+    }
     if (error is AppAuthException) {
       final code = error.code;
       if (code.contains('wrong-password') ||

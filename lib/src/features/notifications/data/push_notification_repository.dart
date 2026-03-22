@@ -28,6 +28,15 @@ const _storedTokenKey = 'push_notification.current_token';
 const _storedUserKey = 'push_notification.current_user';
 const _defaultTimeZone = 'America/Los_Angeles';
 
+class PushNotificationException implements Exception {
+  const PushNotificationException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class PushNotificationRepository {
   PushNotificationRepository({
     required FirebaseFirestore db,
@@ -82,6 +91,15 @@ class PushNotificationRepository {
       return;
     }
 
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      final apnsToken = await _messaging.getAPNSToken();
+      if (apnsToken == null || apnsToken.isEmpty) {
+        throw const PushNotificationException(
+          'Push notifications are not available in this iPhone build. Install a build signed with Push Notifications enabled.',
+        );
+      }
+    }
+
     final token = await _messaging.getToken();
     if (token == null || token.isEmpty) {
       await userRef.set({
@@ -89,7 +107,9 @@ class PushNotificationRepository {
         'notificationPermissionStatus': authorizationStatus,
         'notificationTokenUpdatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-      return;
+      throw const PushNotificationException(
+        'Unable to register this device for push notifications. No notification token was returned.',
+      );
     }
 
     final prefs = await SharedPreferences.getInstance();
