@@ -7,27 +7,37 @@ class NotificationSettings {
     required this.receiptProcessing,
     required this.productUpdates,
     required this.securityAlerts,
+    required this.weeklySummaryEmails,
+    required this.monthlySummaryEmails,
   });
 
   final bool receiptProcessing;
   final bool productUpdates;
   final bool securityAlerts;
+  final bool weeklySummaryEmails;
+  final bool monthlySummaryEmails;
 
   static const defaults = NotificationSettings(
     receiptProcessing: true,
     productUpdates: false,
     securityAlerts: true,
+    weeklySummaryEmails: true,
+    monthlySummaryEmails: true,
   );
 
   NotificationSettings copyWith({
     bool? receiptProcessing,
     bool? productUpdates,
     bool? securityAlerts,
+    bool? weeklySummaryEmails,
+    bool? monthlySummaryEmails,
   }) {
     return NotificationSettings(
       receiptProcessing: receiptProcessing ?? this.receiptProcessing,
       productUpdates: productUpdates ?? this.productUpdates,
       securityAlerts: securityAlerts ?? this.securityAlerts,
+      weeklySummaryEmails: weeklySummaryEmails ?? this.weeklySummaryEmails,
+      monthlySummaryEmails: monthlySummaryEmails ?? this.monthlySummaryEmails,
     );
   }
 
@@ -36,6 +46,8 @@ class NotificationSettings {
       'receiptProcessing': receiptProcessing,
       'productUpdates': productUpdates,
       'securityAlerts': securityAlerts,
+      'weeklySummaryEmails': weeklySummaryEmails,
+      'monthlySummaryEmails': monthlySummaryEmails,
     };
   }
 
@@ -50,6 +62,11 @@ class NotificationSettings {
           input['productUpdates'] as bool? ?? defaults.productUpdates,
       securityAlerts:
           input['securityAlerts'] as bool? ?? defaults.securityAlerts,
+      weeklySummaryEmails:
+          input['weeklySummaryEmails'] as bool? ?? defaults.weeklySummaryEmails,
+      monthlySummaryEmails:
+          input['monthlySummaryEmails'] as bool? ??
+          defaults.monthlySummaryEmails,
     );
   }
 }

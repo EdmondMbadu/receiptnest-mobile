@@ -558,6 +558,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         .copyWith(securityAlerts: v),
                   ),
                 ),
+                _NotifTile(
+                  title: 'Weekly summary emails',
+                  subtitle: 'Your weekly ReceiptNest AI spend recap',
+                  value: _notificationSettings.weeklySummaryEmails,
+                  onChanged: (v) => setState(
+                    () => _notificationSettings = _notificationSettings
+                        .copyWith(weeklySummaryEmails: v),
+                  ),
+                ),
+                _NotifTile(
+                  title: 'Monthly summary emails',
+                  subtitle: 'Your monthly ReceiptNest AI spending statement',
+                  value: _notificationSettings.monthlySummaryEmails,
+                  onChanged: (v) => setState(
+                    () => _notificationSettings = _notificationSettings
+                        .copyWith(monthlySummaryEmails: v),
+                  ),
+                ),
                 if (_notificationError != null)
                   _statusBanner(
                     _notificationError!,

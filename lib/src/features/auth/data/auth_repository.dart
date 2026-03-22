@@ -317,6 +317,8 @@ class AuthRepository {
       receiptProcessing: value.receiptProcessing,
       productUpdates: value.productUpdates,
       securityAlerts: value.securityAlerts,
+      weeklySummaryEmails: value.weeklySummaryEmails,
+      monthlySummaryEmails: value.monthlySummaryEmails,
     );
   }
 
