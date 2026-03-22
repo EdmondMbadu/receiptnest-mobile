@@ -9,6 +9,8 @@ class NotificationSettings {
     required this.securityAlerts,
     required this.weeklySummaryEmails,
     required this.monthlySummaryEmails,
+    required this.weeklySummaryPush,
+    required this.monthlySummaryPush,
   });
 
   final bool receiptProcessing;
@@ -16,6 +18,8 @@ class NotificationSettings {
   final bool securityAlerts;
   final bool weeklySummaryEmails;
   final bool monthlySummaryEmails;
+  final bool weeklySummaryPush;
+  final bool monthlySummaryPush;
 
   static const defaults = NotificationSettings(
     receiptProcessing: true,
@@ -23,6 +27,8 @@ class NotificationSettings {
     securityAlerts: true,
     weeklySummaryEmails: true,
     monthlySummaryEmails: true,
+    weeklySummaryPush: true,
+    monthlySummaryPush: true,
   );
 
   NotificationSettings copyWith({
@@ -31,6 +37,8 @@ class NotificationSettings {
     bool? securityAlerts,
     bool? weeklySummaryEmails,
     bool? monthlySummaryEmails,
+    bool? weeklySummaryPush,
+    bool? monthlySummaryPush,
   }) {
     return NotificationSettings(
       receiptProcessing: receiptProcessing ?? this.receiptProcessing,
@@ -38,6 +46,8 @@ class NotificationSettings {
       securityAlerts: securityAlerts ?? this.securityAlerts,
       weeklySummaryEmails: weeklySummaryEmails ?? this.weeklySummaryEmails,
       monthlySummaryEmails: monthlySummaryEmails ?? this.monthlySummaryEmails,
+      weeklySummaryPush: weeklySummaryPush ?? this.weeklySummaryPush,
+      monthlySummaryPush: monthlySummaryPush ?? this.monthlySummaryPush,
     );
   }
 
@@ -48,6 +58,8 @@ class NotificationSettings {
       'securityAlerts': securityAlerts,
       'weeklySummaryEmails': weeklySummaryEmails,
       'monthlySummaryEmails': monthlySummaryEmails,
+      'weeklySummaryPush': weeklySummaryPush,
+      'monthlySummaryPush': monthlySummaryPush,
     };
   }
 
@@ -55,6 +67,10 @@ class NotificationSettings {
     if (input is! Map<String, dynamic>) {
       return defaults;
     }
+    final weeklySummaryEmails =
+        input['weeklySummaryEmails'] as bool? ?? defaults.weeklySummaryEmails;
+    final monthlySummaryEmails =
+        input['monthlySummaryEmails'] as bool? ?? defaults.monthlySummaryEmails;
     return NotificationSettings(
       receiptProcessing:
           input['receiptProcessing'] as bool? ?? defaults.receiptProcessing,
@@ -62,11 +78,12 @@ class NotificationSettings {
           input['productUpdates'] as bool? ?? defaults.productUpdates,
       securityAlerts:
           input['securityAlerts'] as bool? ?? defaults.securityAlerts,
-      weeklySummaryEmails:
-          input['weeklySummaryEmails'] as bool? ?? defaults.weeklySummaryEmails,
-      monthlySummaryEmails:
-          input['monthlySummaryEmails'] as bool? ??
-          defaults.monthlySummaryEmails,
+      weeklySummaryEmails: weeklySummaryEmails,
+      monthlySummaryEmails: monthlySummaryEmails,
+      weeklySummaryPush:
+          input['weeklySummaryPush'] as bool? ?? weeklySummaryEmails,
+      monthlySummaryPush:
+          input['monthlySummaryPush'] as bool? ?? monthlySummaryEmails,
     );
   }
 }

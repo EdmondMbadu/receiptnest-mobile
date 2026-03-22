@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/models/user_profile.dart';
+import '../../notifications/data/push_notification_repository.dart';
 
 enum _SettingsTab { general, account, notifications }
 
@@ -139,9 +140,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _clearNotificationMessages();
     });
     try {
+      final profile = ref.read(currentUserProfileProvider).valueOrNull;
       await ref
           .read(authRepositoryProvider)
           .updateNotificationSettings(_notificationSettings);
+      if (profile != null) {
+        await ref
+            .read(pushNotificationRepositoryProvider)
+            .syncForUser(userId: profile.id, settings: _notificationSettings);
+      }
       if (!mounted) return;
       setState(() => _notificationSuccess = 'Notification settings updated.');
     } catch (error) {
@@ -527,7 +534,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           // ── Notifications ──
           if (_activeTab == _SettingsTab.notifications) ...[
             _SettingsSection(
-              title: 'Email preferences',
+              title: 'App notifications',
               icon: Icons.notifications_outlined,
               isDark: isDark,
               children: [
@@ -558,6 +565,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         .copyWith(securityAlerts: v),
                   ),
                 ),
+                _NotifTile(
+                  title: 'Weekly spend notifications',
+                  subtitle: 'A morning push recap of last week’s spending',
+                  value: _notificationSettings.weeklySummaryPush,
+                  onChanged: (v) => setState(
+                    () => _notificationSettings = _notificationSettings
+                        .copyWith(weeklySummaryPush: v),
+                  ),
+                ),
+                _NotifTile(
+                  title: 'Monthly spend notifications',
+                  subtitle: 'A morning push recap of last month’s spending',
+                  value: _notificationSettings.monthlySummaryPush,
+                  onChanged: (v) => setState(
+                    () => _notificationSettings = _notificationSettings
+                        .copyWith(monthlySummaryPush: v),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _SettingsSection(
+              title: 'Email summaries',
+              icon: Icons.email_outlined,
+              isDark: isDark,
+              children: [
                 _NotifTile(
                   title: 'Weekly summary emails',
                   subtitle: 'Your weekly ReceiptNest AI spend recap',
