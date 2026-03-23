@@ -1,19 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/utils/formatters.dart';
 import '../../receipts/data/receipt_repository.dart';
 import '../../receipts/models/category.dart';
 import '../../receipts/models/receipt.dart';
+import '../data/category_export_service.dart';
+import '../models/category_period_filter.dart';
+import 'widgets/tax_ready_helper_card.dart';
 
-enum _TimeRange { month, year, allTime }
+enum _CategoryExportFormat { pdf, csv }
 
 class CategoryDetailScreen extends ConsumerStatefulWidget {
-  const CategoryDetailScreen({super.key, required this.categoryId});
+  const CategoryDetailScreen({
+    super.key,
+    required this.categoryId,
+    this.initialRange = CategoryTimeRange.month,
+    this.initialPeriodKey,
+  });
 
   final String categoryId;
+  final CategoryTimeRange initialRange;
+  final String? initialPeriodKey;
 
   @override
   ConsumerState<CategoryDetailScreen> createState() =>
@@ -21,8 +30,16 @@ class CategoryDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
-  _TimeRange _range = _TimeRange.month;
+  late CategoryTimeRange _range;
   String? _selectedPeriod;
+  bool _exporting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _range = widget.initialRange;
+    _selectedPeriod = widget.initialPeriodKey;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,51 +49,45 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
         ref.watch(receiptsStreamProvider).valueOrNull ?? const <Receipt>[];
 
     final category = categoryById(widget.categoryId);
-    final receipts = allReceipts.where((r) {
-      final id = r.category?.id ?? 'other';
-      return id == widget.categoryId;
-    }).toList()
-      ..sort((a, b) {
-        final da = a.effectiveDate;
-        final db = b.effectiveDate;
-        if (da == null && db == null) return 0;
-        if (da == null) return 1;
-        if (db == null) return -1;
-        return db.compareTo(da);
-      });
+    final receipts =
+        allReceipts.where((receipt) {
+          final categoryId = receipt.category?.id ?? 'other';
+          return categoryId == widget.categoryId;
+        }).toList()..sort((a, b) {
+          final dateA = a.effectiveDate;
+          final dateB = b.effectiveDate;
+          if (dateA == null && dateB == null) return 0;
+          if (dateA == null) return 1;
+          if (dateB == null) return -1;
+          return dateB.compareTo(dateA);
+        });
 
-    final allTimeTotal = receipts.fold<double>(
-      0,
-      (sum, r) => sum + (r.effectiveTotalAmount ?? 0),
+    final periods = buildCategoryPeriods(receipts, _range);
+    _selectedPeriod = normalizeSelectedCategoryPeriod(
+      range: _range,
+      periods: periods,
+      selectedPeriodKey: _selectedPeriod,
     );
 
-    final periods = _buildPeriods(receipts);
-
-    if (_selectedPeriod == null && periods.isNotEmpty) {
-      _selectedPeriod = periods.first.key;
-    }
-    if (_selectedPeriod != null &&
-        _range != _TimeRange.allTime &&
-        !periods.any((p) => p.key == _selectedPeriod)) {
-      _selectedPeriod = periods.isNotEmpty ? periods.first.key : null;
-    }
-
-    final filtered = _range == _TimeRange.allTime
-        ? receipts
-        : receipts.where((r) {
-            final date = r.effectiveDate;
-            if (date == null) return false;
-            return _periodKey(date) == _selectedPeriod;
-          }).toList();
+    final filtered = filterReceiptsByCategoryPeriod(
+      receipts,
+      range: _range,
+      selectedPeriodKey: _selectedPeriod,
+    );
 
     final filteredTotal = filtered.fold<double>(
       0,
-      (sum, r) => sum + (r.effectiveTotalAmount ?? 0),
+      (sum, receipt) => sum + (receipt.effectiveTotalAmount ?? 0),
+    );
+    final allTimeTotal = receipts.fold<double>(
+      0,
+      (sum, receipt) => sum + (receipt.effectiveTotalAmount ?? 0),
     );
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF0E0E18) : const Color(0xFFF5F5F7),
+      backgroundColor: isDark
+          ? const Color(0xFF0E0E18)
+          : const Color(0xFFF5F5F7),
       appBar: AppBar(
         title: Text('${category.icon} ${category.name}'),
         backgroundColor: Colors.transparent,
@@ -84,12 +95,10 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
       ),
       body: Column(
         children: [
-          // ── Fixed header ──
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             child: Column(
               children: [
-                // Summary card
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -125,7 +134,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                                 color: cs.onSurface,
                               ),
                             ),
-                            if (_range != _TimeRange.allTime) ...[
+                            if (_range != CategoryTimeRange.allTime) ...[
                               const SizedBox(height: 2),
                               Text(
                                 'All time: ${formatCurrency(allTimeTotal)}',
@@ -156,31 +165,35 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
-
-                // Time range selector
                 _segmentedControl(cs, isDark),
-
-                // Period navigator
-                if (_range != _TimeRange.allTime && periods.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  _PeriodNavigator(
-                    periods: periods,
-                    selectedKey: _selectedPeriod,
-                    onChanged: (key) =>
-                        setState(() => _selectedPeriod = key),
+                const SizedBox(height: 10),
+                _filterActionRow(
+                  cs: cs,
+                  isDark: isDark,
+                  periods: periods,
+                  exportEnabled: filtered.isNotEmpty,
+                  onExport: () => _showExportOptions(
+                    category: category,
+                    receipts: filtered,
                   ),
-                ],
+                ),
+                const SizedBox(height: 10),
+                const TaxReadyHelperCard(
+                  title: 'Tax-Ready',
+                  body:
+                      'Select the filing period you need, then export this category as CSV or PDF for IRS Free File or your accountant.',
+                ),
                 const SizedBox(height: 14),
               ],
             ),
           ),
-
-          // ── Scrollable receipt list ──
           Expanded(
             child: filtered.isEmpty
                 ? Center(
                     child: Text(
-                      'No receipts for this period',
+                      _range == CategoryTimeRange.allTime
+                          ? 'No receipts in this category yet'
+                          : 'No receipts for this period',
                       style: TextStyle(
                         fontSize: 14,
                         color: cs.onSurface.withValues(alpha: 0.4),
@@ -190,16 +203,14 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                 : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                     itemCount: filtered.length,
-                    itemBuilder: (context, i) =>
-                        _receiptTile(filtered[i], cs),
+                    itemBuilder: (context, index) =>
+                        _receiptTile(filtered[index], cs),
                   ),
           ),
         ],
       ),
     );
   }
-
-  // ── Helpers ──
 
   Widget _segmentedControl(ColorScheme cs, bool isDark) {
     return Container(
@@ -210,16 +221,72 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
       ),
       child: Row(
         children: [
-          _tabButton('Month', _TimeRange.month, cs, isDark),
-          _tabButton('Year', _TimeRange.year, cs, isDark),
-          _tabButton('All Time', _TimeRange.allTime, cs, isDark),
+          _tabButton('Month', CategoryTimeRange.month, cs, isDark),
+          _tabButton('Year', CategoryTimeRange.year, cs, isDark),
+          _tabButton('All Time', CategoryTimeRange.allTime, cs, isDark),
         ],
       ),
     );
   }
 
+  Widget _filterActionRow({
+    required ColorScheme cs,
+    required bool isDark,
+    required List<CategoryPeriodOption> periods,
+    required bool exportEnabled,
+    required VoidCallback onExport,
+  }) {
+    final button = SizedBox(
+      height: 48,
+      child: FilledButton.tonalIcon(
+        onPressed: _exporting || !exportEnabled ? null : onExport,
+        icon: _exporting
+            ? SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: cs.primary,
+                ),
+              )
+            : const Icon(Icons.ios_share_rounded, size: 18),
+        label: Text(_exporting ? 'Preparing...' : 'Export'),
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          backgroundColor: cs.primary.withValues(alpha: isDark ? 0.2 : 0.12),
+          foregroundColor: cs.primary,
+        ),
+      ),
+    );
+
+    if (_range == CategoryTimeRange.allTime || periods.isEmpty) {
+      return Align(alignment: Alignment.centerRight, child: button);
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: _PeriodNavigator(
+            periods: periods,
+            selectedKey: _selectedPeriod,
+            onChanged: (key) => setState(() => _selectedPeriod = key),
+          ),
+        ),
+        const SizedBox(width: 10),
+        button,
+      ],
+    );
+  }
+
   Widget _tabButton(
-      String label, _TimeRange range, ColorScheme cs, bool isDark) {
+    String label,
+    CategoryTimeRange range,
+    ColorScheme cs,
+    bool isDark,
+  ) {
     final selected = _range == range;
     return Expanded(
       child: GestureDetector(
@@ -261,46 +328,166 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
     );
   }
 
-  String _periodKey(DateTime date) {
-    switch (_range) {
-      case _TimeRange.month:
-        return '${date.year}-${date.month.toString().padLeft(2, '0')}';
-      case _TimeRange.year:
-        return '${date.year}';
-      case _TimeRange.allTime:
-        return 'all';
+  Future<void> _showExportOptions({
+    required ExpenseCategory category,
+    required List<Receipt> receipts,
+  }) async {
+    if (receipts.isEmpty || _exporting) {
+      if (receipts.isEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No receipts available to export for this period.'),
+          ),
+        );
+      }
+      return;
     }
+
+    final format = await showModalBottomSheet<_CategoryExportFormat>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1A1A2A) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: cs.onSurface.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _exportOptionTile(
+                    context: context,
+                    label: 'PDF',
+                    icon: Icons.picture_as_pdf_outlined,
+                    onTap: () =>
+                        Navigator.of(context).pop(_CategoryExportFormat.pdf),
+                  ),
+                  const SizedBox(height: 8),
+                  _exportOptionTile(
+                    context: context,
+                    label: 'CSV',
+                    icon: Icons.table_chart_outlined,
+                    onTap: () =>
+                        Navigator.of(context).pop(_CategoryExportFormat.csv),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (format == null) return;
+    await _exportCategory(
+      category: category,
+      receipts: receipts,
+      format: format,
+    );
   }
 
-  List<_Period> _buildPeriods(List<Receipt> receipts) {
-    final seen = <String, _Period>{};
-    for (final r in receipts) {
-      final d = r.effectiveDate;
-      if (d == null) continue;
-      final key = _periodKey(d);
-      if (!seen.containsKey(key)) {
-        String label;
-        switch (_range) {
-          case _TimeRange.month:
-            label = DateFormat('MMM yyyy').format(d);
-            break;
-          case _TimeRange.year:
-            label = '${d.year}';
-            break;
-          case _TimeRange.allTime:
-            label = 'All Time';
-            break;
-        }
-        seen[key] = _Period(key: key, label: label);
+  Widget _exportOptionTile({
+    required BuildContext context,
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: cs.primary.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: cs.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: cs.onSurface.withValues(alpha: 0.35),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportCategory({
+    required ExpenseCategory category,
+    required List<Receipt> receipts,
+    required _CategoryExportFormat format,
+  }) async {
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _exporting = true);
+    try {
+      final exportService = ref.read(categoryExportServiceProvider);
+      switch (format) {
+        case _CategoryExportFormat.csv:
+          await exportService.exportCsv(
+            category: category,
+            range: _range,
+            selectedPeriodKey: _selectedPeriod,
+            receipts: receipts,
+          );
+          break;
+        case _CategoryExportFormat.pdf:
+          await exportService.exportPdf(
+            category: category,
+            range: _range,
+            selectedPeriodKey: _selectedPeriod,
+            receipts: receipts,
+          );
+          break;
+      }
+    } on CategoryExportException catch (error) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('We could not export this category right now.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _exporting = false);
       }
     }
-    final list = seen.values.toList()
-      ..sort((a, b) => b.key.compareTo(a.key));
-    return list;
   }
 
   Widget _receiptTile(Receipt receipt, ColorScheme cs) {
-    final merchant = receipt.merchant?.canonicalName ??
+    final merchant =
+        receipt.merchant?.canonicalName ??
         receipt.merchant?.rawName ??
         receipt.file.originalName;
     return Padding(
@@ -311,8 +498,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
           onTap: () => context.push('/app/receipt/${receipt.id}'),
           borderRadius: BorderRadius.circular(14),
           child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 4, vertical: 11),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 11),
             child: Row(
               children: [
                 Container(
@@ -352,8 +538,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        formatDate(receipt.effectiveDate,
-                            pattern: 'MMM d, y'),
+                        formatDate(receipt.effectiveDate, pattern: 'MMM d, y'),
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w400,
@@ -392,12 +577,6 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
   }
 }
 
-class _Period {
-  const _Period({required this.key, required this.label});
-  final String key;
-  final String label;
-}
-
 class _PeriodNavigator extends StatelessWidget {
   const _PeriodNavigator({
     required this.periods,
@@ -405,7 +584,7 @@ class _PeriodNavigator extends StatelessWidget {
     required this.onChanged,
   });
 
-  final List<_Period> periods;
+  final List<CategoryPeriodOption> periods;
   final String? selectedKey;
   final ValueChanged<String> onChanged;
 
@@ -414,11 +593,12 @@ class _PeriodNavigator extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final idx = periods.indexWhere((p) => p.key == selectedKey);
-    final hasPrev = idx < periods.length - 1;
-    final hasNext = idx > 0;
-    final label =
-        idx >= 0 ? periods[idx].label : (periods.isNotEmpty ? periods.first.label : '');
+    final index = periods.indexWhere((period) => period.key == selectedKey);
+    final hasPrev = index < periods.length - 1;
+    final hasNext = index > 0;
+    final label = index >= 0
+        ? periods[index].label
+        : (periods.isNotEmpty ? periods.first.label : '');
 
     return Container(
       height: 48,
@@ -436,7 +616,7 @@ class _PeriodNavigator extends StatelessWidget {
           _arrowButton(
             icon: Icons.chevron_left_rounded,
             enabled: hasPrev,
-            onTap: () => onChanged(periods[idx + 1].key),
+            onTap: () => onChanged(periods[index + 1].key),
             cs: cs,
           ),
           Expanded(
@@ -448,8 +628,7 @@ class _PeriodNavigator extends StatelessWidget {
                   children: [
                     AnimatedSwitcher(
                       duration: const Duration(milliseconds: 250),
-                      transitionBuilder: (child, animation) =>
-                          FadeTransition(
+                      transitionBuilder: (child, animation) => FadeTransition(
                         opacity: animation,
                         child: SlideTransition(
                           position: Tween<Offset>(
@@ -484,7 +663,7 @@ class _PeriodNavigator extends StatelessWidget {
           _arrowButton(
             icon: Icons.chevron_right_rounded,
             enabled: hasNext,
-            onTap: () => onChanged(periods[idx - 1].key),
+            onTap: () => onChanged(periods[index - 1].key),
             cs: cs,
           ),
         ],
@@ -521,21 +700,22 @@ class _PeriodNavigator extends StatelessWidget {
   }
 
   void _showPicker(BuildContext context, ColorScheme cs, bool isDark) {
-    final idx = periods.indexWhere((p) => p.key == selectedKey);
+    final selectedIndex = periods.indexWhere(
+      (period) => period.key == selectedKey,
+    );
 
     showModalBottomSheet<String>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (ctx) {
+      builder: (sheetContext) {
         return Container(
           constraints: BoxConstraints(
             maxHeight: MediaQuery.of(context).size.height * 0.5,
           ),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1A1A2A) : Colors.white,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -569,9 +749,9 @@ class _PeriodNavigator extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
                   shrinkWrap: true,
                   itemCount: periods.length,
-                  itemBuilder: (_, i) {
-                    final p = periods[i];
-                    final selected = i == idx;
+                  itemBuilder: (_, index) {
+                    final period = periods[index];
+                    final selected = index == selectedIndex;
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 2),
                       child: Material(
@@ -581,15 +761,18 @@ class _PeriodNavigator extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(12),
-                          onTap: () => Navigator.of(ctx).pop(p.key),
+                          onTap: () =>
+                              Navigator.of(sheetContext).pop(period.key),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 14),
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
                             child: Row(
                               children: [
                                 Expanded(
                                   child: Text(
-                                    p.label,
+                                    period.label,
                                     style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: selected
@@ -621,7 +804,9 @@ class _PeriodNavigator extends StatelessWidget {
         );
       },
     ).then((value) {
-      if (value != null) onChanged(value);
+      if (value != null) {
+        onChanged(value);
+      }
     });
   }
 }

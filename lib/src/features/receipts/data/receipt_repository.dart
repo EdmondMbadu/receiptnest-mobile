@@ -391,6 +391,16 @@ class ReceiptRepository {
     return _storage.ref(storagePath).getDownloadURL();
   }
 
+  Future<Uint8List?> getReceiptFileBytes(
+    String storagePath, {
+    int maxSizeBytes = 50 * 1024 * 1024,
+  }) async {
+    if (storagePath.isEmpty) {
+      return null;
+    }
+    return _storage.ref(storagePath).getData(maxSizeBytes);
+  }
+
   Future<List<MonthlySummary>> getMonthlySummaries(
     String userId, {
     int? limit,

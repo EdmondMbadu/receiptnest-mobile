@@ -12,6 +12,7 @@ import '../../features/auth/data/auth_repository.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/verify_email_screen.dart';
+import '../../features/folders/models/category_period_filter.dart';
 import '../../features/folders/presentation/category_detail_screen.dart';
 import '../../features/folders/presentation/folder_detail_screen.dart';
 import '../../features/folders/presentation/folders_screen.dart';
@@ -135,8 +136,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/app/categories/:id',
-        builder: (context, state) =>
-            CategoryDetailScreen(categoryId: state.pathParameters['id'] ?? ''),
+        builder: (context, state) => CategoryDetailScreen(
+          categoryId: state.pathParameters['id'] ?? '',
+          initialRange: categoryTimeRangeFromQuery(
+            state.uri.queryParameters['range'],
+          ),
+          initialPeriodKey: state.uri.queryParameters['period'],
+        ),
       ),
       GoRoute(
         path: '/app/pricing',

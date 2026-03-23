@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/utils/formatters.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../receipts/data/receipt_repository.dart';
 import '../../receipts/models/category.dart';
 import '../../receipts/models/receipt.dart';
+import '../models/category_period_filter.dart';
 import '../data/folder_repository.dart';
+import 'widgets/tax_ready_helper_card.dart';
 import '../models/folder.dart';
-
-enum _CatTimeRange { month, year, allTime }
 
 class FoldersScreen extends ConsumerStatefulWidget {
   const FoldersScreen({super.key});
@@ -468,67 +467,26 @@ class _CategoriesTab extends StatefulWidget {
 }
 
 class _CategoriesTabState extends State<_CategoriesTab> {
-  _CatTimeRange _range = _CatTimeRange.month;
+  CategoryTimeRange _range = CategoryTimeRange.month;
   String? _selectedPeriod;
-
-  String _periodKey(DateTime d) {
-    switch (_range) {
-      case _CatTimeRange.month:
-        return '${d.year}-${d.month.toString().padLeft(2, '0')}';
-      case _CatTimeRange.year:
-        return '${d.year}';
-      case _CatTimeRange.allTime:
-        return 'all';
-    }
-  }
-
-  List<_PeriodChip> _buildPeriods(List<Receipt> receipts) {
-    final seen = <String, _PeriodChip>{};
-    for (final r in receipts) {
-      final d = r.effectiveDate;
-      if (d == null) continue;
-      final key = _periodKey(d);
-      if (!seen.containsKey(key)) {
-        String label;
-        switch (_range) {
-          case _CatTimeRange.month:
-            label = DateFormat('MMM yyyy').format(d);
-            break;
-          case _CatTimeRange.year:
-            label = '${d.year}';
-            break;
-          case _CatTimeRange.allTime:
-            label = 'All';
-            break;
-        }
-        seen[key] = _PeriodChip(key: key, label: label);
-      }
-    }
-    return seen.values.toList()..sort((a, b) => b.key.compareTo(a.key));
-  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final periods = _buildPeriods(widget.receipts);
-    if (_selectedPeriod == null && periods.isNotEmpty) {
-      _selectedPeriod = periods.first.key;
-    }
-    if (_selectedPeriod != null &&
-        _range != _CatTimeRange.allTime &&
-        !periods.any((p) => p.key == _selectedPeriod)) {
-      _selectedPeriod = periods.isNotEmpty ? periods.first.key : null;
-    }
+    final periods = buildCategoryPeriods(widget.receipts, _range);
+    _selectedPeriod = normalizeSelectedCategoryPeriod(
+      range: _range,
+      periods: periods,
+      selectedPeriodKey: _selectedPeriod,
+    );
 
-    final filtered = _range == _CatTimeRange.allTime
-        ? widget.receipts
-        : widget.receipts.where((r) {
-            final d = r.effectiveDate;
-            if (d == null) return false;
-            return _periodKey(d) == _selectedPeriod;
-          }).toList();
+    final filtered = filterReceiptsByCategoryPeriod(
+      widget.receipts,
+      range: _range,
+      selectedPeriodKey: _selectedPeriod,
+    );
 
     final byCategory = <String, List<Receipt>>{};
     for (final receipt in filtered) {
@@ -578,11 +536,11 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                 ),
                 child: Row(
                   children: [
-                    _catTabButton('Month', _CatTimeRange.month, cs, isDark),
-                    _catTabButton('Year', _CatTimeRange.year, cs, isDark),
+                    _catTabButton('Month', CategoryTimeRange.month, cs, isDark),
+                    _catTabButton('Year', CategoryTimeRange.year, cs, isDark),
                     _catTabButton(
                       'All Time',
-                      _CatTimeRange.allTime,
+                      CategoryTimeRange.allTime,
                       cs,
                       isDark,
                     ),
@@ -591,7 +549,8 @@ class _CategoriesTabState extends State<_CategoriesTab> {
               ),
 
               // Period navigator
-              if (_range != _CatTimeRange.allTime && periods.isNotEmpty) ...[
+              if (_range != CategoryTimeRange.allTime &&
+                  periods.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 _CatPeriodNavigator(
                   periods: periods,
@@ -599,6 +558,12 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                   onChanged: (key) => setState(() => _selectedPeriod = key),
                 ),
               ],
+              const SizedBox(height: 14),
+              const TaxReadyHelperCard(
+                title: 'Tax-Ready',
+                body:
+                    'Choose the filing period, open a category, and export that category\'s receipts as CSV or PDF for filing or your accountant.',
+              ),
               const SizedBox(height: 14),
             ],
           ),
@@ -626,7 +591,7 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                       ),
                       const SizedBox(height: 14),
                       Text(
-                        _range == _CatTimeRange.allTime
+                        _range == CategoryTimeRange.allTime
                             ? 'No categorized receipts yet'
                             : 'No receipts for this period',
                         style: TextStyle(
@@ -635,7 +600,7 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                           color: cs.onSurface.withValues(alpha: 0.5),
                         ),
                       ),
-                      if (_range == _CatTimeRange.allTime) ...[
+                      if (_range == CategoryTimeRange.allTime) ...[
                         const SizedBox(height: 4),
                         Text(
                           'Upload receipts to see categories',
@@ -687,7 +652,7 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                                     color: cs.onSurface,
                                   ),
                                 ),
-                                if (_range != _CatTimeRange.allTime) ...[
+                                if (_range != CategoryTimeRange.allTime) ...[
                                   const SizedBox(height: 2),
                                   Text(
                                     'All time: ${formatCurrency(allTimeTotal)}',
@@ -748,9 +713,20 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                           child: Material(
                             color: Colors.transparent,
                             child: InkWell(
-                              onTap: () => context.push(
-                                '/app/categories/${entry.category.id}',
-                              ),
+                              onTap: () {
+                                final route = Uri(
+                                  path: '/app/categories/${entry.category.id}',
+                                  queryParameters: <String, String>{
+                                    'range': categoryTimeRangeQueryValue(
+                                      _range,
+                                    ),
+                                    if (_range != CategoryTimeRange.allTime &&
+                                        _selectedPeriod != null)
+                                      'period': _selectedPeriod!,
+                                  },
+                                );
+                                context.push(route.toString());
+                              },
                               borderRadius: BorderRadius.circular(18),
                               child: Padding(
                                 padding: const EdgeInsets.all(16),
@@ -851,7 +827,7 @@ class _CategoriesTabState extends State<_CategoriesTab> {
 
   Widget _catTabButton(
     String label,
-    _CatTimeRange range,
+    CategoryTimeRange range,
     ColorScheme cs,
     bool isDark,
   ) {
@@ -909,12 +885,6 @@ class _CategoryEntry {
   final double total;
 }
 
-class _PeriodChip {
-  const _PeriodChip({required this.key, required this.label});
-  final String key;
-  final String label;
-}
-
 class _CatPeriodNavigator extends StatelessWidget {
   const _CatPeriodNavigator({
     required this.periods,
@@ -922,7 +892,7 @@ class _CatPeriodNavigator extends StatelessWidget {
     required this.onChanged,
   });
 
-  final List<_PeriodChip> periods;
+  final List<CategoryPeriodOption> periods;
   final String? selectedKey;
   final ValueChanged<String> onChanged;
 
