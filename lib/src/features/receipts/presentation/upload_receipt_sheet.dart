@@ -3,12 +3,14 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/config/public_app_config.dart';
 import '../data/receipt_repository.dart';
 import '../models/receipt.dart';
 
-class UploadReceiptSheet extends StatefulWidget {
+class UploadReceiptSheet extends ConsumerStatefulWidget {
   const UploadReceiptSheet({
     super.key,
     required this.userId,
@@ -21,10 +23,10 @@ class UploadReceiptSheet extends StatefulWidget {
   final ValueChanged<Receipt> onUploaded;
 
   @override
-  State<UploadReceiptSheet> createState() => _UploadReceiptSheetState();
+  ConsumerState<UploadReceiptSheet> createState() => _UploadReceiptSheetState();
 }
 
-class _UploadReceiptSheetState extends State<UploadReceiptSheet> {
+class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
   static const Set<String> _previewableImageExtensions = {
     'jpg',
     'jpeg',
@@ -150,20 +152,13 @@ class _UploadReceiptSheetState extends State<UploadReceiptSheet> {
 
   Future<void> _pickDocument() async {
     try {
+      final appConfig =
+          ref.read(publicAppConfigProvider).valueOrNull ??
+          const PublicAppConfig();
       final result = await FilePicker.platform.pickFiles(
         withData: true,
         type: FileType.custom,
-        allowedExtensions: const [
-          'jpg',
-          'jpeg',
-          'png',
-          'webp',
-          'heic',
-          'heif',
-          'pdf',
-          'doc',
-          'docx',
-        ],
+        allowedExtensions: appConfig.uploadAllowedExtensions,
       );
 
       if (result == null || result.files.isEmpty) return;
@@ -192,8 +187,14 @@ class _UploadReceiptSheetState extends State<UploadReceiptSheet> {
   Future<void> _upload() async {
     final file = _selectedFile;
     if (file == null) return;
+    final appConfig =
+        ref.read(publicAppConfigProvider).valueOrNull ??
+        const PublicAppConfig();
 
-    final validation = widget.repository.validateFile(file);
+    final validation = widget.repository.validateFile(
+      file,
+      appConfig: appConfig,
+    );
     if (!validation.valid) {
       setState(() => _error = validation.error);
       return;
@@ -209,6 +210,7 @@ class _UploadReceiptSheetState extends State<UploadReceiptSheet> {
       final uploaded = await widget.repository.uploadReceipt(
         userId: widget.userId,
         file: file,
+        appConfig: appConfig,
         onProgress: (value) {
           if (!mounted) return;
           setState(() => _progress = value);

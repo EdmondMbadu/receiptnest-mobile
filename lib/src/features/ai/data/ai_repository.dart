@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/config/public_app_config.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../receipts/models/monthly_summary.dart';
 import '../../receipts/models/receipt.dart';
@@ -28,14 +29,9 @@ final aiChatHistoryProvider = StreamProvider<List<AiChatHistoryItem>>((ref) {
 });
 
 final aiSuggestedQuestionsProvider = Provider<List<String>>((ref) {
-  return const [
-    'How can I reduce my spending this month?',
-    'What are my biggest expense categories?',
-    'Am I spending more than last month?',
-    'Where should I cut back to save money?',
-    'What patterns do you see in my spending?',
-    'How much am I spending on dining out?',
-  ];
+  final appConfig = ref.watch(publicAppConfigProvider).valueOrNull;
+  return appConfig?.aiSuggestedQuestions ??
+      const PublicAppConfig().aiSuggestedQuestions;
 });
 
 class AiRepository {

@@ -1,23 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class SupportScreen extends StatelessWidget {
+import '../../../core/config/public_app_config.dart';
+
+class SupportScreen extends ConsumerWidget {
   const SupportScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final appConfig =
+        ref.watch(publicAppConfigProvider).valueOrNull ??
+        const PublicAppConfig();
+
     return Scaffold(
       appBar: AppBar(title: const Text('Support')),
       body: ListView(
         padding: const EdgeInsets.all(20),
-        children: const [
+        children: [
           Text(
-            'Need help?',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            appConfig.supportTitle,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
-          SizedBox(height: 12),
-          Text('For account, billing, or receipt processing issues, contact support at info@receipt-nest.com.'),
-          SizedBox(height: 12),
-          Text('Include your account email and a short issue summary so we can help quickly.'),
+          const SizedBox(height: 12),
+          for (
+            var index = 0;
+            index < appConfig.supportParagraphs.length;
+            index++
+          )
+            Padding(
+              padding: EdgeInsets.only(
+                bottom: index == appConfig.supportParagraphs.length - 1
+                    ? 0
+                    : 12,
+              ),
+              child: Text(appConfig.supportParagraphs[index]),
+            ),
         ],
       ),
     );

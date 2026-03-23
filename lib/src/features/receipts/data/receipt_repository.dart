@@ -8,37 +8,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/config/public_app_config.dart';
 import '../../../core/config/public_billing_config.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../auth/data/auth_repository.dart';
 import '../models/monthly_summary.dart';
 import '../models/receipt.dart';
 
-const maxFileSizeBytes = 10 * 1024 * 1024;
+const maxFileSizeBytes = defaultUploadMaxFileSizeBytes;
 
-const allowedFileMimeTypes = <String>{
-  'image/jpeg',
-  'image/jpg',
-  'image/png',
-  'image/webp',
-  'image/heic',
-  'image/heif',
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-};
+const allowedFileMimeTypes = <String>{...defaultUploadAllowedMimeTypes};
 
-const allowedFileExtensions = <String>{
-  'jpg',
-  'jpeg',
-  'png',
-  'webp',
-  'heic',
-  'heif',
-  'pdf',
-  'doc',
-  'docx',
-};
+const allowedFileExtensions = <String>{...defaultUploadAllowedExtensions};
 
 final receiptRepositoryProvider = Provider<ReceiptRepository>((ref) {
   return ReceiptRepository(
@@ -258,22 +239,35 @@ class ReceiptRepository {
     return Receipt.fromSnapshot(snapshot);
   }
 
-  UploadValidationResult validateFile(UploadFileData file) {
+  UploadValidationResult validateFile(
+    UploadFileData file, {
+    PublicAppConfig? appConfig,
+  }) {
     final ext = file.name.split('.').last.toLowerCase();
     final mime = (file.mimeType ?? '').toLowerCase();
+    final allowedMimeTypes = {
+      ...(appConfig?.uploadAllowedMimeTypes ?? defaultUploadAllowedMimeTypes),
+    };
+    final allowedExtensions = {
+      ...(appConfig?.uploadAllowedExtensions ?? defaultUploadAllowedExtensions),
+    };
+    final maxBytes = appConfig?.uploadMaxFileSizeBytes ?? maxFileSizeBytes;
 
-    if (!allowedFileMimeTypes.contains(mime) &&
-        !allowedFileExtensions.contains(ext)) {
+    if (!allowedMimeTypes.contains(mime) && !allowedExtensions.contains(ext)) {
       return const UploadValidationResult(
         valid: false,
         error: 'Invalid file type. Allowed: images, PDF, DOC, DOCX',
       );
     }
 
-    if (file.sizeBytes > maxFileSizeBytes) {
-      return const UploadValidationResult(
+    if (file.sizeBytes > maxBytes) {
+      final hasWholeMegabytes = maxBytes % (1024 * 1024) == 0;
+      final maxSizeMb = (maxBytes / (1024 * 1024)).toStringAsFixed(
+        hasWholeMegabytes ? 0 : 1,
+      );
+      return UploadValidationResult(
         valid: false,
-        error: 'File too large. Maximum size is 10MB.',
+        error: 'File too large. Maximum size is ${maxSizeMb}MB.',
       );
     }
 
@@ -283,9 +277,10 @@ class ReceiptRepository {
   Future<Receipt> uploadReceipt({
     required String userId,
     required UploadFileData file,
+    PublicAppConfig? appConfig,
     ValueChanged<double>? onProgress,
   }) async {
-    final validation = validateFile(file);
+    final validation = validateFile(file, appConfig: appConfig);
     if (!validation.valid) {
       throw Exception(validation.error ?? 'Invalid file');
     }

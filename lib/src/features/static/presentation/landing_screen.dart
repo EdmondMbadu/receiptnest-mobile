@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/config/public_app_config.dart';
 import '../../../core/widgets/brand_header.dart';
 import '../../auth/data/auth_repository.dart';
 
@@ -11,6 +12,9 @@ class LandingScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
+    final appConfig =
+        ref.watch(publicAppConfigProvider).valueOrNull ??
+        const PublicAppConfig();
     if (user != null && user.emailVerified) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) {
@@ -31,10 +35,7 @@ class LandingScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const BrandHeader(
-                    subtitle:
-                        'Receipt inbox for freelancers and small teams.\nTrack, review, and export expenses with AI assistance.',
-                  ),
+                  BrandHeader(subtitle: appConfig.landingSubtitle),
                   const SizedBox(height: 40),
                   FilledButton(
                     onPressed: () => context.go('/register'),
@@ -46,14 +47,22 @@ class LandingScreen extends ConsumerWidget {
                     child: const Text('Sign in'),
                   ),
                   const SizedBox(height: 32),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 12,
+                    runSpacing: 12,
                     children: [
-                      _FeaturePill(icon: Icons.bolt_rounded, label: 'AI-powered', cs: cs),
-                      const SizedBox(width: 12),
-                      _FeaturePill(icon: Icons.lock_outline_rounded, label: 'Secure', cs: cs),
-                      const SizedBox(width: 12),
-                      _FeaturePill(icon: Icons.cloud_outlined, label: 'Cloud sync', cs: cs),
+                      for (final (index, label)
+                          in appConfig.landingFeaturePills.take(3).indexed)
+                        _FeaturePill(
+                          icon: switch (index) {
+                            0 => Icons.bolt_rounded,
+                            1 => Icons.lock_outline_rounded,
+                            _ => Icons.cloud_outlined,
+                          },
+                          label: label,
+                          cs: cs,
+                        ),
                     ],
                   ),
                 ],

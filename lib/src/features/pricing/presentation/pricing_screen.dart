@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
+import '../../../core/config/public_app_config.dart';
 import '../../../core/config/public_billing_config.dart';
 import '../../auth/data/auth_repository.dart';
 
@@ -18,6 +19,29 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
   bool _processingCheckout = false;
   bool _processingPortal = false;
   String? _error;
+
+  String _replaceFreePlanLimit(String value, int freePlanReceiptLimit) {
+    return value.replaceAll('{freePlanReceiptLimit}', '$freePlanReceiptLimit');
+  }
+
+  List<_Feature> _buildFeatures(
+    List<String> labels,
+    List<IconData> icons, {
+    required int freePlanReceiptLimit,
+  }) {
+    return labels
+        .map((label) => _replaceFreePlanLimit(label, freePlanReceiptLimit))
+        .toList(growable: false)
+        .asMap()
+        .entries
+        .map(
+          (entry) => _Feature(
+            entry.value,
+            entry.key < icons.length ? icons[entry.key] : Icons.check_rounded,
+          ),
+        )
+        .toList(growable: false);
+  }
 
   Future<void> _startCheckout() async {
     setState(() {
@@ -81,6 +105,9 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final profile = ref.watch(currentUserProfileProvider).valueOrNull;
     final billingConfig = ref.watch(publicBillingConfigProvider).valueOrNull;
+    final appConfig =
+        ref.watch(publicAppConfigProvider).valueOrNull ??
+        const PublicAppConfig();
     final freePlanReceiptLimit =
         billingConfig?.freePlanReceiptLimit ?? defaultFreePlanReceiptLimit;
 
@@ -136,7 +163,7 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  'Choose your plan',
+                  appConfig.pricingHeadline,
                   style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.w800,
@@ -146,7 +173,7 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Upgrade to Pro for unlimited access and faster workflows',
+                  appConfig.pricingSubheadline,
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w400,
@@ -180,7 +207,9 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
                       ),
                       _TogglePill(
                         label: 'Annual',
-                        badge: 'Save 7%',
+                        badge: appConfig.pricingAnnualSavingsBadge.isEmpty
+                            ? null
+                            : appConfig.pricingAnnualSavingsBadge,
                         selected: _isAnnual,
                         onTap: () => setState(() => _isAnnual = true),
                         isDark: isDark,
@@ -263,19 +292,25 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
           // ── Plan cards ──
           // Pro plan
           _PlanCard(
-            planName: 'Pro',
-            tagline: 'For power users',
-            price: _isAnnual ? '\$100' : '\$9',
+            planName: appConfig.pricingProPlanName,
+            tagline: appConfig.pricingProTagline,
+            price: _isAnnual
+                ? appConfig.pricingAnnualPrice
+                : appConfig.pricingMonthlyPrice,
             cadence: _isAnnual ? '/year' : '/month',
             isActive: isPro,
             isPrimary: true,
             isDark: isDark,
-            features: const [
-              _Feature('Unlimited receipts', Icons.all_inclusive_rounded),
-              _Feature('Advanced search & filters', Icons.search_rounded),
-              _Feature('CSV and PDF exports', Icons.download_rounded),
-              _Feature('Priority support', Icons.support_agent_rounded),
-            ],
+            features: _buildFeatures(
+              appConfig.pricingProFeatures,
+              const [
+                Icons.all_inclusive_rounded,
+                Icons.search_rounded,
+                Icons.download_rounded,
+                Icons.support_agent_rounded,
+              ],
+              freePlanReceiptLimit: freePlanReceiptLimit,
+            ),
             buttonLabel: isPro
                 ? 'Current plan'
                 : (_processingCheckout ? null : 'Upgrade to Pro'),
@@ -288,22 +323,23 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
 
           // Free plan
           _PlanCard(
-            planName: 'Free',
-            tagline: 'For getting started',
+            planName: appConfig.pricingFreePlanName,
+            tagline: appConfig.pricingFreeTagline,
             price: '\$0',
             cadence: 'forever',
             isActive: !isPro,
             isPrimary: false,
             isDark: isDark,
-            features: [
-              _Feature(
-                'Up to $freePlanReceiptLimit receipts',
+            features: _buildFeatures(
+              appConfig.pricingFreeFeatures,
+              const [
                 Icons.receipt_long_rounded,
-              ),
-              _Feature('Smart auto-tagging', Icons.label_rounded),
-              _Feature('Email & PDF uploads', Icons.upload_file_rounded),
-              _Feature('Single workspace', Icons.person_rounded),
-            ],
+                Icons.label_rounded,
+                Icons.upload_file_rounded,
+                Icons.person_rounded,
+              ],
+              freePlanReceiptLimit: freePlanReceiptLimit,
+            ),
             buttonLabel: !isPro ? 'Current plan' : null,
             onButtonPressed: null,
           ),
@@ -376,7 +412,7 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
               ),
               const SizedBox(width: 6),
               Text(
-                'Secured by Stripe',
+                appConfig.pricingTrustLabel,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
