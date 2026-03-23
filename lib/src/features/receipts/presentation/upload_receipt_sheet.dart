@@ -62,13 +62,11 @@ class _UploadReceiptSheetState extends State<UploadReceiptSheet> {
   }
 
   bool _isPreviewableImage(UploadFileData file) {
-    return file.path != null && _previewableImageExtensions.contains(_fileExtension(file.name));
+    return file.path != null &&
+        _previewableImageExtensions.contains(_fileExtension(file.name));
   }
 
-  String _friendlyPickerError(
-    Object error, {
-    required bool isCamera,
-  }) {
+  String _friendlyPickerError(Object error, {required bool isCamera}) {
     if (error is PlatformException) {
       switch (error.code) {
         case 'camera_access_denied':
@@ -108,10 +106,7 @@ class _UploadReceiptSheetState extends State<UploadReceiptSheet> {
           path: image.path,
           bytes: bytes,
           sizeBytes: bytes.length,
-          mimeType: _mimeTypeFromFileName(
-            image.name,
-            fallback: 'image/jpeg',
-          ),
+          mimeType: _mimeTypeFromFileName(image.name, fallback: 'image/jpeg'),
         );
         _error = null;
       });
@@ -141,10 +136,7 @@ class _UploadReceiptSheetState extends State<UploadReceiptSheet> {
           path: image.path,
           bytes: bytes,
           sizeBytes: bytes.length,
-          mimeType: _mimeTypeFromFileName(
-            image.name,
-            fallback: 'image/jpeg',
-          ),
+          mimeType: _mimeTypeFromFileName(image.name, fallback: 'image/jpeg'),
         );
         _error = null;
       });
@@ -161,7 +153,17 @@ class _UploadReceiptSheetState extends State<UploadReceiptSheet> {
       final result = await FilePicker.platform.pickFiles(
         withData: true,
         type: FileType.custom,
-        allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'pdf', 'doc', 'docx'],
+        allowedExtensions: const [
+          'jpg',
+          'jpeg',
+          'png',
+          'webp',
+          'heic',
+          'heif',
+          'pdf',
+          'doc',
+          'docx',
+        ],
       );
 
       if (result == null || result.files.isEmpty) return;
@@ -219,7 +221,7 @@ class _UploadReceiptSheetState extends State<UploadReceiptSheet> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = e.toString().replaceFirst('Exception: ', '');
       });
     } finally {
       if (mounted) {
@@ -342,7 +344,9 @@ class _UploadReceiptSheetState extends State<UploadReceiptSheet> {
                                     '${(selected.sizeBytes / 1024).toStringAsFixed(1)} KB',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: cs.onSurface.withValues(alpha: 0.5),
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.5,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -350,7 +354,8 @@ class _UploadReceiptSheetState extends State<UploadReceiptSheet> {
                             ),
                             if (!_uploading)
                               IconButton(
-                                onPressed: () => setState(() => _selectedFile = null),
+                                onPressed: () =>
+                                    setState(() => _selectedFile = null),
                                 icon: Icon(
                                   Icons.close_rounded,
                                   size: 20,

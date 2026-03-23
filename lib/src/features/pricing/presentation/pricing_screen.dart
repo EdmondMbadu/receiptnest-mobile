@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
+import '../../../core/config/public_billing_config.dart';
 import '../../auth/data/auth_repository.dart';
 
 class PricingScreen extends ConsumerStatefulWidget {
@@ -79,6 +80,9 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final profile = ref.watch(currentUserProfileProvider).valueOrNull;
+    final billingConfig = ref.watch(publicBillingConfigProvider).valueOrNull;
+    final freePlanReceiptLimit =
+        billingConfig?.freePlanReceiptLimit ?? defaultFreePlanReceiptLimit;
 
     final plan = (profile?.subscriptionPlan ?? 'free').toLowerCase();
     final status = (profile?.subscriptionStatus ?? 'inactive').toLowerCase();
@@ -89,7 +93,9 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
     const accent = Color(0xFF00C805);
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0D0D14) : const Color(0xFFF6F7F9),
+      backgroundColor: isDark
+          ? const Color(0xFF0D0D14)
+          : const Color(0xFFF6F7F9),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -194,9 +200,7 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 color: accent.withValues(alpha: isDark ? 0.08 : 0.06),
-                border: Border.all(
-                  color: accent.withValues(alpha: 0.15),
-                ),
+                border: Border.all(color: accent.withValues(alpha: 0.15)),
               ),
               child: Row(
                 children: [
@@ -276,8 +280,9 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
                 ? 'Current plan'
                 : (_processingCheckout ? null : 'Upgrade to Pro'),
             isProcessing: _processingCheckout,
-            onButtonPressed:
-                isPro || _processingCheckout ? null : _startCheckout,
+            onButtonPressed: isPro || _processingCheckout
+                ? null
+                : _startCheckout,
           ),
           const SizedBox(height: 16),
 
@@ -290,8 +295,11 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
             isActive: !isPro,
             isPrimary: false,
             isDark: isDark,
-            features: const [
-              _Feature('Up to 200 receipts', Icons.receipt_long_rounded),
+            features: [
+              _Feature(
+                'Up to $freePlanReceiptLimit receipts',
+                Icons.receipt_long_rounded,
+              ),
               _Feature('Smart auto-tagging', Icons.label_rounded),
               _Feature('Email & PDF uploads', Icons.upload_file_rounded),
               _Feature('Single workspace', Icons.person_rounded),
@@ -335,17 +343,11 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
               decoration: BoxDecoration(
                 color: cs.error.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: cs.error.withValues(alpha: 0.12),
-                ),
+                border: Border.all(color: cs.error.withValues(alpha: 0.12)),
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.error_outline_rounded,
-                    size: 18,
-                    color: cs.error,
-                  ),
+                  Icon(Icons.error_outline_rounded, size: 18, color: cs.error),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -520,14 +522,8 @@ class _PlanCard extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: isDark
-                    ? [
-                        const Color(0xFF0F2010),
-                        const Color(0xFF0D0D14),
-                      ]
-                    : [
-                        const Color(0xFFF0FDF0),
-                        Colors.white,
-                      ],
+                    ? [const Color(0xFF0F2010), const Color(0xFF0D0D14)]
+                    : [const Color(0xFFF0FDF0), Colors.white],
               )
             : null,
         color: isPrimary
@@ -537,8 +533,8 @@ class _PlanCard extends StatelessWidget {
           color: isPrimary
               ? accent.withValues(alpha: isDark ? 0.3 : 0.25)
               : (isDark
-                  ? Colors.white.withValues(alpha: 0.06)
-                  : Colors.grey.shade200),
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.grey.shade200),
           width: isPrimary ? 1.5 : 1,
         ),
         boxShadow: isPrimary
@@ -683,7 +679,9 @@ class _PlanCard extends StatelessWidget {
                             height: 32,
                             decoration: BoxDecoration(
                               color: isPrimary
-                                  ? accent.withValues(alpha: isDark ? 0.15 : 0.08)
+                                  ? accent.withValues(
+                                      alpha: isDark ? 0.15 : 0.08,
+                                    )
                                   : cs.onSurface.withValues(alpha: 0.04),
                               borderRadius: BorderRadius.circular(9),
                             ),

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/config/public_billing_config.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../auth/data/auth_repository.dart';
 import '../models/monthly_summary.dart';
@@ -292,6 +293,7 @@ class ReceiptRepository {
     final userSnap = await _db.collection('users').doc(userId).get();
     final plan = (userSnap.data()?['subscriptionPlan'] as String?) ?? 'free';
     if (plan != 'pro') {
+      final freePlanReceiptLimit = await fetchFreePlanReceiptLimit(_db);
       final countSnap = await _db
           .collection('users')
           .doc(userId)
@@ -299,8 +301,10 @@ class ReceiptRepository {
           .count()
           .get();
       final count = countSnap.count ?? 0;
-      if (count >= 200) {
-        throw Exception('FREE_PLAN_LIMIT_REACHED');
+      if (count >= freePlanReceiptLimit) {
+        throw Exception(
+          'Free plan includes up to $freePlanReceiptLimit receipts total. Upgrade to add more.',
+        );
       }
     }
 
