@@ -27,8 +27,8 @@ class NotificationSettings {
     securityAlerts: true,
     weeklySummaryEmails: true,
     monthlySummaryEmails: true,
-    weeklySummaryPush: true,
-    monthlySummaryPush: true,
+    weeklySummaryPush: false,
+    monthlySummaryPush: false,
   );
 
   NotificationSettings copyWith({
@@ -80,10 +80,8 @@ class NotificationSettings {
           input['securityAlerts'] as bool? ?? defaults.securityAlerts,
       weeklySummaryEmails: weeklySummaryEmails,
       monthlySummaryEmails: monthlySummaryEmails,
-      weeklySummaryPush:
-          input['weeklySummaryPush'] as bool? ?? weeklySummaryEmails,
-      monthlySummaryPush:
-          input['monthlySummaryPush'] as bool? ?? monthlySummaryEmails,
+      weeklySummaryPush: input['weeklySummaryPush'] as bool? ?? false,
+      monthlySummaryPush: input['monthlySummaryPush'] as bool? ?? false,
     );
   }
 

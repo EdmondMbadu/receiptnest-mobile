@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/models/user_profile.dart';
-import '../../notifications/data/push_notification_repository.dart';
 
 enum _SettingsTab { general, account, notifications }
 
@@ -68,9 +67,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   String _errorMessage(Object error, String fallback) {
-    if (error is PushNotificationException) {
-      return error.message;
-    }
     if (error is AppAuthException) {
       final code = error.code;
       if (code.contains('wrong-password') ||
@@ -143,15 +139,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _clearNotificationMessages();
     });
     try {
-      final profile = ref.read(currentUserProfileProvider).valueOrNull;
       await ref
           .read(authRepositoryProvider)
           .updateNotificationSettings(_notificationSettings);
-      if (profile != null) {
-        await ref
-            .read(pushNotificationRepositoryProvider)
-            .syncForUser(userId: profile.id, settings: _notificationSettings);
-      }
       if (!mounted) return;
       setState(() => _notificationSuccess = 'Notification settings updated.');
     } catch (error) {
@@ -537,7 +527,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           // ── Notifications ──
           if (_activeTab == _SettingsTab.notifications) ...[
             _SettingsSection(
-              title: 'App notifications',
+              title: 'App alerts',
               icon: Icons.notifications_outlined,
               isDark: isDark,
               children: [
@@ -566,24 +556,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   onChanged: (v) => setState(
                     () => _notificationSettings = _notificationSettings
                         .copyWith(securityAlerts: v),
-                  ),
-                ),
-                _NotifTile(
-                  title: 'Weekly spend notifications',
-                  subtitle: 'A morning push recap of last week’s spending',
-                  value: _notificationSettings.weeklySummaryPush,
-                  onChanged: (v) => setState(
-                    () => _notificationSettings = _notificationSettings
-                        .copyWith(weeklySummaryPush: v),
-                  ),
-                ),
-                _NotifTile(
-                  title: 'Monthly spend notifications',
-                  subtitle: 'A morning push recap of last month’s spending',
-                  value: _notificationSettings.monthlySummaryPush,
-                  onChanged: (v) => setState(
-                    () => _notificationSettings = _notificationSettings
-                        .copyWith(monthlySummaryPush: v),
                   ),
                 ),
               ],

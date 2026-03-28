@@ -319,8 +319,8 @@ class AuthRepository {
       securityAlerts: value.securityAlerts,
       weeklySummaryEmails: value.weeklySummaryEmails,
       monthlySummaryEmails: value.monthlySummaryEmails,
-      weeklySummaryPush: value.weeklySummaryPush,
-      monthlySummaryPush: value.monthlySummaryPush,
+      weeklySummaryPush: false,
+      monthlySummaryPush: false,
     );
   }
 

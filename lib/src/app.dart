@@ -19,9 +19,7 @@ class ReceiptNestApp extends ConsumerStatefulWidget {
 
 class _ReceiptNestAppState extends ConsumerState<ReceiptNestApp> {
   ProviderSubscription<AsyncValue<UserProfile?>>? _profileSubscription;
-  StreamSubscription<String>? _tokenRefreshSubscription;
-  String? _lastSyncedUserId;
-  NotificationSettings? _lastSyncedNotificationSettings;
+  String? _lastUnlinkedUserId;
 
   @override
   void initState() {
@@ -35,8 +33,7 @@ class _ReceiptNestAppState extends ConsumerState<ReceiptNestApp> {
         final nextProfile = next.valueOrNull;
 
         if (previousProfile != null && nextProfile == null) {
-          _lastSyncedUserId = null;
-          _lastSyncedNotificationSettings = null;
+          _lastUnlinkedUserId = null;
           unawaited(pushRepository.unlinkCurrentDevice(previousProfile.id));
         }
 
@@ -44,51 +41,20 @@ class _ReceiptNestAppState extends ConsumerState<ReceiptNestApp> {
           return;
         }
 
-        final shouldSync =
-            _lastSyncedUserId != nextProfile.id ||
-            _lastSyncedNotificationSettings != nextProfile.notificationSettings;
-        if (!shouldSync) {
+        if (_lastUnlinkedUserId == nextProfile.id) {
           return;
         }
 
-        unawaited(_syncPushSettings(pushRepository, nextProfile));
+        _lastUnlinkedUserId = nextProfile.id;
+        unawaited(pushRepository.unlinkCurrentDevice(nextProfile.id));
       },
       fireImmediately: true,
     );
-
-    _tokenRefreshSubscription = pushRepository.tokenRefreshStream.listen((_) {
-      final profile = ref.read(currentUserProfileProvider).valueOrNull;
-      if (profile == null) {
-        return;
-      }
-
-      unawaited(_syncPushSettings(pushRepository, profile));
-    });
-  }
-
-  Future<void> _syncPushSettings(
-    PushNotificationRepository pushRepository,
-    UserProfile profile,
-  ) async {
-    try {
-      await pushRepository.syncForUser(
-        userId: profile.id,
-        settings: profile.notificationSettings,
-      );
-      if (!mounted) {
-        return;
-      }
-      _lastSyncedUserId = profile.id;
-      _lastSyncedNotificationSettings = profile.notificationSettings;
-    } catch (_) {
-      // Preserve existing behavior by failing silently on background sync.
-    }
   }
 
   @override
   void dispose() {
     _profileSubscription?.close();
-    _tokenRefreshSubscription?.cancel();
     super.dispose();
   }
 

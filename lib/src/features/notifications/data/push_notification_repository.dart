@@ -193,7 +193,8 @@ class PushNotificationRepository {
   bool _shouldRegisterForSummaryPush(
     profile_models.NotificationSettings settings,
   ) {
-    return settings.weeklySummaryPush || settings.monthlySummaryPush;
+    // Summary push notifications are intentionally disabled for now.
+    return false;
   }
 
   bool get _supportsPushNotifications {
