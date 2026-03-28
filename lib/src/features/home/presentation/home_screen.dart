@@ -484,8 +484,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 )
                 .toList(),
-            includeName: true,
-            includeEmail: true,
+            includeName: false,
+            includeEmail: false,
             ownerName: profile?.displayName,
             ownerEmail: profile?.email,
           );
