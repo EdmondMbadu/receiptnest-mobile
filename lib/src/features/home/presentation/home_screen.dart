@@ -19,6 +19,8 @@ enum _GraphViewMode { month, histogram }
 
 enum _TimeRange { oneDay, oneWeek, oneMonth, threeMonths, oneYear, all }
 
+final _receiptMonthFormatter = DateFormat('MMMM yyyy');
+
 String _timeRangeLabel(_TimeRange range) {
   switch (range) {
     case _TimeRange.oneDay:
@@ -529,42 +531,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ColorScheme cs,
     bool isDark,
   ) {
-    // Keep month sections chronologically stable regardless of backend order.
-    final sortedReceipts = [...receipts]
-      ..sort((a, b) {
-        final aDate = a.effectiveDate;
-        final bDate = b.effectiveDate;
-
-        if (aDate != null && bDate != null) {
-          final byEffectiveDate = bDate.compareTo(aDate);
-          if (byEffectiveDate != 0) return byEffectiveDate;
-        } else if (aDate == null && bDate != null) {
-          return 1;
-        } else if (aDate != null && bDate == null) {
-          return -1;
-        }
-
-        final aCreated = a.createdAt;
-        final bCreated = b.createdAt;
-        if (aCreated != null && bCreated != null) {
-          final byCreatedAt = bCreated.compareTo(aCreated);
-          if (byCreatedAt != 0) return byCreatedAt;
-        } else if (aCreated == null && bCreated != null) {
-          return 1;
-        } else if (aCreated != null && bCreated == null) {
-          return -1;
-        }
-
-        return b.id.compareTo(a.id);
-      });
-
     final grouped = <String, List<Receipt>>{};
     final monthOrder = <String>[];
 
-    for (final receipt in sortedReceipts) {
+    for (final receipt in receipts) {
       final date = receipt.effectiveDate;
       final key = date != null
-          ? DateFormat('MMMM yyyy').format(date)
+          ? _receiptMonthFormatter.format(date)
           : 'Unknown date';
       if (!grouped.containsKey(key)) {
         grouped[key] = [];
@@ -633,6 +606,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final month = ref.watch(selectedMonthProvider);
     final year = ref.watch(selectedYearProvider);
     final receiptsAsync = ref.watch(receiptsStreamProvider);
+    final sortedReceipts = ref.watch(sortedReceiptsProvider);
     final today = DateTime.now();
     final isCurrentMonth = month == today.month && year == today.year;
     final totalDaysInMonth = DateTime(year, month + 1, 0).day;
@@ -655,9 +629,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: receiptsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Failed to load receipts: $err')),
-        data: (receipts) {
+        data: (_) {
           final histogramMonthlyData = _buildHistogramMonthlyData(
-            receipts,
+            sortedReceipts,
             month,
             year,
           );
@@ -665,10 +639,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             0,
             (sum, point) => sum + point.amount,
           );
-          final timeRangePoints = _buildTimeRangeData(receipts);
+          final timeRangePoints = _buildTimeRangeData(sortedReceipts);
           final timeRangeTotal = _timeRangeSpend(timeRangePoints);
-          final filtered = receipts.where((receipt) {
-            final query = _searchQuery.trim().toLowerCase();
+          final query = _searchQuery.trim().toLowerCase();
+          final filtered = sortedReceipts.where((receipt) {
             if (query.isEmpty) return true;
 
             final merchant =

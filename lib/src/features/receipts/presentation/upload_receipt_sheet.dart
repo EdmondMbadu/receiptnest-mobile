@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -99,15 +100,14 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
       );
       if (image == null) return;
 
-      final bytes = await image.readAsBytes();
+      final sizeBytes = await File(image.path).length();
       if (!mounted) return;
 
       setState(() {
         _selectedFile = UploadFileData(
           name: image.name,
           path: image.path,
-          bytes: bytes,
-          sizeBytes: bytes.length,
+          sizeBytes: sizeBytes,
           mimeType: _mimeTypeFromFileName(image.name, fallback: 'image/jpeg'),
         );
         _error = null;
@@ -129,15 +129,14 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
       );
       if (image == null) return;
 
-      final bytes = await image.readAsBytes();
+      final sizeBytes = await File(image.path).length();
       if (!mounted) return;
 
       setState(() {
         _selectedFile = UploadFileData(
           name: image.name,
           path: image.path,
-          bytes: bytes,
-          sizeBytes: bytes.length,
+          sizeBytes: sizeBytes,
           mimeType: _mimeTypeFromFileName(image.name, fallback: 'image/jpeg'),
         );
         _error = null;
@@ -156,7 +155,7 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
           ref.read(publicAppConfigProvider).valueOrNull ??
           const PublicAppConfig();
       final result = await FilePicker.platform.pickFiles(
-        withData: true,
+        withData: kIsWeb,
         type: FileType.custom,
         allowedExtensions: appConfig.uploadAllowedExtensions,
       );
@@ -170,7 +169,7 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
         _selectedFile = UploadFileData(
           name: file.name,
           path: file.path,
-          bytes: file.bytes,
+          bytes: file.path == null ? file.bytes : null,
           sizeBytes: file.size,
           mimeType: null,
         );

@@ -20,6 +20,8 @@ class ReceiptNestApp extends ConsumerStatefulWidget {
 class _ReceiptNestAppState extends ConsumerState<ReceiptNestApp> {
   ProviderSubscription<AsyncValue<UserProfile?>>? _profileSubscription;
   StreamSubscription<String>? _tokenRefreshSubscription;
+  String? _lastSyncedUserId;
+  NotificationSettings? _lastSyncedNotificationSettings;
 
   @override
   void initState() {
@@ -33,17 +35,23 @@ class _ReceiptNestAppState extends ConsumerState<ReceiptNestApp> {
         final nextProfile = next.valueOrNull;
 
         if (previousProfile != null && nextProfile == null) {
+          _lastSyncedUserId = null;
+          _lastSyncedNotificationSettings = null;
           unawaited(pushRepository.unlinkCurrentDevice(previousProfile.id));
         }
 
-        if (nextProfile != null) {
-          unawaited(
-            pushRepository.syncForUser(
-              userId: nextProfile.id,
-              settings: nextProfile.notificationSettings,
-            ),
-          );
+        if (nextProfile == null) {
+          return;
         }
+
+        final shouldSync =
+            _lastSyncedUserId != nextProfile.id ||
+            _lastSyncedNotificationSettings != nextProfile.notificationSettings;
+        if (!shouldSync) {
+          return;
+        }
+
+        unawaited(_syncPushSettings(pushRepository, nextProfile));
       },
       fireImmediately: true,
     );
@@ -54,13 +62,27 @@ class _ReceiptNestAppState extends ConsumerState<ReceiptNestApp> {
         return;
       }
 
-      unawaited(
-        pushRepository.syncForUser(
-          userId: profile.id,
-          settings: profile.notificationSettings,
-        ),
-      );
+      unawaited(_syncPushSettings(pushRepository, profile));
     });
+  }
+
+  Future<void> _syncPushSettings(
+    PushNotificationRepository pushRepository,
+    UserProfile profile,
+  ) async {
+    try {
+      await pushRepository.syncForUser(
+        userId: profile.id,
+        settings: profile.notificationSettings,
+      );
+      if (!mounted) {
+        return;
+      }
+      _lastSyncedUserId = profile.id;
+      _lastSyncedNotificationSettings = profile.notificationSettings;
+    } catch (_) {
+      // Preserve existing behavior by failing silently on background sync.
+    }
   }
 
   @override

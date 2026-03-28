@@ -149,8 +149,11 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
                   color: cs.error.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.warning_amber_rounded,
-                    size: 20, color: cs.error),
+                child: Icon(
+                  Icons.warning_amber_rounded,
+                  size: 20,
+                  color: cs.error,
+                ),
               ),
               const SizedBox(width: 12),
               const Text('Delete receipt'),
@@ -164,9 +167,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              style: FilledButton.styleFrom(
-                backgroundColor: cs.error,
-              ),
+              style: FilledButton.styleFrom(backgroundColor: cs.error),
               child: const Text('Delete'),
             ),
           ],
@@ -191,9 +192,9 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
 
   Future<void> _openFile(Receipt receipt) async {
     try {
-      final url = await ref
-          .read(receiptRepositoryProvider)
-          .getReceiptFileUrl(receipt.file.storagePath);
+      final url = await ref.read(
+        receiptFileUrlProvider(receipt.file.storagePath).future,
+      );
       await _openUrlExternally(url);
     } catch (e) {
       if (!mounted) return;
@@ -233,55 +234,42 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
         extension == 'pdf' ||
         receipt.file.mimeType.toLowerCase() == 'application/pdf';
     final useGoogleViewer = isPdf || extension == 'doc' || extension == 'docx';
+    final fileUrlAsync = ref.watch(
+      receiptFileUrlProvider(receipt.file.storagePath),
+    );
 
-    return FutureBuilder<String>(
-      future: ref
-          .read(receiptRepositoryProvider)
-          .getReceiptFileUrl(receipt.file.storagePath),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Container(
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF151520) : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.grey.shade200,
-              ),
-            ),
-            height: 260,
-            child: Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                color: cs.primary,
-              ),
-            ),
-          );
-        }
-
-        if (snapshot.hasError ||
-            snapshot.data == null ||
-            snapshot.data!.isEmpty) {
-          return Container(
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF151520) : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.grey.shade200,
-              ),
-            ),
-            child: _InlinePreviewError(
-              message: 'Could not load in-app preview.',
-              onOpenExternally: null,
-            ),
-          );
-        }
-
-        final fileUrl = snapshot.data!;
-
+    return fileUrlAsync.when(
+      loading: () => Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF151520) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.grey.shade200,
+          ),
+        ),
+        height: 260,
+        child: Center(
+          child: CircularProgressIndicator(strokeWidth: 2.5, color: cs.primary),
+        ),
+      ),
+      error: (_, _) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF151520) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.grey.shade200,
+          ),
+        ),
+        child: const _InlinePreviewError(
+          message: 'Could not load in-app preview.',
+          onOpenExternally: null,
+        ),
+      ),
+      data: (fileUrl) {
         Widget previewContent;
         if (_isImagePreviewable(receipt)) {
           previewContent = Column(
@@ -298,8 +286,11 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
                         color: cs.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.image_outlined,
-                          size: 16, color: cs.primary),
+                      child: Icon(
+                        Icons.image_outlined,
+                        size: 16,
+                        color: cs.primary,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Text(
@@ -344,8 +335,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
                         errorWidget: (context, url, error) {
                           return _InlinePreviewError(
                             message: 'Image preview is unavailable in-app.',
-                            onOpenExternally: () =>
-                                _openUrlExternally(fileUrl),
+                            onOpenExternally: () => _openUrlExternally(fileUrl),
                           );
                         },
                       ),
@@ -371,8 +361,11 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
                         color: cs.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.description_outlined,
-                          size: 16, color: cs.primary),
+                      child: Icon(
+                        Icons.description_outlined,
+                        size: 16,
+                        color: cs.primary,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Text(
@@ -480,8 +473,9 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
     final receiptAsync = ref.watch(receiptFutureProvider(widget.receiptId));
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF0D0D14) : const Color(0xFFF6F7F9),
+      backgroundColor: isDark
+          ? const Color(0xFF0D0D14)
+          : const Color(0xFFF6F7F9),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -495,17 +489,17 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
       ),
       body: receiptAsync.when(
         loading: () => Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.5,
-            color: cs.primary,
-          ),
+          child: CircularProgressIndicator(strokeWidth: 2.5, color: cs.primary),
         ),
         error: (err, _) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.error_outline_rounded,
-                  size: 48, color: cs.error.withValues(alpha: 0.5)),
+              Icon(
+                Icons.error_outline_rounded,
+                size: 48,
+                color: cs.error.withValues(alpha: 0.5),
+              ),
               const SizedBox(height: 12),
               Text(
                 'Failed to load receipt',
@@ -523,9 +517,11 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.receipt_long_outlined,
-                      size: 48,
-                      color: cs.onSurface.withValues(alpha: 0.15)),
+                  Icon(
+                    Icons.receipt_long_outlined,
+                    size: 48,
+                    color: cs.onSurface.withValues(alpha: 0.15),
+                  ),
                   const SizedBox(height: 12),
                   Text(
                     'Receipt not found',
@@ -623,8 +619,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
                                   '${formatCurrency(receipt.effectiveTotalAmount)} \u2022 ${formatDate(receipt.effectiveDate)}',
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color:
-                                        cs.onSurface.withValues(alpha: 0.45),
+                                    color: cs.onSurface.withValues(alpha: 0.45),
                                   ),
                                 ),
                               ],
@@ -687,8 +682,11 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
                             color: cs.primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Icon(Icons.edit_note_rounded,
-                              size: 18, color: cs.primary),
+                          child: Icon(
+                            Icons.edit_note_rounded,
+                            size: 18,
+                            color: cs.primary,
+                          ),
                         ),
                         const SizedBox(width: 10),
                         Text(
@@ -706,9 +704,11 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
                       controller: _merchantController,
                       decoration: InputDecoration(
                         labelText: 'Merchant',
-                        prefixIcon: Icon(Icons.store_outlined,
-                            size: 20,
-                            color: cs.onSurface.withValues(alpha: 0.4)),
+                        prefixIcon: Icon(
+                          Icons.store_outlined,
+                          size: 20,
+                          color: cs.onSurface.withValues(alpha: 0.4),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -743,17 +743,17 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
                       initialValue: _categoryId,
                       decoration: InputDecoration(
                         labelText: 'Category',
-                        prefixIcon: Icon(Icons.category_outlined,
-                            size: 20,
-                            color: cs.onSurface.withValues(alpha: 0.4)),
+                        prefixIcon: Icon(
+                          Icons.category_outlined,
+                          size: 20,
+                          color: cs.onSurface.withValues(alpha: 0.4),
+                        ),
                       ),
                       items: defaultCategories
                           .map(
                             (category) => DropdownMenuItem<String>(
                               value: category.id,
-                              child: Text(
-                                '${category.icon} ${category.name}',
-                              ),
+                              child: Text('${category.icon} ${category.name}'),
                             ),
                           )
                           .toList(),
@@ -770,9 +770,11 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
                         labelText: 'Notes',
                         prefixIcon: Padding(
                           padding: const EdgeInsets.only(bottom: 40),
-                          child: Icon(Icons.notes_outlined,
-                              size: 20,
-                              color: cs.onSurface.withValues(alpha: 0.4)),
+                          child: Icon(
+                            Icons.notes_outlined,
+                            size: 20,
+                            color: cs.onSurface.withValues(alpha: 0.4),
+                          ),
                         ),
                         alignLabelWithHint: true,
                       ),
@@ -1013,9 +1015,7 @@ class _ProcessingBannerState extends State<_ProcessingBanner>
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF151520) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: cs.primary.withValues(alpha: 0.2),
-        ),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.2)),
         boxShadow: isDark
             ? null
             : [
@@ -1082,8 +1082,9 @@ class _ProcessingBannerState extends State<_ProcessingBanner>
               height: 5,
               child: LinearProgressIndicator(
                 value: null,
-                backgroundColor:
-                    cs.primary.withValues(alpha: isDark ? 0.1 : 0.08),
+                backgroundColor: cs.primary.withValues(
+                  alpha: isDark ? 0.1 : 0.08,
+                ),
                 color: cs.primary.withValues(alpha: 0.6),
               ),
             ),

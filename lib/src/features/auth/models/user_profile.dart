@@ -86,6 +86,30 @@ class NotificationSettings {
           input['monthlySummaryPush'] as bool? ?? monthlySummaryEmails,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is NotificationSettings &&
+            receiptProcessing == other.receiptProcessing &&
+            productUpdates == other.productUpdates &&
+            securityAlerts == other.securityAlerts &&
+            weeklySummaryEmails == other.weeklySummaryEmails &&
+            monthlySummaryEmails == other.monthlySummaryEmails &&
+            weeklySummaryPush == other.weeklySummaryPush &&
+            monthlySummaryPush == other.monthlySummaryPush;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    receiptProcessing,
+    productUpdates,
+    securityAlerts,
+    weeklySummaryEmails,
+    monthlySummaryEmails,
+    weeklySummaryPush,
+    monthlySummaryPush,
+  );
 }
 
 class UserProfile {

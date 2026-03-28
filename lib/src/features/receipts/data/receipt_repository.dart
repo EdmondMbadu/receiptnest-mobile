@@ -21,6 +21,9 @@ const allowedFileMimeTypes = <String>{...defaultUploadAllowedMimeTypes};
 
 const allowedFileExtensions = <String>{...defaultUploadAllowedExtensions};
 
+const _receiptFileUrlCacheTtl = Duration(minutes: 20);
+const _maxReceiptFileUrlCacheEntries = 128;
+
 final receiptRepositoryProvider = Provider<ReceiptRepository>((ref) {
   return ReceiptRepository(
     db: ref.watch(firestoreProvider),
@@ -35,6 +38,16 @@ final receiptsStreamProvider = StreamProvider<List<Receipt>>((ref) {
     return Stream.value(const []);
   }
   return ref.watch(receiptRepositoryProvider).watchReceipts(uid);
+});
+
+final sortedReceiptsProvider = Provider<List<Receipt>>((ref) {
+  final receipts = ref.watch(receiptsStreamProvider).valueOrNull ?? const [];
+  if (receipts.length < 2) {
+    return receipts;
+  }
+
+  final sorted = [...receipts]..sort(compareReceiptsForDisplay);
+  return List<Receipt>.unmodifiable(sorted);
 });
 
 final receiptFileUrlProvider = FutureProvider.family<String, String>((
@@ -56,7 +69,7 @@ final selectedMonthLabelProvider = Provider<String>((ref) {
 final selectedMonthReceiptsProvider = Provider<List<Receipt>>((ref) {
   final month = ref.watch(selectedMonthProvider);
   final year = ref.watch(selectedYearProvider);
-  final receipts = ref.watch(receiptsStreamProvider).valueOrNull ?? const [];
+  final receipts = ref.watch(sortedReceiptsProvider);
 
   return receipts.where((receipt) {
     final date = receipt.effectiveDate;
@@ -80,7 +93,7 @@ final selectedMonthReceiptCountProvider = Provider<int>((ref) {
 final previousMonthSpendProvider = Provider<double>((ref) {
   final month = ref.watch(selectedMonthProvider);
   final year = ref.watch(selectedYearProvider);
-  final receipts = ref.watch(receiptsStreamProvider).valueOrNull ?? const [];
+  final receipts = ref.watch(sortedReceiptsProvider);
 
   final previous = DateTime(year, month - 1, 1);
   return receipts
@@ -137,12 +150,43 @@ final dailySpendingDataProvider = Provider<List<DailySpendingPoint>>((ref) {
 });
 
 final receiptByIdProvider = Provider.family<Receipt?, String>((ref, id) {
-  final receipts = ref.watch(receiptsStreamProvider).valueOrNull ?? const [];
+  final receipts = ref.watch(sortedReceiptsProvider);
   for (final receipt in receipts) {
     if (receipt.id == id) return receipt;
   }
   return null;
 });
+
+int compareReceiptsForDisplay(Receipt a, Receipt b) {
+  final aDate = a.effectiveDate;
+  final bDate = b.effectiveDate;
+
+  if (aDate != null && bDate != null) {
+    final byEffectiveDate = bDate.compareTo(aDate);
+    if (byEffectiveDate != 0) {
+      return byEffectiveDate;
+    }
+  } else if (aDate == null && bDate != null) {
+    return 1;
+  } else if (aDate != null && bDate == null) {
+    return -1;
+  }
+
+  final aCreated = a.createdAt;
+  final bCreated = b.createdAt;
+  if (aCreated != null && bCreated != null) {
+    final byCreatedAt = bCreated.compareTo(aCreated);
+    if (byCreatedAt != 0) {
+      return byCreatedAt;
+    }
+  } else if (aCreated == null && bCreated != null) {
+    return 1;
+  } else if (aCreated != null && bCreated == null) {
+    return -1;
+  }
+
+  return b.id.compareTo(a.id);
+}
 
 final receiptFutureProvider = FutureProvider.family<Receipt?, String>((
   ref,
@@ -215,6 +259,7 @@ class ReceiptRepository {
   final FirebaseFirestore _db;
   final FirebaseStorage _storage;
   final FirebaseFunctions _functions;
+  final Map<String, _CachedReceiptFileUrl> _receiptFileUrlCache = {};
 
   Stream<List<Receipt>> watchReceipts(String userId) {
     return _db
@@ -307,19 +352,18 @@ class ReceiptRepository {
         'users/$userId/receipts/${DateTime.now().millisecondsSinceEpoch}_${sanitizeFileName(file.name)}';
     final ref = _storage.ref(storagePath);
 
-    Uint8List uploadBytes;
-    if (file.bytes != null) {
-      uploadBytes = file.bytes!;
-    } else if (file.path != null) {
-      uploadBytes = await File(file.path!).readAsBytes();
+    final metadata = SettableMetadata(
+      contentType: file.mimeType ?? _inferMimeType(file.name),
+    );
+
+    late final UploadTask task;
+    if (file.path != null) {
+      task = ref.putFile(File(file.path!), metadata);
+    } else if (file.bytes != null) {
+      task = ref.putData(file.bytes!, metadata);
     } else {
       throw Exception('No file data found for upload.');
     }
-
-    final task = ref.putData(
-      uploadBytes,
-      SettableMetadata(contentType: file.mimeType ?? _inferMimeType(file.name)),
-    );
 
     task.snapshotEvents.listen((event) {
       final total = event.totalBytes == 0 ? 1 : event.totalBytes;
@@ -388,7 +432,20 @@ class ReceiptRepository {
   }
 
   Future<String> getReceiptFileUrl(String storagePath) async {
-    return _storage.ref(storagePath).getDownloadURL();
+    final cached = _receiptFileUrlCache[storagePath];
+    final now = DateTime.now();
+    if (cached != null &&
+        now.difference(cached.fetchedAt) < _receiptFileUrlCacheTtl) {
+      return cached.url;
+    }
+
+    final url = await _storage.ref(storagePath).getDownloadURL();
+    _receiptFileUrlCache[storagePath] = _CachedReceiptFileUrl(
+      url: url,
+      fetchedAt: now,
+    );
+    _pruneReceiptFileUrlCache(now);
+    return url;
   }
 
   Future<Uint8List?> getReceiptFileBytes(
@@ -457,4 +514,29 @@ class ReceiptRepository {
         return 'application/octet-stream';
     }
   }
+
+  void _pruneReceiptFileUrlCache(DateTime now) {
+    _receiptFileUrlCache.removeWhere(
+      (_, cached) =>
+          now.difference(cached.fetchedAt) >= _receiptFileUrlCacheTtl,
+    );
+    if (_receiptFileUrlCache.length <= _maxReceiptFileUrlCacheEntries) {
+      return;
+    }
+
+    final oldestEntries = _receiptFileUrlCache.entries.toList()
+      ..sort((a, b) => a.value.fetchedAt.compareTo(b.value.fetchedAt));
+    final overflow =
+        _receiptFileUrlCache.length - _maxReceiptFileUrlCacheEntries;
+    for (var index = 0; index < overflow; index++) {
+      _receiptFileUrlCache.remove(oldestEntries[index].key);
+    }
+  }
+}
+
+class _CachedReceiptFileUrl {
+  const _CachedReceiptFileUrl({required this.url, required this.fetchedAt});
+
+  final String url;
+  final DateTime fetchedAt;
 }
