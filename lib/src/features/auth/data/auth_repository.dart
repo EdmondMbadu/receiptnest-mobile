@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -82,7 +83,7 @@ class AuthRepository {
       if (!snapshot.exists) {
         final currentUser = _auth.currentUser;
         if (currentUser?.uid == uid) {
-          unawaited(_upsertUserProfileDocument(currentUser!));
+          _queueProfileRepair(currentUser!);
         }
         return null;
       }
@@ -91,7 +92,7 @@ class AuthRepository {
       if (_userProfileNeedsRepair(data)) {
         final currentUser = _auth.currentUser;
         if (currentUser?.uid == uid) {
-          unawaited(_upsertUserProfileDocument(currentUser!));
+          _queueProfileRepair(currentUser!);
         }
       }
       return UserProfile.fromSnapshot(snapshot);
@@ -104,29 +105,44 @@ class AuthRepository {
     required String email,
     required String password,
   }) async {
+    final trimmedFirstName = firstName.trim();
+    final trimmedLastName = lastName.trim();
+    final trimmedEmail = email.trim();
     final cred = await _auth.createUserWithEmailAndPassword(
-      email: email.trim(),
+      email: trimmedEmail,
       password: password,
     );
+    final user = cred.user!;
+
+    final displayName = '$trimmedFirstName $trimmedLastName'.trim();
+    if (displayName.isNotEmpty) {
+      await user.updateDisplayName(displayName);
+    }
 
     await _upsertUserProfileDocument(
-      cred.user!,
-      firstName: firstName,
-      lastName: lastName,
-      email: email,
+      user,
+      firstName: trimmedFirstName,
+      lastName: trimmedLastName,
+      email: trimmedEmail,
+      includeLastLoginAt: true,
     );
 
     await sendVerificationEmail();
   }
 
   Future<void> loginWithEmail(String email, String password) async {
+    final trimmedEmail = email.trim();
     final cred = await _auth.signInWithEmailAndPassword(
-      email: email.trim(),
+      email: trimmedEmail,
       password: password,
     );
 
     if (cred.user != null) {
-      await _upsertUserProfileDocument(cred.user!, email: email);
+      await _upsertUserProfileDocument(
+        cred.user!,
+        email: trimmedEmail,
+        includeLastLoginAt: true,
+      );
     }
 
     if (!(cred.user?.emailVerified ?? false)) {
@@ -152,7 +168,7 @@ class AuthRepository {
     final user = userCred.user;
     if (user == null) return;
 
-    await _upsertUserProfileDocument(user);
+    await _upsertUserProfileDocument(user, includeLastLoginAt: true);
   }
 
   Future<void> sendVerificationEmail() async {
@@ -196,6 +212,11 @@ class AuthRepository {
     required String lastName,
   }) async {
     final user = _requireCurrentUser();
+    final displayName = '${firstName.trim()} ${lastName.trim()}'.trim();
+    if (displayName.isNotEmpty &&
+        displayName != (user.displayName ?? '').trim()) {
+      await user.updateDisplayName(displayName);
+    }
     await _upsertUserProfileDocument(
       user,
       firstName: firstName,
@@ -300,6 +321,7 @@ class AuthRepository {
     String? firstName,
     String? lastName,
     String? email,
+    bool includeLastLoginAt = false,
   }) async {
     final userRef = _db.collection('users').doc(user.uid);
     final snapshot = await userRef.get();
@@ -322,45 +344,72 @@ class AuthRepository {
       data['email'] as String?,
     );
 
-    final updates = <String, dynamic>{
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
+    if (!snapshot.exists) {
+      final createData = <String, dynamic>{
+        'id': user.uid,
+        'firstName': resolvedFirstName,
+        'lastName': resolvedLastName,
+        'email': resolvedEmail,
+        'receiptCount': 0,
+        'role': 'user',
+        'notificationSettings': NotificationSettings.defaults.toMap(),
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      if (includeLastLoginAt) {
+        createData['lastLoginAt'] = FieldValue.serverTimestamp();
+      }
+      await userRef.set(createData);
+      return;
+    }
 
-    if (resolvedFirstName.isNotEmpty) {
+    final updates = <String, dynamic>{};
+
+    if (resolvedFirstName.isNotEmpty &&
+        resolvedFirstName != (data['firstName'] as String? ?? '')) {
       updates['firstName'] = resolvedFirstName;
     }
-    if (resolvedLastName.isNotEmpty) {
+    if (resolvedLastName.isNotEmpty &&
+        resolvedLastName != (data['lastName'] as String? ?? '')) {
       updates['lastName'] = resolvedLastName;
     }
-    if (resolvedEmail.isNotEmpty) {
+    if (resolvedEmail.isNotEmpty &&
+        resolvedEmail != (data['email'] as String? ?? '')) {
       updates['email'] = resolvedEmail;
-    }
-    if ((data['role'] as String?)?.trim().isNotEmpty != true) {
-      updates['role'] = 'user';
-    }
-    if ((data['subscriptionPlan'] as String?)?.trim().isNotEmpty != true) {
-      updates['subscriptionPlan'] = 'free';
     }
     if (data['notificationSettings'] == null) {
       updates['notificationSettings'] = NotificationSettings.defaults.toMap();
     }
-    if (data['createdAt'] == null) {
-      updates['createdAt'] = FieldValue.serverTimestamp();
+    if (includeLastLoginAt) {
+      updates['lastLoginAt'] = FieldValue.serverTimestamp();
     }
+    if (updates.isEmpty) return;
 
+    updates['updatedAt'] = FieldValue.serverTimestamp();
     await userRef.set(updates, SetOptions(merge: true));
   }
 
   bool _userProfileNeedsRepair(Map<String, dynamic> data) {
     final email = (data['email'] as String?)?.trim() ?? '';
-    final role = (data['role'] as String?)?.trim() ?? '';
-    final subscriptionPlan =
-        (data['subscriptionPlan'] as String?)?.trim() ?? '';
+    final firstName = (data['firstName'] as String?)?.trim();
+    final lastName = (data['lastName'] as String?)?.trim();
     return email.isEmpty ||
-        role.isEmpty ||
-        subscriptionPlan.isEmpty ||
-        data['notificationSettings'] == null ||
-        data['createdAt'] == null;
+        firstName == null ||
+        lastName == null ||
+        data['notificationSettings'] == null;
+  }
+
+  void _queueProfileRepair(User user) {
+    unawaited(_repairUserProfile(user));
+  }
+
+  Future<void> _repairUserProfile(User user) async {
+    try {
+      await _upsertUserProfileDocument(user);
+    } catch (error, stackTrace) {
+      debugPrint('Profile repair skipped for ${user.uid}: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 
   (String, String) _splitDisplayName(String? displayName) {
