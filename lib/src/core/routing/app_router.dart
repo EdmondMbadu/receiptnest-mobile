@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../features/admin/presentation/admin_screen.dart';
 import '../../features/ai/presentation/ai_insights_screen.dart';
 import '../../features/auth/data/auth_repository.dart';
 import '../../features/auth/presentation/login_screen.dart';
@@ -67,6 +66,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           verified &&
           (path == '/' || isAuthRoute || isVerifyRoute)) {
         return '/app/home';
+      }
+
+      if (path == '/app/admin') {
+        return loggedIn ? '/app/settings' : '/login';
       }
 
       if (!loggedIn && isPublicRoute) {
@@ -147,10 +150,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/app/pricing',
         builder: (context, state) => const PricingScreen(),
-      ),
-      GoRoute(
-        path: '/app/admin',
-        builder: (context, state) => const AdminScreen(),
       ),
     ],
   );

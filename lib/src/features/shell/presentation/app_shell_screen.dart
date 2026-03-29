@@ -298,12 +298,6 @@ class AppShellScreen extends ConsumerWidget {
                 label: 'Settings',
                 onTap: () => openFromDrawer('/app/settings'),
               ),
-              if (profile?.isAdmin == true)
-                _DrawerTile(
-                  icon: Icons.admin_panel_settings_outlined,
-                  label: 'Admin',
-                  onTap: () => openFromDrawer('/app/admin'),
-                ),
               _DrawerTile(
                 icon: Icons.support_agent_outlined,
                 label: 'Support',
