@@ -425,6 +425,171 @@ class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
 
     final isCompactLayout = MediaQuery.of(context).size.width < 860;
 
+    // ── Full-screen paywall for non-pro users ──
+    if (!hasAccess) {
+      return Scaffold(
+        backgroundColor: isDark
+            ? const Color(0xFF0D0D14)
+            : const Color(0xFFF6F7F9),
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          title: const Text('AI Insights'),
+          titleTextStyle: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: cs.onSurface,
+          ),
+        ),
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Lock icon container
+                  Container(
+                    width: 96,
+                    height: 96,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          cs.primary.withValues(alpha: 0.15),
+                          cs.primary.withValues(alpha: 0.05),
+                        ],
+                      ),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: cs.primary.withValues(alpha: 0.18),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Icon(
+                          Icons.auto_awesome_rounded,
+                          size: 36,
+                          color: cs.primary.withValues(alpha: 0.35),
+                        ),
+                        Positioned(
+                          bottom: 18,
+                          right: 18,
+                          child: Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? const Color(0xFF1A1A28)
+                                  : Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.12),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              Icons.lock_rounded,
+                              size: 13,
+                              color: cs.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  Text(
+                    'AI Insights',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: cs.onSurface,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Chat with an AI trained on your receipts.\nGet spending breakdowns, trends, and answers — instantly.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      color: cs.onSurface.withValues(alpha: 0.5),
+                      height: 1.55,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  // Feature list
+                  _ProFeatureRow(
+                    icon: Icons.insights_rounded,
+                    label: 'Monthly spending insights',
+                    cs: cs,
+                    isDark: isDark,
+                  ),
+                  const SizedBox(height: 12),
+                  _ProFeatureRow(
+                    icon: Icons.chat_bubble_outline_rounded,
+                    label: 'Ask anything about your receipts',
+                    cs: cs,
+                    isDark: isDark,
+                  ),
+                  const SizedBox(height: 12),
+                  _ProFeatureRow(
+                    icon: Icons.trending_up_rounded,
+                    label: 'Trend analysis & category breakdowns',
+                    cs: cs,
+                    isDark: isDark,
+                  ),
+                  const SizedBox(height: 36),
+                  // CTA button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton(
+                      onPressed: () => context.push('/app/pricing'),
+                      style: FilledButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.diamond_outlined, size: 18),
+                          const SizedBox(width: 8),
+                          const Text('Upgrade to Pro'),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Unlock all features with a Pro subscription',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: cs.onSurface.withValues(alpha: 0.35),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: isDark
@@ -534,70 +699,6 @@ class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
           Expanded(
             child: Column(
               children: [
-                // ── Pro upgrade banner ──
-                if (!hasAccess)
-                  Container(
-                    margin: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          cs.primary.withValues(alpha: 0.08),
-                          cs.primary.withValues(alpha: 0.03),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: cs.primary.withValues(alpha: 0.12),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 34,
-                          height: 34,
-                          decoration: BoxDecoration(
-                            color: cs.primary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            Icons.diamond_outlined,
-                            color: cs.primary,
-                            size: 18,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'AI Insights is available for Pro users.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: cs.onSurface,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        FilledButton(
-                          onPressed: () => context.push('/app/pricing'),
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            textStyle: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          child: const Text('Upgrade'),
-                        ),
-                      ],
-                    ),
-                  ),
-
                 // ── Action buttons ──
                 Padding(
                   padding: const EdgeInsets.symmetric(
@@ -1116,6 +1217,64 @@ class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
               ),
             )
           : null,
+    );
+  }
+}
+
+class _ProFeatureRow extends StatelessWidget {
+  const _ProFeatureRow({
+    required this.icon,
+    required this.label,
+    required this.cs,
+    required this.isDark,
+  });
+
+  final IconData icon;
+  final String label;
+  final ColorScheme cs;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF151520) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.grey.shade200,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: cs.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 16, color: cs.primary),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: cs.onSurface.withValues(alpha: 0.8),
+            ),
+          ),
+          const Spacer(),
+          Icon(
+            Icons.check_circle_rounded,
+            size: 16,
+            color: cs.primary.withValues(alpha: 0.6),
+          ),
+        ],
+      ),
     );
   }
 }
