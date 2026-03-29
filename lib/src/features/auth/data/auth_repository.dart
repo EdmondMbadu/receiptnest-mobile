@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -78,7 +80,19 @@ class AuthRepository {
   Stream<UserProfile?> userProfileStream(String uid) {
     return _db.collection('users').doc(uid).snapshots().map((snapshot) {
       if (!snapshot.exists) {
+        final currentUser = _auth.currentUser;
+        if (currentUser?.uid == uid) {
+          unawaited(_upsertUserProfileDocument(currentUser!));
+        }
         return null;
+      }
+
+      final data = snapshot.data() ?? const <String, dynamic>{};
+      if (_userProfileNeedsRepair(data)) {
+        final currentUser = _auth.currentUser;
+        if (currentUser?.uid == uid) {
+          unawaited(_upsertUserProfileDocument(currentUser!));
+        }
       }
       return UserProfile.fromSnapshot(snapshot);
     });
@@ -95,19 +109,14 @@ class AuthRepository {
       password: password,
     );
 
-    await _db.collection('users').doc(cred.user!.uid).set({
-      'firstName': firstName.trim(),
-      'lastName': lastName.trim(),
-      'email': email.trim(),
-      'role': 'user',
-      'subscriptionPlan': 'free',
-      'notificationSettings': NotificationSettings.defaults.toMap(),
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    await _upsertUserProfileDocument(
+      cred.user!,
+      firstName: firstName,
+      lastName: lastName,
+      email: email,
+    );
 
     await sendVerificationEmail();
-    await _auth.signOut();
   }
 
   Future<void> loginWithEmail(String email, String password) async {
@@ -116,9 +125,12 @@ class AuthRepository {
       password: password,
     );
 
+    if (cred.user != null) {
+      await _upsertUserProfileDocument(cred.user!, email: email);
+    }
+
     if (!(cred.user?.emailVerified ?? false)) {
       await sendVerificationEmail();
-      await _auth.signOut();
       throw const AppAuthException(
         'auth/email-not-verified',
         'Please verify your email before signing in.',
@@ -140,26 +152,7 @@ class AuthRepository {
     final user = userCred.user;
     if (user == null) return;
 
-    final userRef = _db.collection('users').doc(user.uid);
-    final snap = await userRef.get();
-    if (!snap.exists) {
-      final splitName = (user.displayName ?? '').trim().split(' ');
-      final firstName = splitName.isNotEmpty ? splitName.first : '';
-      final lastName = splitName.length > 1
-          ? splitName.sublist(1).join(' ')
-          : '';
-
-      await userRef.set({
-        'firstName': firstName,
-        'lastName': lastName,
-        'email': user.email ?? '',
-        'role': 'user',
-        'subscriptionPlan': 'free',
-        'notificationSettings': NotificationSettings.defaults.toMap(),
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-    }
+    await _upsertUserProfileDocument(user);
   }
 
   Future<void> sendVerificationEmail() async {
@@ -202,19 +195,12 @@ class AuthRepository {
     required String firstName,
     required String lastName,
   }) async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) {
-      throw const AppAuthException(
-        'auth/no-current-user',
-        'User not authenticated.',
-      );
-    }
-
-    await _db.collection('users').doc(uid).set({
-      'firstName': firstName.trim(),
-      'lastName': lastName.trim(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    final user = _requireCurrentUser();
+    await _upsertUserProfileDocument(
+      user,
+      firstName: firstName,
+      lastName: lastName,
+    );
   }
 
   Future<void> updateNotificationSettings(NotificationSettings settings) async {
@@ -308,6 +294,105 @@ class AuthRepository {
   }
 
   Future<void> logout() => _auth.signOut();
+
+  Future<void> _upsertUserProfileDocument(
+    User user, {
+    String? firstName,
+    String? lastName,
+    String? email,
+  }) async {
+    final userRef = _db.collection('users').doc(user.uid);
+    final snapshot = await userRef.get();
+    final data = snapshot.data() ?? const <String, dynamic>{};
+    final splitName = _splitDisplayName(user.displayName);
+
+    final resolvedFirstName = _pickPreferredValue(
+      firstName,
+      data['firstName'] as String?,
+      splitName.$1,
+    );
+    final resolvedLastName = _pickPreferredValue(
+      lastName,
+      data['lastName'] as String?,
+      splitName.$2,
+    );
+    final resolvedEmail = _pickPreferredValue(
+      email,
+      user.email,
+      data['email'] as String?,
+    );
+
+    final updates = <String, dynamic>{
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    if (resolvedFirstName.isNotEmpty) {
+      updates['firstName'] = resolvedFirstName;
+    }
+    if (resolvedLastName.isNotEmpty) {
+      updates['lastName'] = resolvedLastName;
+    }
+    if (resolvedEmail.isNotEmpty) {
+      updates['email'] = resolvedEmail;
+    }
+    if ((data['role'] as String?)?.trim().isNotEmpty != true) {
+      updates['role'] = 'user';
+    }
+    if ((data['subscriptionPlan'] as String?)?.trim().isNotEmpty != true) {
+      updates['subscriptionPlan'] = 'free';
+    }
+    if (data['notificationSettings'] == null) {
+      updates['notificationSettings'] = NotificationSettings.defaults.toMap();
+    }
+    if (data['createdAt'] == null) {
+      updates['createdAt'] = FieldValue.serverTimestamp();
+    }
+
+    await userRef.set(updates, SetOptions(merge: true));
+  }
+
+  bool _userProfileNeedsRepair(Map<String, dynamic> data) {
+    final email = (data['email'] as String?)?.trim() ?? '';
+    final role = (data['role'] as String?)?.trim() ?? '';
+    final subscriptionPlan =
+        (data['subscriptionPlan'] as String?)?.trim() ?? '';
+    return email.isEmpty ||
+        role.isEmpty ||
+        subscriptionPlan.isEmpty ||
+        data['notificationSettings'] == null ||
+        data['createdAt'] == null;
+  }
+
+  (String, String) _splitDisplayName(String? displayName) {
+    final parts = (displayName ?? '')
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.trim().isNotEmpty)
+        .toList();
+
+    if (parts.isEmpty) {
+      return ('', '');
+    }
+
+    final firstName = parts.first.trim();
+    final lastName = parts.length > 1 ? parts.sublist(1).join(' ').trim() : '';
+    return (firstName, lastName);
+  }
+
+  String _pickPreferredValue(
+    String? primary,
+    String? secondary,
+    String? tertiary,
+  ) {
+    for (final candidate in [primary, secondary, tertiary]) {
+      final value = candidate?.trim() ?? '';
+      if (value.isNotEmpty) {
+        return value;
+      }
+    }
+
+    return '';
+  }
 
   NotificationSettings _normalizedNotificationSettings(
     NotificationSettings? settings,

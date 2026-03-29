@@ -85,6 +85,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String? _forwardingAddress;
   String? _forwardingError;
 
+  bool _shouldRefreshStoredForwardingAddress(String? address) {
+    final normalized = address?.trim().toLowerCase();
+    if (normalized == null || normalized.isEmpty) {
+      return true;
+    }
+
+    final localPart = normalized.split('@').first;
+    return RegExp(r'^user\.[a-z0-9]{8}$').hasMatch(localPart) ||
+        RegExp(r'^(r-)?[a-f0-9]{20}$').hasMatch(localPart);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -115,6 +126,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _loadForwardingAddress() async {
+    final profile = ref.read(currentUserProfileProvider).valueOrNull;
+    final storedAddress = profile?.receiptForwardingAddress?.trim();
+    if (!_shouldRefreshStoredForwardingAddress(storedAddress)) {
+      setState(() {
+        _loadingForwarding = false;
+        _forwardingError = null;
+        _forwardingAddress = storedAddress;
+      });
+      return;
+    }
+
     setState(() {
       _loadingForwarding = true;
       _forwardingError = null;
@@ -607,6 +629,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final year = ref.watch(selectedYearProvider);
     final receiptsAsync = ref.watch(receiptsStreamProvider);
     final sortedReceipts = ref.watch(sortedReceiptsProvider);
+    final profile = ref.watch(currentUserProfileProvider).valueOrNull;
+    final profileForwardingAddress = profile?.receiptForwardingAddress?.trim();
+    final displayedForwardingAddress =
+        !_shouldRefreshStoredForwardingAddress(profileForwardingAddress)
+        ? profileForwardingAddress
+        : _forwardingAddress;
     final today = DateTime.now();
     final isCurrentMonth = month == today.month && year == today.year;
     final totalDaysInMonth = DateTime(year, month + 1, 0).day;
@@ -1150,7 +1178,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ),
                             ),
                           )
-                        else if (_forwardingAddress != null) ...[
+                        else if (displayedForwardingAddress != null) ...[
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.symmetric(
@@ -1164,7 +1192,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: SelectableText(
-                              _forwardingAddress!,
+                              displayedForwardingAddress,
                               style: TextStyle(
                                 fontFamily: 'monospace',
                                 fontSize: 12.5,
@@ -1183,7 +1211,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   label: 'Copy',
                                   onTap: () {
                                     Clipboard.setData(
-                                      ClipboardData(text: _forwardingAddress!),
+                                      ClipboardData(
+                                        text: displayedForwardingAddress,
+                                      ),
                                     );
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(

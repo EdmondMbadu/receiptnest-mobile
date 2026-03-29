@@ -234,7 +234,11 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                   ),
                   const SizedBox(height: 12),
                   TextButton(
-                    onPressed: () => context.go('/login'),
+                    onPressed: () async {
+                      await ref.read(authRepositoryProvider).logout();
+                      if (!context.mounted) return;
+                      context.go('/login');
+                    },
                     child: Text(
                       'Back to login',
                       style: TextStyle(

@@ -122,6 +122,7 @@ class UserProfile {
     this.subscriptionInterval,
     this.subscriptionCurrentPeriodEnd,
     this.subscriptionCancelAtPeriodEnd,
+    this.adminSubscriptionPlanOverride,
     this.telegramChatId,
     this.receiptForwardingAddress,
     this.receiptForwardingFallbackAddresses = const [],
@@ -140,6 +141,7 @@ class UserProfile {
   final String? subscriptionInterval;
   final DateTime? subscriptionCurrentPeriodEnd;
   final bool? subscriptionCancelAtPeriodEnd;
+  final String? adminSubscriptionPlanOverride;
   final int? telegramChatId;
   final String? receiptForwardingAddress;
   final List<String> receiptForwardingFallbackAddresses;
@@ -153,7 +155,8 @@ class UserProfile {
   }
 
   bool get isAdmin => role == 'admin';
-  bool get isPro => subscriptionPlan == 'pro';
+  bool get hasManualProOverride => adminSubscriptionPlanOverride == 'pro';
+  bool get isPro => hasManualProOverride || subscriptionPlan == 'pro';
 
   static UserProfile fromSnapshot(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? const <String, dynamic>{};
@@ -171,6 +174,8 @@ class UserProfile {
       ),
       subscriptionCancelAtPeriodEnd:
           data['subscriptionCancelAtPeriodEnd'] as bool?,
+      adminSubscriptionPlanOverride:
+          data['adminSubscriptionPlanOverride'] as String?,
       telegramChatId: data['telegramChatId'] as int?,
       receiptForwardingAddress: data['receiptForwardingAddress'] as String?,
       receiptForwardingFallbackAddresses:
