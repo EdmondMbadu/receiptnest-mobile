@@ -25,7 +25,10 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
 
     try {
       await ref.read(authRepositoryProvider).sendVerificationEmail();
-      setState(() => _message = 'Verification email sent. Check your inbox.');
+      setState(
+        () => _message =
+            'Verification email sent. Check your inbox for your ReceiptNest AI confirmation link.',
+      );
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -42,7 +45,9 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
     final user = ref.watch(currentUserProvider);
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0D0D14) : const Color(0xFFF6F7F9),
+      backgroundColor: isDark
+          ? const Color(0xFF0D0D14)
+          : const Color(0xFFF6F7F9),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -106,7 +111,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    'Check your email',
+                    'Welcome to ReceiptNest AI',
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
@@ -116,7 +121,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'We sent a verification link to',
+                    'Verify your email to finish setting up your ReceiptNest AI account.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
@@ -154,13 +159,18 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                         color: const Color(0xFF00C805).withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: const Color(0xFF00C805).withValues(alpha: 0.15),
+                          color: const Color(
+                            0xFF00C805,
+                          ).withValues(alpha: 0.15),
                         ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.check_circle_outline_rounded,
-                              size: 16, color: Color(0xFF00C805)),
+                          const Icon(
+                            Icons.check_circle_outline_rounded,
+                            size: 16,
+                            color: Color(0xFF00C805),
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -189,8 +199,11 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.error_outline_rounded,
-                              size: 16, color: cs.error),
+                          Icon(
+                            Icons.error_outline_rounded,
+                            size: 16,
+                            color: cs.error,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -220,7 +233,9 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                               ),
                             )
                           : const Icon(Icons.refresh_rounded, size: 20),
-                      label: Text(_sending ? 'Sending...' : 'Resend email'),
+                      label: Text(
+                        _sending ? 'Sending...' : 'Resend verification email',
+                      ),
                       style: FilledButton.styleFrom(
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),

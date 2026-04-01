@@ -190,13 +190,23 @@ class AuthRepository {
   }
 
   Future<void> sendPasswordReset(String email) async {
-    if (email.trim().isEmpty) {
+    final trimmedEmail = email.trim();
+    if (trimmedEmail.isEmpty) {
       throw const AppAuthException(
         'auth/invalid-email',
         'Enter a valid email address.',
       );
     }
-    await _auth.sendPasswordResetEmail(email: email.trim());
+
+    final callable = _functions.httpsCallable('sendPasswordResetEmail');
+    try {
+      await callable.call(<String, dynamic>{'email': trimmedEmail});
+    } on FirebaseFunctionsException catch (error) {
+      throw AppAuthException(
+        error.code,
+        'Unable to send the reset email right now. Please try again in a moment.',
+      );
+    }
   }
 
   bool isCurrentUserPasswordAuth() {

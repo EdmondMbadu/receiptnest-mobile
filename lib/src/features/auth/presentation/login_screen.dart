@@ -22,6 +22,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscurePassword = true;
   String? _error;
   String? _resetMessage;
+  String? _notice;
 
   @override
   void dispose() {
@@ -36,15 +37,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() {
       _submitting = true;
       _error = null;
+      _notice = null;
     });
 
     try {
-      await ref.read(authRepositoryProvider).loginWithEmail(
-            _emailController.text,
-            _passwordController.text,
-          );
+      await ref
+          .read(authRepositoryProvider)
+          .loginWithEmail(_emailController.text, _passwordController.text);
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() {
+        _error = e.toString();
+        if (e is AppAuthException && e.code == 'auth/email-not-verified') {
+          _notice =
+              'Please verify your email to finish setting up ReceiptNest AI.';
+        }
+      });
     } finally {
       if (mounted) {
         setState(() => _submitting = false);
@@ -56,6 +63,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() {
       _submitting = true;
       _error = null;
+      _notice = null;
     });
 
     try {
@@ -72,20 +80,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _sendReset() async {
     final email = _emailController.text.trim();
     if (email.isEmpty) {
-      setState(() => _error = 'Enter your email first to reset your password.');
+      setState(() => _error = 'Enter your email above to reset your password.');
       return;
     }
 
     setState(() {
       _sendingReset = true;
       _error = null;
+      _notice = null;
       _resetMessage = null;
     });
 
     try {
       await ref.read(authRepositoryProvider).sendPasswordReset(email);
       setState(() {
-        _resetMessage = 'Password reset link sent to $email';
+        _resetMessage =
+            'If an account exists for $email, we sent a secure reset link. Check your inbox to finish updating your password.';
       });
     } catch (e) {
       setState(() => _error = e.toString());
@@ -102,7 +112,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0D0D14) : const Color(0xFFF6F7F9),
+      backgroundColor: isDark
+          ? const Color(0xFF0D0D14)
+          : const Color(0xFFF6F7F9),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -140,6 +152,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       key: _formKey,
                       child: Column(
                         children: [
+                          if (_notice != null) ...[
+                            Container(
+                              width: double.infinity,
+                              margin: const EdgeInsets.only(bottom: 16),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: cs.primary.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: cs.primary.withValues(alpha: 0.14),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.info_outline_rounded,
+                                    size: 16,
+                                    color: cs.primary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _notice!,
+                                      style: TextStyle(
+                                        color: cs.primary,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                           TextFormField(
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
@@ -157,7 +203,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               if (value == null || value.trim().isEmpty) {
                                 return 'Email is required';
                               }
-                              if (!value.contains('@')) return 'Enter a valid email';
+                              if (!value.contains('@')) {
+                                return 'Enter a valid email';
+                              }
                               return null;
                             },
                           ),
@@ -182,8 +230,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   size: 20,
                                   color: cs.onSurface.withValues(alpha: 0.4),
                                 ),
-                                onPressed: () =>
-                                    setState(() => _obscurePassword = !_obscurePassword),
+                                onPressed: () => setState(
+                                  () => _obscurePassword = !_obscurePassword,
+                                ),
                               ),
                             ),
                             validator: (value) {
@@ -209,7 +258,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ),
                               ),
                               child: Text(
-                                _sendingReset ? 'Sending...' : 'Forgot password?',
+                                _sendingReset
+                                    ? 'Sending...'
+                                    : 'Forgot password?',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
@@ -233,8 +284,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.error_outline_rounded,
-                                      size: 16, color: cs.error),
+                                  Icon(
+                                    Icons.error_outline_rounded,
+                                    size: 16,
+                                    color: cs.error,
+                                  ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
@@ -254,27 +308,59 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             const SizedBox(height: 8),
                             Container(
                               width: double.infinity,
-                              padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF00C805).withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(12),
+                                color: const Color(
+                                  0xFF00C805,
+                                ).withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
-                                  color: const Color(0xFF00C805).withValues(alpha: 0.15),
+                                  color: const Color(
+                                    0xFF00C805,
+                                  ).withValues(alpha: 0.15),
                                 ),
                               ),
-                              child: Row(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.check_circle_outline_rounded,
-                                      size: 16, color: Color(0xFF00C805)),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      _resetMessage!,
-                                      style: const TextStyle(
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.check_circle_outline_rounded,
+                                        size: 16,
                                         color: Color(0xFF00C805),
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
                                       ),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        'Reset link sent',
+                                        style: TextStyle(
+                                          color: Color(0xFF00C805),
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    _resetMessage!,
+                                    style: const TextStyle(
+                                      color: Color(0xFF00C805),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      height: 1.45,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Check your inbox and spam folder. After updating your password, return here to sign in.',
+                                    style: TextStyle(
+                                      color: const Color(
+                                        0xFF00C805,
+                                      ).withValues(alpha: 0.9),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      height: 1.4,
                                     ),
                                   ),
                                 ],
