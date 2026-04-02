@@ -641,11 +641,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final lastVisibleDay = isCurrentMonth
         ? math.min(today.day, totalDaysInMonth)
         : totalDaysInMonth;
-    final trendColor = monthChange == null
-        ? const Color(0xFF00C805)
-        : (monthChange.isIncrease
-              ? const Color(0xFFE53935)
-              : const Color(0xFF00C805));
+    const chartColor = Color(0xFF00C805);
+    final monthChangeColor = monthChange == null
+        ? chartColor
+        : (monthChange.isIncrease ? const Color(0xFFE53935) : chartColor);
     const histogramColor = Color(0xFF00C805);
 
     return Scaffold(
@@ -844,7 +843,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: isSelected
-                                            ? trendColor
+                                            ? chartColor
                                             : Colors.transparent,
                                         borderRadius: BorderRadius.circular(10),
                                       ),
@@ -929,7 +928,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           if (_timeRange == _TimeRange.oneMonth)
                             _MonthChangeLabel(
                               change: monthChange,
-                              color: trendColor,
+                              color: monthChangeColor,
                             )
                           else
                             Text(
@@ -945,7 +944,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           if (_timeRange == _TimeRange.oneMonth)
                             _RobinhoodMonthlyChart(
                               points: dailyPoints,
-                              lineColor: trendColor,
+                              lineColor: chartColor,
                               visibleDay: lastVisibleDay,
                               totalDays: totalDaysInMonth,
                               isCurrentMonth: isCurrentMonth,
@@ -953,7 +952,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           else
                             _RobinhoodTimeRangeChart(
                               points: timeRangePoints,
-                              lineColor: trendColor,
+                              lineColor: chartColor,
                               timeRange: _timeRange,
                             ),
                         ],
