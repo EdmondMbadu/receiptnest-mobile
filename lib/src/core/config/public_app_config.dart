@@ -35,13 +35,23 @@ const defaultPricingAnnualPrice = r'$100';
 const defaultPricingAnnualSavingsBadge = 'Save 7%';
 const defaultPricingProPlanName = 'Pro';
 const defaultPricingFreePlanName = 'Free';
-const defaultPricingProTagline = 'For power users';
+const legacyPricingProTagline = 'For power users';
+const defaultPricingProTagline =
+    'Everything in Free, plus unlimited receipts, deeper insights, and richer exports.';
 const defaultPricingFreeTagline = 'For getting started';
-const defaultPricingProFeatures = <String>[
+const legacyPricingProFeatures = <String>[
   'Unlimited receipts',
   'Advanced search & filters',
   'CSV and PDF exports',
   'Priority support',
+];
+const defaultPricingProFeatures = <String>[
+  'Unlimited receipts',
+  'Advanced search & filters',
+  'Export to CSV + PDF',
+  'Spending insights & trends',
+  'Priority support',
+  'Early access to new features',
 ];
 const defaultPricingFreeFeatures = <String>[
   'Up to {freePlanReceiptLimit} receipts',
@@ -128,6 +138,24 @@ int _parsePositiveInt(Map<String, dynamic>? data, String key, int fallback) {
     return fallback;
   }
   return parsed;
+}
+
+String _normalizePricingProTagline(String value) {
+  return value == legacyPricingProTagline ? defaultPricingProTagline : value;
+}
+
+List<String> _normalizePricingProFeatures(List<String> values) {
+  if (values.length != legacyPricingProFeatures.length) {
+    return values;
+  }
+
+  for (var index = 0; index < values.length; index++) {
+    if (values[index] != legacyPricingProFeatures[index]) {
+      return values;
+    }
+  }
+
+  return defaultPricingProFeatures;
 }
 
 class PublicAppConfig {
@@ -238,20 +266,16 @@ class PublicAppConfig {
         'pricingFreePlanName',
         defaultPricingFreePlanName,
       ),
-      pricingProTagline: _parseString(
-        data,
-        'pricingProTagline',
-        defaultPricingProTagline,
+      pricingProTagline: _normalizePricingProTagline(
+        _parseString(data, 'pricingProTagline', defaultPricingProTagline),
       ),
       pricingFreeTagline: _parseString(
         data,
         'pricingFreeTagline',
         defaultPricingFreeTagline,
       ),
-      pricingProFeatures: _parseStringList(
-        data,
-        'pricingProFeatures',
-        defaultPricingProFeatures,
+      pricingProFeatures: _normalizePricingProFeatures(
+        _parseStringList(data, 'pricingProFeatures', defaultPricingProFeatures),
       ),
       pricingFreeFeatures: _parseStringList(
         data,

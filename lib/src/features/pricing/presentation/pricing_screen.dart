@@ -301,13 +301,16 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
             isActive: isPro,
             isPrimary: true,
             isDark: isDark,
+            featuresHeading: 'Everything in Free, plus:',
             features: _buildFeatures(
               appConfig.pricingProFeatures,
               const [
                 Icons.all_inclusive_rounded,
                 Icons.search_rounded,
                 Icons.download_rounded,
+                Icons.insights_rounded,
                 Icons.support_agent_rounded,
+                Icons.auto_awesome_rounded,
               ],
               freePlanReceiptLimit: freePlanReceiptLimit,
             ),
@@ -528,6 +531,7 @@ class _PlanCard extends StatelessWidget {
     required this.isPrimary,
     required this.isDark,
     required this.features,
+    this.featuresHeading,
     this.buttonLabel,
     this.onButtonPressed,
     this.isProcessing = false,
@@ -541,6 +545,7 @@ class _PlanCard extends StatelessWidget {
   final bool isPrimary;
   final bool isDark;
   final List<_Feature> features;
+  final String? featuresHeading;
   final String? buttonLabel;
   final VoidCallback? onButtonPressed;
   final bool isProcessing;
@@ -704,48 +709,58 @@ class _PlanCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
-              children: features
-                  .map(
-                    (f) => Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: isPrimary
-                                  ? accent.withValues(
-                                      alpha: isDark ? 0.15 : 0.08,
-                                    )
-                                  : cs.onSurface.withValues(alpha: 0.04),
-                              borderRadius: BorderRadius.circular(9),
-                            ),
-                            child: Icon(
-                              f.icon,
-                              size: 16,
-                              color: isPrimary
-                                  ? accent
-                                  : cs.onSurface.withValues(alpha: 0.45),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Text(
-                              f.label,
-                              style: TextStyle(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w500,
-                                color: cs.onSurface.withValues(alpha: 0.8),
-                                letterSpacing: -0.1,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (featuresHeading != null) ...[
+                  Text(
+                    featuresHeading!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface.withValues(alpha: 0.45),
                     ),
-                  )
-                  .toList(),
+                  ),
+                  const SizedBox(height: 14),
+                ],
+                ...features.map(
+                  (f) => Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: isPrimary
+                                ? accent.withValues(alpha: isDark ? 0.15 : 0.08)
+                                : cs.onSurface.withValues(alpha: 0.04),
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                          child: Icon(
+                            f.icon,
+                            size: 16,
+                            color: isPrimary
+                                ? accent
+                                : cs.onSurface.withValues(alpha: 0.45),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            f.label,
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w500,
+                              color: cs.onSurface.withValues(alpha: 0.8),
+                              letterSpacing: -0.1,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 6),
