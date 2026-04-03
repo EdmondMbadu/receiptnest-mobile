@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher_string.dart';
 import '../../../core/config/public_app_config.dart';
 import '../../../core/config/public_billing_config.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../auth/models/user_profile.dart';
 
 class PricingScreen extends ConsumerStatefulWidget {
   const PricingScreen({super.key});
@@ -19,6 +20,7 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
   bool _processingCheckout = false;
   bool _processingPortal = false;
   String? _error;
+  String? _lastSyncedBillingIntervalKey;
 
   String _replaceFreePlanLimit(String value, int freePlanReceiptLimit) {
     return value.replaceAll('{freePlanReceiptLimit}', '$freePlanReceiptLimit');
@@ -122,6 +124,32 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
     }
   }
 
+  void _syncBillingIntervalSelection(UserProfile? profile) {
+    final paidInterval = profile?.subscriptionInterval?.toLowerCase();
+    final nextKey = profile?.isPro == true
+        ? 'pro:${paidInterval == 'annual' ? 'annual' : 'monthly'}'
+        : 'free:annual';
+
+    if (_lastSyncedBillingIntervalKey == nextKey) {
+      return;
+    }
+
+    _lastSyncedBillingIntervalKey = nextKey;
+    final nextIsAnnual =
+        profile?.isPro == true ? paidInterval == 'annual' : true;
+
+    if (_isAnnual == nextIsAnnual) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isAnnual = nextIsAnnual);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -139,6 +167,8 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
     final hasBillingPortalAccess = profile?.hasBillingPortalAccess ?? false;
     final renewDate = profile?.subscriptionCurrentPeriodEnd;
     final cancelling = profile?.subscriptionCancelAtPeriodEnd == true;
+
+    _syncBillingIntervalSelection(profile);
 
     const accent = Color(0xFF00C805);
 
