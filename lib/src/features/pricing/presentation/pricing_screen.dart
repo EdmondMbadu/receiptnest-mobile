@@ -55,13 +55,20 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
           .httpsCallable('createCheckoutSession');
       final response = await callable.call({
         'interval': _isAnnual ? 'annual' : 'monthly',
+        'platform': 'mobile',
       });
       final result = response.data;
       final url = result is Map ? result['url']?.toString() : null;
       if (url == null || url.isEmpty) {
         throw Exception('Missing checkout URL from server.');
       }
-      await launchUrlString(url, mode: LaunchMode.externalApplication);
+      final launched = await launchUrlString(
+        url,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        throw Exception('Unable to launch checkout URL.');
+      }
     } catch (e) {
       setState(
         () => _error = 'Unable to start checkout right now. Please try again.',
@@ -74,6 +81,14 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
   }
 
   Future<void> _openPortal() async {
+    final profile = ref.read(currentUserProfileProvider).valueOrNull;
+    if (!(profile?.hasBillingPortalAccess ?? false)) {
+      setState(
+        () => _error = 'Billing portal becomes available after a Stripe billing profile is created.',
+      );
+      return;
+    }
+
     setState(() {
       _processingPortal = true;
       _error = null;
@@ -83,13 +98,21 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
       final callable = ref
           .read(functionsProvider)
           .httpsCallable('createPortalSession');
-      final response = await callable.call(<String, dynamic>{});
+      final response = await callable.call(<String, dynamic>{
+        'platform': 'mobile',
+      });
       final result = response.data;
       final url = result is Map ? result['url']?.toString() : null;
       if (url == null || url.isEmpty) {
         throw Exception('Missing billing portal URL from server.');
       }
-      await launchUrlString(url, mode: LaunchMode.externalApplication);
+      final launched = await launchUrlString(
+        url,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        throw Exception('Unable to launch billing portal URL.');
+      }
     } catch (e) {
       setState(() => _error = 'Unable to open billing portal right now.');
     } finally {
@@ -111,9 +134,9 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
     final freePlanReceiptLimit =
         billingConfig?.freePlanReceiptLimit ?? defaultFreePlanReceiptLimit;
 
-    final plan = (profile?.subscriptionPlan ?? 'free').toLowerCase();
+    final isPro = profile?.isPro ?? false;
     final status = (profile?.subscriptionStatus ?? 'inactive').toLowerCase();
-    final isPro = plan == 'pro';
+    final hasBillingPortalAccess = profile?.hasBillingPortalAccess ?? false;
     final renewDate = profile?.subscriptionCurrentPeriodEnd;
     final cancelling = profile?.subscriptionCancelAtPeriodEnd == true;
 
@@ -222,6 +245,27 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
           ),
           const SizedBox(height: 28),
 
+          if (profile?.hasManualProOverride == true) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                color: accent.withValues(alpha: isDark ? 0.08 : 0.06),
+                border: Border.all(color: accent.withValues(alpha: 0.15)),
+              ),
+              child: Text(
+                'This Pro plan was granted by an admin. If the override is removed later, the account returns to its normal billing state.',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  height: 1.4,
+                  color: cs.onSurface,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
           // ── Current plan status (Pro users) ──
           if (isPro) ...[
             Container(
@@ -273,16 +317,26 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
                       ],
                     ),
                   ),
-                  TextButton(
-                    onPressed: _processingPortal ? null : _openPortal,
-                    child: _processingPortal
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Manage'),
-                  ),
+                  if (hasBillingPortalAccess)
+                    TextButton(
+                      onPressed: !_processingPortal ? _openPortal : null,
+                      child: _processingPortal
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Manage'),
+                    )
+                  else if (profile?.hasManualProOverride == true)
+                    Text(
+                      'Admin managed',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurface.withValues(alpha: 0.55),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -349,7 +403,7 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
           const SizedBox(height: 24),
 
           // ── Manage billing link ──
-          if (!isPro && status != 'inactive')
+          if (!isPro && status != 'inactive' && hasBillingPortalAccess)
             Center(
               child: TextButton.icon(
                 onPressed: _processingPortal ? null : _openPortal,

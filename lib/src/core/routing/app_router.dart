@@ -16,6 +16,7 @@ import '../../features/folders/presentation/category_detail_screen.dart';
 import '../../features/folders/presentation/folder_detail_screen.dart';
 import '../../features/folders/presentation/folders_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/pricing/presentation/billing_return_screen.dart';
 import '../../features/pricing/presentation/pricing_screen.dart';
 import '../../features/receipts/presentation/receipt_detail_screen.dart';
 import '../../features/share/presentation/share_view_screen.dart';
@@ -150,6 +151,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/app/pricing',
         builder: (context, state) => const PricingScreen(),
+      ),
+      GoRoute(
+        path: '/mobile-return/:flow',
+        builder: (context, state) => BillingReturnScreen(
+          flow: state.pathParameters['flow'] ?? '',
+          status: state.uri.queryParameters['status'],
+        ),
       ),
     ],
   );

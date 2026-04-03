@@ -65,6 +65,16 @@
 				<string>com.googleusercontent.apps.453781466794-kda6cjuv870psq42be4oa8p5pcrj7shv</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.receiptnest.mobile</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>receiptnest</string>
+			</array>
+		</dict>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>

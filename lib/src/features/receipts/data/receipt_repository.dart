@@ -331,8 +331,14 @@ class ReceiptRepository {
     }
 
     final userSnap = await _db.collection('users').doc(userId).get();
-    final plan = (userSnap.data()?['subscriptionPlan'] as String?) ?? 'free';
-    if (plan != 'pro') {
+    final userData = userSnap.data() ?? const <String, dynamic>{};
+    final subscriptionPlan =
+        (userData['subscriptionPlan'] as String?)?.toLowerCase() ?? 'free';
+    final adminOverride =
+        (userData['adminSubscriptionPlanOverride'] as String?)?.toLowerCase();
+    final hasProAccess =
+        subscriptionPlan == 'pro' || adminOverride == 'pro';
+    if (!hasProAccess) {
       final freePlanReceiptLimit = await fetchFreePlanReceiptLimit(_db);
       final countSnap = await _db
           .collection('users')
