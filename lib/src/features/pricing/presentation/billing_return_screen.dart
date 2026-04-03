@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../auth/data/auth_repository.dart';
+
+const _proHighlights = <String>[
+  'Unlimited receipts',
+  'Advanced search and filters',
+  'Export to CSV and PDF',
+  'Spending insights and trends',
+  'Priority support',
+];
 
 class BillingReturnScreen extends ConsumerWidget {
   const BillingReturnScreen({
@@ -25,6 +34,15 @@ class BillingReturnScreen extends ConsumerWidget {
     final isSuccess = normalizedStatus == 'success';
     final isCancel = normalizedStatus == 'cancel';
     final isPro = profile?.isPro ?? false;
+    final renewalDate = profile?.subscriptionCurrentPeriodEnd;
+    final cancellationAtPeriodEnd =
+        profile?.subscriptionCancelAtPeriodEnd == true;
+    final renewalLabel = renewalDate == null
+        ? null
+        : DateFormat('MMM d, y').format(renewalDate.toLocal());
+    final emailLabel = (profile?.email ?? '').trim().isEmpty
+        ? 'your account email'
+        : profile!.email;
 
     late final String title;
     late final String message;
@@ -40,9 +58,9 @@ class BillingReturnScreen extends ConsumerWidget {
         child: CircularProgressIndicator(strokeWidth: 3),
       );
     } else if (isCheckout && isSuccess) {
-      title = 'Subscription active';
+      title = 'Congratulations, you are now on Pro';
       message =
-          'Your Pro plan is active now. You can return to the app and keep going.';
+          'Your payment went through and your workspace has been upgraded.';
       leading = const Icon(
         Icons.check_circle_rounded,
         size: 32,
@@ -106,15 +124,119 @@ class BillingReturnScreen extends ConsumerWidget {
                     color: cs.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
+                if (isCheckout && isSuccess && isPro) ...[
+                  const SizedBox(height: 18),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      color: const Color(0xFF00C805).withValues(alpha: 0.08),
+                      border: Border.all(
+                        color: const Color(0xFF00C805).withValues(alpha: 0.18),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Pro is active',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          renewalLabel == null
+                              ? 'Your billing status has already synced.'
+                              : cancellationAtPeriodEnd
+                              ? 'Access stays active until $renewalLabel.'
+                              : 'Renews on $renewalLabel.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.45,
+                            color: cs.onSurface.withValues(alpha: 0.72),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'A payment receipt and confirmation are being emailed to $emailLabel.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
+                      border: Border.all(
+                        color: cs.outlineVariant.withValues(alpha: 0.6),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Everything you just unlocked',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ..._proHighlights.map(
+                          (feature) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Padding(
+                                  padding: EdgeInsets.only(top: 1),
+                                  child: Icon(
+                                    Icons.check_circle_rounded,
+                                    size: 18,
+                                    color: Color(0xFF00C805),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    feature,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      height: 1.4,
+                                      color: cs.onSurface.withValues(alpha: 0.82),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 24),
                 FilledButton(
-                  onPressed: () => context.go('/app/pricing'),
-                  child: Text(isCheckout ? 'Open pricing' : 'Back to app'),
+                  onPressed: () => context.go(isCheckout && isSuccess ? '/app/home' : '/app/pricing'),
+                  child: Text(
+                    isCheckout && isSuccess ? 'Go to dashboard' : (isCheckout ? 'Open pricing' : 'Back to app'),
+                  ),
                 ),
                 const SizedBox(height: 10),
                 TextButton(
-                  onPressed: () => context.go('/app/home'),
-                  child: const Text('Go to home'),
+                  onPressed: () => context.go('/app/pricing'),
+                  child: Text(isCheckout && isSuccess ? 'View plan details' : 'Go to home'),
                 ),
               ],
             ),
