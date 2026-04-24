@@ -178,13 +178,38 @@ class AuthRepository {
   Future<void> loginWithApple() async {
     final rawNonce = _generateNonce();
     final hashedNonce = _sha256ofString(rawNonce);
-    final appleCredential = await SignInWithApple.getAppleIDCredential(
-      scopes: const [
-        AppleIDAuthorizationScopes.email,
-        AppleIDAuthorizationScopes.fullName,
-      ],
-      nonce: hashedNonce,
-    );
+    final AuthorizationCredentialAppleID appleCredential;
+    try {
+      appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: const [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: hashedNonce,
+      );
+    } on SignInWithAppleAuthorizationException catch (error) {
+      if (error.code == AuthorizationErrorCode.canceled) {
+        throw const AppAuthException(
+          'auth/apple-cancelled',
+          'Apple sign-in was cancelled.',
+        );
+      }
+      if (error.code == AuthorizationErrorCode.unknown) {
+        throw const AppAuthException(
+          'auth/apple-not-configured',
+          'Apple sign-in is not available for this build yet. Confirm the iOS App ID has Sign in with Apple enabled, then regenerate the provisioning profile and reinstall the app.',
+        );
+      }
+      throw const AppAuthException(
+        'auth/apple-authorization-failed',
+        'Apple sign-in could not be completed. Please try again.',
+      );
+    } on SignInWithAppleNotSupportedException {
+      throw const AppAuthException(
+        'auth/apple-not-supported',
+        'Apple sign-in is not supported on this device.',
+      );
+    }
 
     final identityToken = appleCredential.identityToken;
     if (identityToken == null || identityToken.isEmpty) {
@@ -192,6 +217,10 @@ class AuthRepository {
         'auth/missing-apple-token',
         'Apple did not return a sign-in token. Please try again.',
       );
+    }
+
+    if (kDebugMode) {
+      _debugLogAppleToken(identityToken, hashedNonce: hashedNonce);
     }
 
     final oauthCredential = OAuthProvider(
@@ -542,5 +571,48 @@ class AuthRepository {
     final bytes = utf8.encode(input);
     final digest = sha256.convert(bytes);
     return digest.toString();
+  }
+
+  void _debugLogAppleToken(
+    String identityToken, {
+    required String hashedNonce,
+  }) {
+    try {
+      final parts = identityToken.split('.');
+      if (parts.length < 2) {
+        debugPrint('[AppleSignIn] Token is not a valid JWT');
+        return;
+      }
+      String segment = parts[1];
+      switch (segment.length % 4) {
+        case 2:
+          segment += '==';
+          break;
+        case 3:
+          segment += '=';
+          break;
+      }
+      final normalized = segment.replaceAll('-', '+').replaceAll('_', '/');
+      final payload = utf8.decode(base64.decode(normalized));
+      final claims = jsonDecode(payload) as Map<String, dynamic>;
+      debugPrint('[AppleSignIn] Token claims:');
+      debugPrint('  iss (issuer): ${claims['iss']}');
+      debugPrint('  aud (audience / bundle id): ${claims['aud']}');
+      debugPrint('  sub: ${claims['sub']}');
+      debugPrint('  email: ${claims['email']}');
+      debugPrint('  nonce_supported: ${claims['nonce_supported']}');
+      debugPrint('  nonce (hashed) in token: ${claims['nonce']}');
+      debugPrint('  hashedNonce we sent:     $hashedNonce');
+      debugPrint(
+        '  nonce match: ${claims['nonce'] == hashedNonce}',
+      );
+      final exp = claims['exp'];
+      if (exp is int) {
+        final expires = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+        debugPrint('  exp: $expires (now: ${DateTime.now()})');
+      }
+    } catch (e) {
+      debugPrint('[AppleSignIn] Failed to decode token: $e');
+    }
   }
 }
