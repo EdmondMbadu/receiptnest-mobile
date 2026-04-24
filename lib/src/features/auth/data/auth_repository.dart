@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../models/user_profile.dart';
 
@@ -169,6 +173,51 @@ class AuthRepository {
     if (user == null) return;
 
     await _upsertUserProfileDocument(user, includeLastLoginAt: true);
+  }
+
+  Future<void> loginWithApple() async {
+    final rawNonce = _generateNonce();
+    final hashedNonce = _sha256ofString(rawNonce);
+    final appleCredential = await SignInWithApple.getAppleIDCredential(
+      scopes: const [
+        AppleIDAuthorizationScopes.email,
+        AppleIDAuthorizationScopes.fullName,
+      ],
+      nonce: hashedNonce,
+    );
+
+    final identityToken = appleCredential.identityToken;
+    if (identityToken == null || identityToken.isEmpty) {
+      throw const AppAuthException(
+        'auth/missing-apple-token',
+        'Apple did not return a sign-in token. Please try again.',
+      );
+    }
+
+    final oauthCredential = OAuthProvider(
+      'apple.com',
+    ).credential(idToken: identityToken, rawNonce: rawNonce);
+    final userCred = await _auth.signInWithCredential(oauthCredential);
+    final user = userCred.user;
+    if (user == null) return;
+
+    final firstName = appleCredential.givenName?.trim();
+    final lastName = appleCredential.familyName?.trim();
+    final displayName = [
+      firstName,
+      lastName,
+    ].where((part) => part != null && part.isNotEmpty).join(' ');
+    if (displayName.isNotEmpty && (user.displayName ?? '').trim().isEmpty) {
+      await user.updateDisplayName(displayName);
+    }
+
+    await _upsertUserProfileDocument(
+      user,
+      firstName: firstName,
+      lastName: lastName,
+      email: appleCredential.email,
+      includeLastLoginAt: true,
+    );
   }
 
   Future<void> sendVerificationEmail() async {
@@ -477,5 +526,21 @@ class AuthRepository {
       );
     }
     return user;
+  }
+
+  String _generateNonce([int length = 32]) {
+    const charset =
+        '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(
+      length,
+      (_) => charset[random.nextInt(charset.length)],
+    ).join();
+  }
+
+  String _sha256ofString(String input) {
+    final bytes = utf8.encode(input);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -41,7 +42,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     });
 
     try {
-      await ref.read(authRepositoryProvider).registerWithEmail(
+      await ref
+          .read(authRepositoryProvider)
+          .registerWithEmail(
             firstName: _firstNameController.text,
             lastName: _lastNameController.text,
             email: _emailController.text,
@@ -74,13 +77,38 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
   }
 
+  Future<void> _appleSignIn() async {
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+
+    try {
+      await ref.read(authRepositoryProvider).loginWithApple();
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
+    }
+  }
+
+  bool get _showsAppleSignIn {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS;
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0D0D14) : const Color(0xFFF6F7F9),
+      backgroundColor: isDark
+          ? const Color(0xFF0D0D14)
+          : const Color(0xFFF6F7F9),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -129,13 +157,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                     prefixIcon: Icon(
                                       Icons.person_outline_rounded,
                                       size: 20,
-                                      color: cs.onSurface.withValues(alpha: 0.4),
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.4,
+                                      ),
                                     ),
                                   ),
                                   validator: (value) =>
                                       value == null || value.trim().isEmpty
-                                          ? 'Required'
-                                          : null,
+                                      ? 'Required'
+                                      : null,
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -148,8 +178,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                   ),
                                   validator: (value) =>
                                       value == null || value.trim().isEmpty
-                                          ? 'Required'
-                                          : null,
+                                      ? 'Required'
+                                      : null,
                                 ),
                               ),
                             ],
@@ -172,7 +202,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               if (value == null || value.trim().isEmpty) {
                                 return 'Email is required';
                               }
-                              if (!value.contains('@')) return 'Enter a valid email';
+                              if (!value.contains('@')) {
+                                return 'Enter a valid email';
+                              }
                               return null;
                             },
                           ),
@@ -197,15 +229,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                   size: 20,
                                   color: cs.onSurface.withValues(alpha: 0.4),
                                 ),
-                                onPressed: () =>
-                                    setState(() => _obscurePassword = !_obscurePassword),
+                                onPressed: () => setState(
+                                  () => _obscurePassword = !_obscurePassword,
+                                ),
                               ),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
                                 return 'Password is required';
                               }
-                              if (value.length < 6) return 'Minimum 6 characters';
+                              if (value.length < 6) {
+                                return 'Minimum 6 characters';
+                              }
                               return null;
                             },
                           ),
@@ -224,8 +259,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.error_outline_rounded,
-                                      size: 16, color: cs.error),
+                                  Icon(
+                                    Icons.error_outline_rounded,
+                                    size: 16,
+                                    color: cs.error,
+                                  ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
@@ -330,6 +368,31 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                     ),
                   ),
+                  if (_showsAppleSignIn) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 50,
+                      child: OutlinedButton.icon(
+                        onPressed: _submitting ? null : _appleSignIn,
+                        icon: const Icon(Icons.apple, size: 22),
+                        label: const Text('Continue with Apple'),
+                        style: OutlinedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          side: BorderSide(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.1)
+                                : Colors.grey.shade300,
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
 
                   const SizedBox(height: 32),
 

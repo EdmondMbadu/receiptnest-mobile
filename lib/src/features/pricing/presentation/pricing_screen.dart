@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +10,7 @@ import '../../../core/config/public_app_config.dart';
 import '../../../core/config/public_billing_config.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/models/user_profile.dart';
+import '../data/revenuecat_repository.dart';
 
 class PricingScreen extends ConsumerStatefulWidget {
   const PricingScreen({super.key});
@@ -19,8 +23,17 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
   bool _isAnnual = true;
   bool _processingCheckout = false;
   bool _processingPortal = false;
+  bool _loadingAppleBilling = false;
+  bool _appleEntitlementActive = false;
   String? _error;
   String? _lastSyncedBillingIntervalKey;
+  String? _lastLoadedAppleBillingUserId;
+  RevenueCatPurchaseOption? _appleMonthlyOption;
+
+  bool get _usesAppleBilling {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.iOS;
+  }
 
   String _replaceFreePlanLimit(String value, int freePlanReceiptLimit) {
     return value.replaceAll('{freePlanReceiptLimit}', '$freePlanReceiptLimit');
@@ -52,6 +65,34 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
     });
 
     try {
+      if (_usesAppleBilling) {
+        final uid = ref.read(currentUserIdProvider);
+        if (uid == null) {
+          throw const RevenueCatException('Sign in before subscribing.');
+        }
+        final option =
+            _appleMonthlyOption ??
+            await ref
+                .read(revenueCatRepositoryProvider)
+                .fetchMonthlyOption(uid);
+        final customerInfo = await ref
+            .read(revenueCatRepositoryProvider)
+            .purchaseMonthly(userId: uid, package: option.package);
+        final hasPro = ref
+            .read(revenueCatRepositoryProvider)
+            .hasActivePro(customerInfo);
+        if (!hasPro) {
+          throw const RevenueCatException(
+            'The App Store purchase finished, but Pro access is still syncing.',
+          );
+        }
+        setState(() {
+          _appleMonthlyOption = option;
+          _appleEntitlementActive = true;
+        });
+        return;
+      }
+
       final callable = ref
           .read(functionsProvider)
           .httpsCallable('createCheckoutSession');
@@ -73,7 +114,9 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
       }
     } catch (e) {
       setState(
-        () => _error = 'Unable to start checkout right now. Please try again.',
+        () => _error = _usesAppleBilling
+            ? e.toString()
+            : 'Unable to start checkout right now. Please try again.',
       );
     } finally {
       if (mounted) {
@@ -83,10 +126,34 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
   }
 
   Future<void> _openPortal() async {
+    if (_usesAppleBilling) {
+      setState(() {
+        _processingPortal = true;
+        _error = null;
+      });
+      try {
+        final launched = await launchUrlString(
+          'https://apps.apple.com/account/subscriptions',
+          mode: LaunchMode.externalApplication,
+        );
+        if (!launched) {
+          throw Exception('Unable to open App Store subscriptions.');
+        }
+      } catch (_) {
+        setState(() => _error = 'Unable to open App Store subscriptions.');
+      } finally {
+        if (mounted) {
+          setState(() => _processingPortal = false);
+        }
+      }
+      return;
+    }
+
     final profile = ref.read(currentUserProfileProvider).valueOrNull;
     if (!(profile?.hasBillingPortalAccess ?? false)) {
       setState(
-        () => _error = 'Billing portal becomes available after a Stripe billing profile is created.',
+        () => _error =
+            'Billing portal becomes available after a Stripe billing profile is created.',
       );
       return;
     }
@@ -124,7 +191,71 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
     }
   }
 
+  Future<void> _restoreApplePurchases() async {
+    final uid = ref.read(currentUserIdProvider);
+    if (uid == null) {
+      setState(() => _error = 'Sign in before restoring purchases.');
+      return;
+    }
+
+    setState(() {
+      _processingPortal = true;
+      _error = null;
+    });
+
+    try {
+      final repo = ref.read(revenueCatRepositoryProvider);
+      final customerInfo = await repo.restorePurchases(uid);
+      final hasPro = repo.hasActivePro(customerInfo);
+      setState(() {
+        _appleEntitlementActive = hasPro;
+        _error = hasPro ? null : 'No active App Store subscription was found.';
+      });
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) {
+        setState(() => _processingPortal = false);
+      }
+    }
+  }
+
+  Future<void> _loadAppleBilling(String uid) async {
+    if (_loadingAppleBilling || _lastLoadedAppleBillingUserId == uid) return;
+    setState(() {
+      _loadingAppleBilling = true;
+      _lastLoadedAppleBillingUserId = uid;
+    });
+
+    try {
+      final repo = ref.read(revenueCatRepositoryProvider);
+      final option = await repo.fetchMonthlyOption(uid);
+      final customerInfo = await repo.fetchCustomerInfo(uid);
+      if (!mounted) return;
+      setState(() {
+        _appleMonthlyOption = option;
+        _appleEntitlementActive = repo.hasActivePro(customerInfo);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) {
+        setState(() => _loadingAppleBilling = false);
+      }
+    }
+  }
+
   void _syncBillingIntervalSelection(UserProfile? profile) {
+    if (_usesAppleBilling) {
+      if (_isAnnual) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _isAnnual = false);
+        });
+      }
+      return;
+    }
+
     final paidInterval = profile?.subscriptionInterval?.toLowerCase();
     final nextKey = profile?.isPro == true
         ? 'pro:${paidInterval == 'annual' ? 'annual' : 'monthly'}'
@@ -135,8 +266,9 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
     }
 
     _lastSyncedBillingIntervalKey = nextKey;
-    final nextIsAnnual =
-        profile?.isPro == true ? paidInterval == 'annual' : true;
+    final nextIsAnnual = profile?.isPro == true
+        ? paidInterval == 'annual'
+        : true;
 
     if (_isAnnual == nextIsAnnual) {
       return;
@@ -155,6 +287,7 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final profile = ref.watch(currentUserProfileProvider).valueOrNull;
+    final uid = ref.watch(currentUserIdProvider);
     final billingConfig = ref.watch(publicBillingConfigProvider).valueOrNull;
     final appConfig =
         ref.watch(publicAppConfigProvider).valueOrNull ??
@@ -162,15 +295,32 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
     final freePlanReceiptLimit =
         billingConfig?.freePlanReceiptLimit ?? defaultFreePlanReceiptLimit;
 
-    final isPro = profile?.isPro ?? false;
+    final isPro = (profile?.isPro ?? false) || _appleEntitlementActive;
     final status = (profile?.subscriptionStatus ?? 'inactive').toLowerCase();
-    final hasBillingPortalAccess = profile?.hasBillingPortalAccess ?? false;
+    final hasBillingPortalAccess =
+        _usesAppleBilling || (profile?.hasBillingPortalAccess ?? false);
     final renewDate = profile?.subscriptionCurrentPeriodEnd;
     final cancelling = profile?.subscriptionCancelAtPeriodEnd == true;
 
     _syncBillingIntervalSelection(profile);
+    if (_usesAppleBilling && uid != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_loadAppleBilling(uid));
+      });
+    }
 
     const accent = Color(0xFF00C805);
+    final proPrice = _usesAppleBilling
+        ? (_appleMonthlyOption?.price ?? appConfig.pricingMonthlyPrice)
+        : (_isAnnual
+              ? appConfig.pricingAnnualPrice
+              : appConfig.pricingMonthlyPrice);
+    final proCadence = _usesAppleBilling
+        ? '/month'
+        : (_isAnnual ? '/year' : '/month');
+    final trustLabel = _usesAppleBilling
+        ? 'Billed by the App Store'
+        : appConfig.pricingTrustLabel;
 
     return Scaffold(
       backgroundColor: isDark
@@ -236,40 +386,41 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
                 const SizedBox(height: 24),
 
                 // ── Billing toggle ──
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.06)
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
+                if (!_usesAppleBilling)
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
                       color: isDark
-                          ? Colors.white.withValues(alpha: 0.08)
-                          : Colors.grey.shade200,
+                          ? Colors.white.withValues(alpha: 0.06)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : Colors.grey.shade200,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _TogglePill(
+                          label: 'Monthly',
+                          selected: !_isAnnual,
+                          onTap: () => setState(() => _isAnnual = false),
+                          isDark: isDark,
+                        ),
+                        _TogglePill(
+                          label: 'Annual',
+                          badge: appConfig.pricingAnnualSavingsBadge.isEmpty
+                              ? null
+                              : appConfig.pricingAnnualSavingsBadge,
+                          selected: _isAnnual,
+                          onTap: () => setState(() => _isAnnual = true),
+                          isDark: isDark,
+                        ),
+                      ],
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _TogglePill(
-                        label: 'Monthly',
-                        selected: !_isAnnual,
-                        onTap: () => setState(() => _isAnnual = false),
-                        isDark: isDark,
-                      ),
-                      _TogglePill(
-                        label: 'Annual',
-                        badge: appConfig.pricingAnnualSavingsBadge.isEmpty
-                            ? null
-                            : appConfig.pricingAnnualSavingsBadge,
-                        selected: _isAnnual,
-                        onTap: () => setState(() => _isAnnual = true),
-                        isDark: isDark,
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
@@ -378,10 +529,8 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
           _PlanCard(
             planName: appConfig.pricingProPlanName,
             tagline: appConfig.pricingProTagline,
-            price: _isAnnual
-                ? appConfig.pricingAnnualPrice
-                : appConfig.pricingMonthlyPrice,
-            cadence: _isAnnual ? '/year' : '/month',
+            price: proPrice,
+            cadence: proCadence,
             isActive: isPro,
             isPrimary: true,
             isDark: isDark,
@@ -400,9 +549,14 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
             ),
             buttonLabel: isPro
                 ? 'Current plan'
-                : (_processingCheckout ? null : 'Upgrade to Pro'),
-            isProcessing: _processingCheckout,
-            onButtonPressed: isPro || _processingCheckout
+                : (_processingCheckout
+                      ? null
+                      : (_usesAppleBilling
+                            ? 'Subscribe with App Store'
+                            : 'Upgrade to Pro')),
+            isProcessing: _processingCheckout || _loadingAppleBilling,
+            onButtonPressed:
+                isPro || _processingCheckout || _loadingAppleBilling
                 ? null
                 : _startCheckout,
           ),
@@ -457,6 +611,30 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
                 ),
               ),
             ),
+          if (_usesAppleBilling && !isPro)
+            Center(
+              child: TextButton.icon(
+                onPressed: _processingPortal ? null : _restoreApplePurchases,
+                icon: _processingPortal
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        Icons.restore_rounded,
+                        size: 18,
+                        color: cs.onSurface.withValues(alpha: 0.5),
+                      ),
+                label: Text(
+                  'Restore App Store purchase',
+                  style: TextStyle(
+                    color: cs.onSurface.withValues(alpha: 0.5),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
 
           // ── Error ──
           if (_error != null) ...[
@@ -499,7 +677,7 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
               ),
               const SizedBox(width: 6),
               Text(
-                appConfig.pricingTrustLabel,
+                trustLabel,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
