@@ -292,6 +292,30 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
     final appConfig =
         ref.watch(publicAppConfigProvider).valueOrNull ??
         const PublicAppConfig();
+    final pricingHeadline = _usesAppleBilling
+        ? 'ReceiptNest Pro'
+        : appConfig.pricingHeadline;
+    final pricingSubheadline = _usesAppleBilling
+        ? 'Monthly Pro access billed through your Apple ID'
+        : appConfig.pricingSubheadline;
+    final proPlanName = _usesAppleBilling
+        ? defaultPricingProPlanName
+        : appConfig.pricingProPlanName;
+    final freePlanName = _usesAppleBilling
+        ? defaultPricingFreePlanName
+        : appConfig.pricingFreePlanName;
+    final proTagline = _usesAppleBilling
+        ? 'Unlimited receipts, deeper insights, and richer exports with a monthly App Store subscription.'
+        : appConfig.pricingProTagline;
+    final freeTagline = _usesAppleBilling
+        ? defaultPricingFreeTagline
+        : appConfig.pricingFreeTagline;
+    final proFeatures = _usesAppleBilling
+        ? defaultPricingProFeatures
+        : appConfig.pricingProFeatures;
+    final freeFeatures = _usesAppleBilling
+        ? defaultPricingFreeFeatures
+        : appConfig.pricingFreeFeatures;
     final freePlanReceiptLimit =
         billingConfig?.freePlanReceiptLimit ?? defaultFreePlanReceiptLimit;
 
@@ -311,7 +335,7 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
 
     const accent = Color(0xFF00C805);
     final proPrice = _usesAppleBilling
-        ? (_appleMonthlyOption?.price ?? appConfig.pricingMonthlyPrice)
+        ? (_appleMonthlyOption?.price ?? defaultPricingMonthlyPrice)
         : (_isAnnual
               ? appConfig.pricingAnnualPrice
               : appConfig.pricingMonthlyPrice);
@@ -366,7 +390,7 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  appConfig.pricingHeadline,
+                  pricingHeadline,
                   style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.w800,
@@ -376,7 +400,7 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  appConfig.pricingSubheadline,
+                  pricingSubheadline,
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w400,
@@ -527,26 +551,22 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
           // ── Plan cards ──
           // Pro plan
           _PlanCard(
-            planName: appConfig.pricingProPlanName,
-            tagline: appConfig.pricingProTagline,
+            planName: proPlanName,
+            tagline: proTagline,
             price: proPrice,
             cadence: proCadence,
             isActive: isPro,
             isPrimary: true,
             isDark: isDark,
             featuresHeading: 'Everything in Free, plus:',
-            features: _buildFeatures(
-              appConfig.pricingProFeatures,
-              const [
-                Icons.all_inclusive_rounded,
-                Icons.search_rounded,
-                Icons.download_rounded,
-                Icons.insights_rounded,
-                Icons.support_agent_rounded,
-                Icons.auto_awesome_rounded,
-              ],
-              freePlanReceiptLimit: freePlanReceiptLimit,
-            ),
+            features: _buildFeatures(proFeatures, const [
+              Icons.all_inclusive_rounded,
+              Icons.search_rounded,
+              Icons.download_rounded,
+              Icons.insights_rounded,
+              Icons.support_agent_rounded,
+              Icons.auto_awesome_rounded,
+            ], freePlanReceiptLimit: freePlanReceiptLimit),
             buttonLabel: isPro
                 ? 'Current plan'
                 : (_processingCheckout
@@ -564,23 +584,19 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
 
           // Free plan
           _PlanCard(
-            planName: appConfig.pricingFreePlanName,
-            tagline: appConfig.pricingFreeTagline,
+            planName: freePlanName,
+            tagline: freeTagline,
             price: '\$0',
             cadence: 'forever',
             isActive: !isPro,
             isPrimary: false,
             isDark: isDark,
-            features: _buildFeatures(
-              appConfig.pricingFreeFeatures,
-              const [
-                Icons.receipt_long_rounded,
-                Icons.label_rounded,
-                Icons.upload_file_rounded,
-                Icons.person_rounded,
-              ],
-              freePlanReceiptLimit: freePlanReceiptLimit,
-            ),
+            features: _buildFeatures(freeFeatures, const [
+              Icons.receipt_long_rounded,
+              Icons.label_rounded,
+              Icons.upload_file_rounded,
+              Icons.person_rounded,
+            ], freePlanReceiptLimit: freePlanReceiptLimit),
             buttonLabel: !isPro ? 'Current plan' : null,
             onButtonPressed: null,
           ),

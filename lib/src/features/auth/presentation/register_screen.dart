@@ -345,31 +345,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                   const SizedBox(height: 24),
 
-                  // ── Google button ──
-                  SizedBox(
-                    height: 50,
-                    child: OutlinedButton.icon(
-                      onPressed: _submitting ? null : _googleSignIn,
-                      icon: const Icon(Icons.g_mobiledata_rounded, size: 26),
-                      label: const Text('Continue with Google'),
-                      style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        side: BorderSide(
-                          color: isDark
-                              ? Colors.white.withValues(alpha: 0.1)
-                              : Colors.grey.shade300,
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
                   if (_showsAppleSignIn) ...[
-                    const SizedBox(height: 12),
                     SizedBox(
                       height: 50,
                       child: OutlinedButton.icon(
@@ -392,7 +368,30 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 12),
                   ],
+                  SizedBox(
+                    height: 50,
+                    child: OutlinedButton.icon(
+                      onPressed: _submitting ? null : _googleSignIn,
+                      icon: const Icon(Icons.g_mobiledata_rounded, size: 26),
+                      label: const Text('Continue with Google'),
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        side: BorderSide(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.1)
+                              : Colors.grey.shade300,
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
 
                   const SizedBox(height: 32),
 
