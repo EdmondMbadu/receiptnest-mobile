@@ -218,15 +218,39 @@ class AuthRepository {
         'Apple did not return a sign-in token. Please try again.',
       );
     }
-
-    if (kDebugMode) {
-      _debugLogAppleToken(identityToken, hashedNonce: hashedNonce);
+    final authorizationCode = appleCredential.authorizationCode;
+    if (authorizationCode.isEmpty) {
+      throw const AppAuthException(
+        'auth/missing-apple-authorization-code',
+        'Apple did not return an authorization code. Please try again.',
+      );
     }
 
-    final oauthCredential = OAuthProvider(
-      'apple.com',
-    ).credential(idToken: identityToken, rawNonce: rawNonce);
-    final userCred = await _auth.signInWithCredential(oauthCredential);
+    if (kDebugMode) {
+      _debugLogAppleToken(
+        identityToken,
+        hashedNonce: hashedNonce,
+        authorizationCode: authorizationCode,
+      );
+    }
+
+    final oauthCredential = OAuthProvider('apple.com').credential(
+      idToken: identityToken,
+      rawNonce: rawNonce,
+      accessToken: authorizationCode,
+    );
+    final UserCredential userCred;
+    try {
+      userCred = await _auth.signInWithCredential(oauthCredential);
+    } on FirebaseAuthException catch (error) {
+      if (error.code == 'invalid-credential') {
+        throw const AppAuthException(
+          'auth/apple-invalid-credential',
+          'Firebase rejected the Apple credential. Confirm Apple sign-in is enabled for the Firebase project and retry with a fresh Apple sign-in.',
+        );
+      }
+      rethrow;
+    }
     final user = userCred.user;
     if (user == null) return;
 
@@ -576,6 +600,7 @@ class AuthRepository {
   void _debugLogAppleToken(
     String identityToken, {
     required String hashedNonce,
+    required String authorizationCode,
   }) {
     try {
       final parts = identityToken.split('.');
@@ -603,8 +628,9 @@ class AuthRepository {
       debugPrint('  nonce_supported: ${claims['nonce_supported']}');
       debugPrint('  nonce (hashed) in token: ${claims['nonce']}');
       debugPrint('  hashedNonce we sent:     $hashedNonce');
+      debugPrint('  nonce match: ${claims['nonce'] == hashedNonce}');
       debugPrint(
-        '  nonce match: ${claims['nonce'] == hashedNonce}',
+        '  authorizationCode present: ${authorizationCode.isNotEmpty}',
       );
       final exp = claims['exp'];
       if (exp is int) {
