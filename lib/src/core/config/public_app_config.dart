@@ -23,7 +23,7 @@ const defaultSupportParagraphs = <String>[
 const defaultTermsTitle = 'ReceiptNest AI Terms';
 const defaultTermsParagraphs = <String>[
   'By using ReceiptNest AI, you agree to process only receipts you are authorized to store and analyze.',
-  'Subscription billing is managed by Stripe and renews according to your selected plan.',
+  'Subscription billing is managed by the payment provider available on your platform and renews according to your selected plan.',
   'For the latest legal terms, refer to receipt-nest web terms page.',
 ];
 
@@ -59,7 +59,7 @@ const defaultPricingFreeFeatures = <String>[
   'Email & PDF uploads',
   'Single workspace',
 ];
-const defaultPricingTrustLabel = 'Secured by Stripe';
+const defaultPricingTrustLabel = 'Secure billing';
 
 const defaultAiSuggestedQuestions = <String>[
   'How can I reduce my spending this month?',

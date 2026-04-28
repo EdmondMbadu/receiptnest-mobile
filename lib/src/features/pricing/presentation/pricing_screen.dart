@@ -28,11 +28,20 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
   String? _error;
   String? _lastSyncedBillingIntervalKey;
   String? _lastLoadedAppleBillingUserId;
-  RevenueCatPurchaseOption? _appleMonthlyOption;
+  RevenueCatPlanOptions? _applePlanOptions;
 
   bool get _usesAppleBilling {
     if (kIsWeb) return false;
     return defaultTargetPlatform == TargetPlatform.iOS;
+  }
+
+  bool _shouldShowBillingToggle({
+    required bool appleHasMonthly,
+    required bool appleHasAnnual,
+  }) {
+    if (!_usesAppleBilling) return true;
+    if (_applePlanOptions == null) return true;
+    return appleHasMonthly && appleHasAnnual;
   }
 
   String _replaceFreePlanLimit(String value, int freePlanReceiptLimit) {
@@ -70,24 +79,36 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
         if (uid == null) {
           throw const RevenueCatException('Sign in before subscribing.');
         }
+        final repo = ref.read(revenueCatRepositoryProvider);
+        final plans = _applePlanOptions ?? await repo.fetchPlanOptions(uid);
+        final desiredInterval = _isAnnual
+            ? BillingInterval.annual
+            : BillingInterval.monthly;
         final option =
-            _appleMonthlyOption ??
-            await ref
-                .read(revenueCatRepositoryProvider)
-                .fetchMonthlyOption(uid);
-        final customerInfo = await ref
-            .read(revenueCatRepositoryProvider)
-            .purchaseMonthly(userId: uid, package: option.package);
-        final hasPro = ref
-            .read(revenueCatRepositoryProvider)
-            .hasActivePro(customerInfo);
+            plans.forInterval(desiredInterval) ??
+            plans.forInterval(
+              desiredInterval == BillingInterval.annual
+                  ? BillingInterval.monthly
+                  : BillingInterval.annual,
+            );
+        if (option == null) {
+          throw const RevenueCatException(
+            'No App Store subscription is available right now.',
+          );
+        }
+        final customerInfo = await repo.purchasePackage(
+          userId: uid,
+          package: option.package,
+          interval: option.interval,
+        );
+        final hasPro = repo.hasActivePro(customerInfo);
         if (!hasPro) {
           throw const RevenueCatException(
             'The App Store purchase finished, but Pro access is still syncing.',
           );
         }
         setState(() {
-          _appleMonthlyOption = option;
+          _applePlanOptions = plans;
           _appleEntitlementActive = true;
         });
         return;
@@ -153,7 +174,7 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
     if (!(profile?.hasBillingPortalAccess ?? false)) {
       setState(
         () => _error =
-            'Billing portal becomes available after a Stripe billing profile is created.',
+            'Billing portal becomes available after a billing profile is created.',
       );
       return;
     }
@@ -229,11 +250,11 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
 
     try {
       final repo = ref.read(revenueCatRepositoryProvider);
-      final option = await repo.fetchMonthlyOption(uid);
+      final plans = await repo.fetchPlanOptions(uid);
       final customerInfo = await repo.fetchCustomerInfo(uid);
       if (!mounted) return;
       setState(() {
-        _appleMonthlyOption = option;
+        _applePlanOptions = plans;
         _appleEntitlementActive = repo.hasActivePro(customerInfo);
       });
     } catch (e) {
@@ -247,15 +268,6 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
   }
 
   void _syncBillingIntervalSelection(UserProfile? profile) {
-    if (_usesAppleBilling) {
-      if (_isAnnual) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) setState(() => _isAnnual = false);
-        });
-      }
-      return;
-    }
-
     final paidInterval = profile?.subscriptionInterval?.toLowerCase();
     final nextKey = profile?.isPro == true
         ? 'pro:${paidInterval == 'annual' ? 'annual' : 'monthly'}'
@@ -296,7 +308,7 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
         ? 'ReceiptNest Pro'
         : appConfig.pricingHeadline;
     final pricingSubheadline = _usesAppleBilling
-        ? 'Monthly Pro access billed through your Apple ID'
+        ? 'Pro access billed through your Apple ID'
         : appConfig.pricingSubheadline;
     final proPlanName = _usesAppleBilling
         ? defaultPricingProPlanName
@@ -305,7 +317,7 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
         ? defaultPricingFreePlanName
         : appConfig.pricingFreePlanName;
     final proTagline = _usesAppleBilling
-        ? 'Unlimited receipts, deeper insights, and richer exports with a monthly App Store subscription.'
+        ? 'Unlimited receipts, deeper insights, and richer exports with an App Store subscription.'
         : appConfig.pricingProTagline;
     final freeTagline = _usesAppleBilling
         ? defaultPricingFreeTagline
@@ -334,14 +346,22 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
     }
 
     const accent = Color(0xFF00C805);
+    final selectedAppleOption = _usesAppleBilling
+        ? _applePlanOptions?.forInterval(
+            _isAnnual ? BillingInterval.annual : BillingInterval.monthly,
+          )
+        : null;
+    final appleHasAnnual = _applePlanOptions?.annual != null;
+    final appleHasMonthly = _applePlanOptions?.monthly != null;
     final proPrice = _usesAppleBilling
-        ? (_appleMonthlyOption?.price ?? defaultPricingMonthlyPrice)
+        ? (selectedAppleOption?.price ??
+              (_isAnnual
+                  ? defaultPricingAnnualPrice
+                  : defaultPricingMonthlyPrice))
         : (_isAnnual
               ? appConfig.pricingAnnualPrice
               : appConfig.pricingMonthlyPrice);
-    final proCadence = _usesAppleBilling
-        ? '/month'
-        : (_isAnnual ? '/year' : '/month');
+    final proCadence = _isAnnual ? '/year' : '/month';
     final trustLabel = _usesAppleBilling
         ? 'Billed by the App Store'
         : appConfig.pricingTrustLabel;
@@ -410,7 +430,10 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
                 const SizedBox(height: 24),
 
                 // ── Billing toggle ──
-                if (!_usesAppleBilling)
+                if (_shouldShowBillingToggle(
+                  appleHasMonthly: appleHasMonthly,
+                  appleHasAnnual: appleHasAnnual,
+                ))
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(

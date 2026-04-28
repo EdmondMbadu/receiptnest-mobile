@@ -43,7 +43,7 @@ class TermsScreen extends ConsumerWidget {
 
     return const [
       'By using ReceiptNest AI, you agree to process only receipts you are authorized to store and analyze.',
-      'Subscriptions purchased in this iOS app are monthly subscriptions billed by Apple through the App Store.',
+      'Subscriptions purchased in this iOS app are billed by Apple through the App Store and renew according to your selected monthly or yearly plan.',
       'You can manage or cancel App Store subscriptions from your Apple ID subscription settings.',
     ];
   }

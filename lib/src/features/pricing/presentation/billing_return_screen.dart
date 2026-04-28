@@ -97,7 +97,7 @@ class BillingReturnScreen extends ConsumerWidget {
     if (isCheckout && isSuccess && !isPro) {
       title = 'Finalizing your subscription';
       message =
-          'Your payment was accepted. ReceiptNest AI is waiting for Stripe webhook confirmation, which usually takes a few seconds.';
+          'Your payment was accepted. ReceiptNest AI is waiting for billing confirmation, which usually takes a few seconds.';
       leading = const SizedBox(
         width: 28,
         height: 28,

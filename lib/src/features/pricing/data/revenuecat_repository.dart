@@ -14,6 +14,9 @@ const _revenueCatProEntitlementId = String.fromEnvironment(
 const _revenueCatMonthlyPackageId = String.fromEnvironment(
   'REVENUECAT_IOS_MONTHLY_PACKAGE_ID',
 );
+const _revenueCatAnnualPackageId = String.fromEnvironment(
+  'REVENUECAT_IOS_ANNUAL_PACKAGE_ID',
+);
 const _revenueCatOfferingId = String.fromEnvironment(
   'REVENUECAT_IOS_OFFERING_ID',
 );
@@ -21,6 +24,8 @@ const _revenueCatOfferingId = String.fromEnvironment(
 final revenueCatRepositoryProvider = Provider<RevenueCatRepository>((ref) {
   return RevenueCatRepository(db: ref.watch(firestoreProvider));
 });
+
+enum BillingInterval { monthly, annual }
 
 class RevenueCatException implements Exception {
   const RevenueCatException(this.message);
@@ -32,10 +37,28 @@ class RevenueCatException implements Exception {
 }
 
 class RevenueCatPurchaseOption {
-  const RevenueCatPurchaseOption({required this.price, required this.package});
+  const RevenueCatPurchaseOption({
+    required this.price,
+    required this.package,
+    required this.interval,
+  });
 
   final String price;
   final Package package;
+  final BillingInterval interval;
+}
+
+class RevenueCatPlanOptions {
+  const RevenueCatPlanOptions({this.monthly, this.annual});
+
+  final RevenueCatPurchaseOption? monthly;
+  final RevenueCatPurchaseOption? annual;
+
+  RevenueCatPurchaseOption? forInterval(BillingInterval interval) {
+    return interval == BillingInterval.annual ? annual : monthly;
+  }
+
+  bool get hasAny => monthly != null || annual != null;
 }
 
 class RevenueCatRepository {
@@ -50,25 +73,35 @@ class RevenueCatRepository {
     return defaultTargetPlatform == TargetPlatform.iOS;
   }
 
-  Future<RevenueCatPurchaseOption> fetchMonthlyOption(String userId) async {
+  Future<RevenueCatPlanOptions> fetchPlanOptions(String userId) async {
     await _ensureConfigured(userId);
     final offerings = await Purchases.getOfferings();
     final offering = _selectOffering(offerings);
-    final package = _selectMonthlyPackage(offering);
-    if (package == null) {
+    if (offering == null) {
       throw const RevenueCatException(
-        'The App Store monthly subscription is not available yet.',
+        'No App Store subscription offering is configured yet.',
       );
     }
-    return RevenueCatPurchaseOption(
-      price: package.storeProduct.priceString,
-      package: package,
+    final monthly = _buildOption(
+      _selectMonthlyPackage(offering),
+      BillingInterval.monthly,
     );
+    final annual = _buildOption(
+      _selectAnnualPackage(offering),
+      BillingInterval.annual,
+    );
+    if (monthly == null && annual == null) {
+      throw const RevenueCatException(
+        'No App Store subscription packages are available yet.',
+      );
+    }
+    return RevenueCatPlanOptions(monthly: monthly, annual: annual);
   }
 
-  Future<CustomerInfo> purchaseMonthly({
+  Future<CustomerInfo> purchasePackage({
     required String userId,
     required Package package,
+    required BillingInterval interval,
   }) async {
     await _ensureConfigured(userId);
     try {
@@ -76,6 +109,7 @@ class RevenueCatRepository {
       await syncActiveEntitlement(
         userId: userId,
         customerInfo: result.customerInfo,
+        interval: interval,
       );
       return result.customerInfo;
     } on PlatformException catch (error) {
@@ -116,15 +150,20 @@ class RevenueCatRepository {
   Future<void> syncActiveEntitlement({
     required String userId,
     required CustomerInfo customerInfo,
+    BillingInterval? interval,
   }) async {
     final entitlement = _activeEntitlement(customerInfo);
     if (entitlement == null) return;
 
     final expirationDate = _parseRevenueCatDate(entitlement.expirationDate);
+    final resolvedInterval =
+        interval ?? _intervalFromProductId(entitlement.productIdentifier);
     await _db.collection('users').doc(userId).set({
       'subscriptionPlan': 'pro',
       'subscriptionStatus': 'active',
-      'subscriptionInterval': 'monthly',
+      'subscriptionInterval': resolvedInterval == BillingInterval.annual
+          ? 'annual'
+          : 'monthly',
       'subscriptionSource': 'app_store',
       'subscriptionCurrentPeriodEnd': expirationDate == null
           ? FieldValue.delete()
@@ -169,6 +208,18 @@ class RevenueCatRepository {
     }
   }
 
+  RevenueCatPurchaseOption? _buildOption(
+    Package? package,
+    BillingInterval interval,
+  ) {
+    if (package == null) return null;
+    return RevenueCatPurchaseOption(
+      price: package.storeProduct.priceString,
+      package: package,
+      interval: interval,
+    );
+  }
+
   Offering? _selectOffering(Offerings offerings) {
     if (_revenueCatOfferingId.trim().isNotEmpty) {
       return offerings.getOffering(_revenueCatOfferingId.trim());
@@ -178,19 +229,38 @@ class RevenueCatRepository {
         (allOfferings.isEmpty ? null : allOfferings.first);
   }
 
-  Package? _selectMonthlyPackage(Offering? offering) {
-    if (offering == null) return null;
+  Package? _selectMonthlyPackage(Offering offering) {
     if (_revenueCatMonthlyPackageId.trim().isNotEmpty) {
       return offering.getPackage(_revenueCatMonthlyPackageId.trim());
     }
-    return offering.monthly ??
-        offering.availablePackages.firstWhereOrNull(
-          (package) => package.packageType == PackageType.monthly,
-        );
+    if (offering.monthly != null) return offering.monthly;
+    for (final package in offering.availablePackages) {
+      if (package.packageType == PackageType.monthly) return package;
+    }
+    return null;
+  }
+
+  Package? _selectAnnualPackage(Offering offering) {
+    if (_revenueCatAnnualPackageId.trim().isNotEmpty) {
+      return offering.getPackage(_revenueCatAnnualPackageId.trim());
+    }
+    if (offering.annual != null) return offering.annual;
+    for (final package in offering.availablePackages) {
+      if (package.packageType == PackageType.annual) return package;
+    }
+    return null;
   }
 
   EntitlementInfo? _activeEntitlement(CustomerInfo customerInfo) {
     return customerInfo.entitlements.active[_revenueCatProEntitlementId];
+  }
+
+  BillingInterval _intervalFromProductId(String productId) {
+    final lower = productId.toLowerCase();
+    if (lower.contains('year') || lower.contains('annual')) {
+      return BillingInterval.annual;
+    }
+    return BillingInterval.monthly;
   }
 
   DateTime? _parseRevenueCatDate(String? value) {

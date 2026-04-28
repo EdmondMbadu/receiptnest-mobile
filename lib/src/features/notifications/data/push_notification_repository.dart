@@ -160,7 +160,7 @@ class PushNotificationRepository {
     final prefs = await SharedPreferences.getInstance();
     final storedUserId = prefs.getString(_storedUserKey);
     final storedToken = prefs.getString(_storedTokenKey);
-    final token = storedToken ?? await _messaging.getToken();
+    final token = storedToken ?? await _getCurrentMessagingToken();
 
     if (token != null && token.isNotEmpty) {
       await _db.collection('users').doc(userId).set({
@@ -172,6 +172,17 @@ class PushNotificationRepository {
     if (storedUserId == userId) {
       await prefs.remove(_storedUserKey);
       await prefs.remove(_storedTokenKey);
+    }
+  }
+
+  Future<String?> _getCurrentMessagingToken() async {
+    try {
+      return await _messaging.getToken();
+    } on FirebaseException catch (error) {
+      if (error.code == 'apns-token-not-set') {
+        return null;
+      }
+      rethrow;
     }
   }
 
