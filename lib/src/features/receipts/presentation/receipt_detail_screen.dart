@@ -11,6 +11,9 @@ import '../../auth/data/auth_repository.dart';
 import '../data/receipt_repository.dart';
 import '../models/category.dart';
 import '../models/receipt.dart';
+import '../../getting_started/data/native_onboarding_repository.dart';
+import '../../getting_started/data/onboarding_analytics.dart';
+import '../../getting_started/presentation/onboarding_widgets.dart';
 
 const _previewImageExtensions = <String>{
   'jpg',
@@ -24,9 +27,16 @@ const _previewImageExtensions = <String>{
 const _previewDocExtensions = <String>{'pdf', 'doc', 'docx'};
 
 class ReceiptDetailScreen extends ConsumerStatefulWidget {
-  const ReceiptDetailScreen({super.key, required this.receiptId});
+  const ReceiptDetailScreen({
+    super.key,
+    required this.receiptId,
+    this.guided = false,
+    this.onboardingReplay = false,
+  });
 
   final String receiptId;
+  final bool guided;
+  final bool onboardingReplay;
 
   @override
   ConsumerState<ReceiptDetailScreen> createState() =>
@@ -44,6 +54,8 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
   bool _saving = false;
   String? _error;
   String? _success;
+  bool _viewRecorded = false;
+  final _detailsKey = GlobalKey();
 
   @override
   void dispose() {
@@ -55,7 +67,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
   }
 
   void _loadForm(Receipt receipt) {
-    if (_loaded) return;
+    if (_loaded || receipt.isProcessing) return;
     _merchantController.text =
         receipt.merchant?.canonicalName ??
         receipt.extraction?.supplierName?.value?.toString() ??
@@ -72,8 +84,35 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
   }
 
   Future<void> _save(Receipt receipt) async {
+    if (_saving || receipt.isProcessing) return;
     final uid = ref.read(currentUserIdProvider);
     if (uid == null) return;
+
+    final parsedAmount = double.tryParse(_amountController.text.trim());
+    final date = _dateController.text.trim();
+    final parsedDate = DateTime.tryParse(date);
+    if (parsedAmount == null ||
+        !parsedAmount.isFinite ||
+        _merchantController.text.trim().isEmpty ||
+        !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(date) ||
+        parsedDate == null ||
+        parsedDate.toIso8601String().substring(0, 10) != date) {
+      setState(
+        () => _error =
+            'Please enter a merchant, a valid amount, and a date in YYYY-MM-DD format.',
+      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_error!)));
+      final detailsContext = _detailsKey.currentContext;
+      if (detailsContext != null) {
+        Scrollable.ensureVisible(
+          detailsContext,
+          duration: const Duration(milliseconds: 250),
+        );
+      }
+      return;
+    }
 
     setState(() {
       _saving = true;
@@ -470,7 +509,8 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final receiptAsync = ref.watch(receiptFutureProvider(widget.receiptId));
+    final receiptAsync = ref.watch(receiptWatchProvider(widget.receiptId));
+    final currentReceipt = receiptAsync.valueOrNull;
 
     return Scaffold(
       backgroundColor: isDark
@@ -487,6 +527,41 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
           color: cs.onSurface,
         ),
       ),
+      bottomNavigationBar:
+          widget.guided &&
+              currentReceipt != null &&
+              !currentReceipt.isProcessing
+          ? SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
+                child: FilledButton.icon(
+                  onPressed: _saving
+                      ? null
+                      : () {
+                          if (currentReceipt.status ==
+                              ReceiptStatuses.finalStatus) {
+                            Navigator.of(context).pop(true);
+                          } else {
+                            _save(currentReceipt);
+                          }
+                        },
+                  icon: Icon(
+                    currentReceipt.status == ReceiptStatuses.finalStatus
+                        ? Icons.arrow_forward_rounded
+                        : Icons.check_rounded,
+                    size: 20,
+                  ),
+                  label: Text(
+                    _saving
+                        ? 'Saving…'
+                        : currentReceipt.status == ReceiptStatuses.finalStatus
+                        ? 'Continue'
+                        : 'Confirm & save',
+                  ),
+                ),
+              ),
+            )
+          : null,
       body: receiptAsync.when(
         loading: () => Center(
           child: CircularProgressIndicator(strokeWidth: 2.5, color: cs.primary),
@@ -538,10 +613,58 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
           _loadForm(receipt);
 
           final isProcessing = receipt.isProcessing;
+          if (isProcessing) {
+            return ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                _ProcessingBanner(),
+                const SizedBox(height: 20),
+                _buildPreviewCard(receipt),
+                const SizedBox(height: 20),
+                const OnboardingMessage(
+                  message:
+                      'Your receipt is saved. Its details will appear here when processing finishes. You can leave and come back anytime.',
+                ),
+              ],
+            );
+          }
+          if (!isProcessing && !_viewRecorded && isUsableReceipt(receipt)) {
+            _viewRecorded = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              ref.read(onboardingAnalyticsProvider).event(
+                'native_receipt_view',
+                {
+                  'usable': 1,
+                  'guided': widget.guided ? 1 : 0,
+                  'receipt_id': receipt.id,
+                },
+              );
+              final uid = ref.read(currentUserIdProvider);
+              if (uid != null) {
+                ref
+                    .read(nativeOnboardingProvider(uid).notifier)
+                    .act(
+                      widget.guided && !widget.onboardingReplay
+                          ? 'view'
+                          : 'observe',
+                      receiptId: receipt.id,
+                    );
+              }
+            });
+          }
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
             children: [
+              if (widget.guided && !isProcessing) ...[
+                OnboardingMessage(
+                  message: receipt.status == ReceiptStatuses.finalStatus
+                      ? 'Your receipt is saved. The details below were filled automatically. Editing and notes are optional.'
+                      : 'Check the details against your original receipt. Add anything missing, then choose Confirm & save.',
+                ),
+                const SizedBox(height: 16),
+              ],
               // ── Processing banner ──
               if (isProcessing) ...[
                 _ProcessingBanner(),
@@ -651,6 +774,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
 
               // ── Details card ──
               Container(
+                key: _detailsKey,
                 padding: const EdgeInsets.all(22),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF151520) : Colors.white,
@@ -798,7 +922,9 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
               SizedBox(
                 height: 50,
                 child: FilledButton.icon(
-                  onPressed: _saving ? null : () => _save(receipt),
+                  onPressed: _saving || isProcessing
+                      ? null
+                      : () => _save(receipt),
                   icon: _saving
                       ? const SizedBox(
                           width: 20,
@@ -810,7 +936,11 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
                         )
                       : const Icon(Icons.check_rounded, size: 20),
                   label: Text(
-                    _saving ? 'Saving...' : 'Save changes',
+                    _saving
+                        ? 'Saving...'
+                        : receipt.status == ReceiptStatuses.finalStatus
+                        ? 'Save changes'
+                        : 'Confirm & save',
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,

@@ -203,6 +203,21 @@ final receiptFutureProvider = FutureProvider.family<Receipt?, String>((
   return ref.watch(receiptRepositoryProvider).getReceipt(uid, id);
 });
 
+// Follow the exact receipt, even when it is outside the dashboard's 200 rows.
+final receiptWatchProvider = StreamProvider.autoDispose
+    .family<Receipt?, String>((ref, id) {
+      final uid = ref.watch(currentUserIdProvider);
+      if (uid == null) return Stream.value(null);
+      return ref
+          .watch(firestoreProvider)
+          .collection('users')
+          .doc(uid)
+          .collection('receipts')
+          .doc(id)
+          .snapshots()
+          .map((doc) => doc.exists ? Receipt.fromSnapshot(doc) : null);
+    });
+
 class MonthOverMonthChange {
   const MonthOverMonthChange({required this.percent, required this.isIncrease});
 
@@ -298,6 +313,13 @@ class ReceiptRepository {
     };
     final maxBytes = appConfig?.uploadMaxFileSizeBytes ?? maxFileSizeBytes;
 
+    if (file.sizeBytes <= 0) {
+      return const UploadValidationResult(
+        valid: false,
+        error: 'This file is empty. Please choose another receipt.',
+      );
+    }
+
     if (!allowedMimeTypes.contains(mime) && !allowedExtensions.contains(ext)) {
       return const UploadValidationResult(
         valid: false,
@@ -324,20 +346,34 @@ class ReceiptRepository {
     required UploadFileData file,
     PublicAppConfig? appConfig,
     ValueChanged<double>? onProgress,
+    String? uploadId,
   }) async {
     final validation = validateFile(file, appConfig: appConfig);
     if (!validation.valid) {
       throw Exception(validation.error ?? 'Invalid file');
     }
 
+    // The picker keeps this ID for retries of the same selected file. A lost
+    // acknowledgement must not create another receipt or charge another slot.
+    final receiptsRef = _db
+        .collection('users')
+        .doc(userId)
+        .collection('receipts');
+    final docRef = uploadId == null
+        ? receiptsRef.doc()
+        : receiptsRef.doc(uploadId);
+    if (uploadId != null) {
+      final existing = await docRef.get();
+      if (existing.exists) return Receipt.fromSnapshot(existing);
+    }
+
     final userSnap = await _db.collection('users').doc(userId).get();
     final userData = userSnap.data() ?? const <String, dynamic>{};
     final subscriptionPlan =
         (userData['subscriptionPlan'] as String?)?.toLowerCase() ?? 'free';
-    final adminOverride =
-        (userData['adminSubscriptionPlanOverride'] as String?)?.toLowerCase();
-    final hasProAccess =
-        subscriptionPlan == 'pro' || adminOverride == 'pro';
+    final adminOverride = (userData['adminSubscriptionPlanOverride'] as String?)
+        ?.toLowerCase();
+    final hasProAccess = subscriptionPlan == 'pro' || adminOverride == 'pro';
     if (!hasProAccess) {
       final freePlanReceiptLimit = await fetchFreePlanReceiptLimit(_db);
       final countSnap = await _db
@@ -355,7 +391,7 @@ class ReceiptRepository {
     }
 
     final storagePath =
-        'users/$userId/receipts/${DateTime.now().millisecondsSinceEpoch}_${sanitizeFileName(file.name)}';
+        'users/$userId/receipts/${docRef.id}_${sanitizeFileName(file.name)}';
     final ref = _storage.ref(storagePath);
 
     final metadata = SettableMetadata(
@@ -371,32 +407,30 @@ class ReceiptRepository {
       throw Exception('No file data found for upload.');
     }
 
-    task.snapshotEvents.listen((event) {
+    final progressSubscription = task.snapshotEvents.listen((event) {
       final total = event.totalBytes == 0 ? 1 : event.totalBytes;
       onProgress?.call(event.bytesTransferred / total);
     });
 
-    await task;
+    try {
+      await task;
+    } finally {
+      await progressSubscription.cancel();
+    }
 
-    final docRef = await _db
-        .collection('users')
-        .doc(userId)
-        .collection('receipts')
-        .add({
-          'userId': userId,
-          'status': ReceiptStatuses.uploaded,
-          'file': {
-            'storagePath': storagePath,
-            'originalName': file.name,
-            'mimeType': file.mimeType ?? _inferMimeType(file.name),
-            'sizeBytes': file.sizeBytes,
-            'uploadedAt': FieldValue.serverTimestamp(),
-          },
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-
-    await docRef.update({'id': docRef.id});
+    await docRef.set({
+      'userId': userId,
+      'status': ReceiptStatuses.uploaded,
+      'file': {
+        'storagePath': storagePath,
+        'originalName': file.name,
+        'mimeType': file.mimeType ?? _inferMimeType(file.name),
+        'sizeBytes': file.sizeBytes,
+        'uploadedAt': FieldValue.serverTimestamp(),
+      },
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
 
     final receipt = await getReceipt(userId, docRef.id);
     if (receipt == null) {

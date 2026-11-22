@@ -16,6 +16,8 @@ import '../../features/folders/presentation/category_detail_screen.dart';
 import '../../features/folders/presentation/folder_detail_screen.dart';
 import '../../features/folders/presentation/folders_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/getting_started/presentation/getting_started_screen.dart';
+import '../../features/getting_started/presentation/native_onboarding_screen.dart';
 import '../../features/pricing/presentation/billing_return_screen.dart';
 import '../../features/pricing/presentation/pricing_screen.dart';
 import '../../features/receipts/presentation/receipt_detail_screen.dart';
@@ -66,7 +68,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       if (loggedIn &&
           verified &&
           (path == '/' || isAuthRoute || isVerifyRoute)) {
-        return '/app/home';
+        return '/app/entry';
       }
 
       if (path == '/app/admin') {
@@ -91,6 +93,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const VerifyEmailScreen(),
       ),
       GoRoute(
+        path: '/app/entry',
+        builder: (context, state) => const NativeOnboardingEntryScreen(),
+      ),
+      GoRoute(
+        path: '/app/onboarding',
+        builder: (context, state) => NativeOnboardingScreen(
+          replay: state.uri.queryParameters['replay'] == '1',
+        ),
+      ),
+      GoRoute(
         path: '/support',
         builder: (context, state) => const SupportScreen(),
       ),
@@ -106,8 +118,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/app/home',
-            pageBuilder: (context, state) =>
-                _noTransitionPage(state: state, child: const HomeScreen()),
+            pageBuilder: (context, state) => _noTransitionPage(
+              state: state,
+              child: HomeScreen(
+                highlightReceiptId: state.uri.queryParameters['highlight'],
+                openUploadOnArrival:
+                    state.uri.queryParameters['addReceipt'] == '1',
+              ),
+            ),
           ),
           GoRoute(
             path: '/app/insights',
@@ -122,6 +140,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 _noTransitionPage(state: state, child: const FoldersScreen()),
           ),
           GoRoute(
+            path: '/app/help',
+            pageBuilder: (context, state) => _noTransitionPage(
+              state: state,
+              child: const GettingStartedScreen(),
+            ),
+          ),
+          GoRoute(
             path: '/app/settings',
             pageBuilder: (context, state) =>
                 _noTransitionPage(state: state, child: const SettingsScreen()),
@@ -130,8 +155,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/app/receipt/:id',
-        builder: (context, state) =>
-            ReceiptDetailScreen(receiptId: state.pathParameters['id'] ?? ''),
+        builder: (context, state) => ReceiptDetailScreen(
+          receiptId: state.pathParameters['id'] ?? '',
+          guided: state.uri.queryParameters['guide'] == '1',
+          onboardingReplay: state.uri.queryParameters['replay'] == '1',
+        ),
       ),
       GoRoute(
         path: '/app/folders/:id',

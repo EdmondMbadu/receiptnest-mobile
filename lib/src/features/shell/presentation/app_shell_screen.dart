@@ -179,7 +179,8 @@ class AppShellScreen extends ConsumerWidget {
         ),
         drawer: Drawer(
           backgroundColor: isDark ? const Color(0xFF0D0D14) : Colors.white,
-          child: Column(
+          child: ListView(
+            padding: EdgeInsets.zero,
             children: [
               // ── Premium drawer header ──
               Container(
@@ -299,6 +300,11 @@ class AppShellScreen extends ConsumerWidget {
                 onTap: () => openFromDrawer('/app/settings'),
               ),
               _DrawerTile(
+                icon: Icons.play_circle_outline_rounded,
+                label: 'Help & getting started',
+                onTap: () => openFromDrawer('/app/help'),
+              ),
+              _DrawerTile(
                 icon: Icons.support_agent_outlined,
                 label: 'Support',
                 onTap: () => openFromDrawer('/support'),
@@ -314,7 +320,7 @@ class AppShellScreen extends ConsumerWidget {
                 onTap: logoutFromDrawer,
                 color: cs.error,
               ),
-              const Spacer(),
+              const SizedBox(height: 24),
               Padding(
                 padding: const EdgeInsets.all(24),
                 child: Row(

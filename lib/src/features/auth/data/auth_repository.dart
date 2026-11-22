@@ -282,13 +282,35 @@ class AuthRepository {
     }
   }
 
-  Future<void> sendWelcomeEmailIfNeeded() async {
+  Future<bool> sendWelcomeEmailIfNeeded(String expectedUserId) async {
+    final user = _auth.currentUser;
+    if (user == null || user.uid != expectedUserId || !user.emailVerified) {
+      return false;
+    }
     final callable = _functions.httpsCallable('sendWelcomeEmail');
     try {
       await callable.call(<String, dynamic>{});
+      return true;
     } catch (_) {
-      // no-op
+      debugPrint(
+        'Welcome email will be retried on a later sign-in or app resume.',
+      );
+      return false;
     }
+  }
+
+  Future<bool> refreshCurrentUser() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    final wasVerified = user.emailVerified;
+    await user.reload();
+    final refreshed = _auth.currentUser;
+    if (refreshed?.uid != user.uid) return false;
+    if (!wasVerified && refreshed!.emailVerified) {
+      await refreshed.getIdToken(true);
+      return true;
+    }
+    return false;
   }
 
   Future<void> sendPasswordReset(String email) async {

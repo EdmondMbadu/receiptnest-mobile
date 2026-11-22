@@ -1,7 +1,7 @@
 name: recieptnest_ai
 description: "ReceiptNest AI native mobile app"
 publish_to: 'none'
-version: 1.0.0+7
+version: 1.0.1+9
 
 environment:
   sdk: ^3.11.0
@@ -35,6 +35,7 @@ dependencies:
   sign_in_with_apple: ^7.0.1
   purchases_flutter: ^10.0.1
   crypto: ^3.0.7
+  firebase_analytics: ^12.0.0
 
 dev_dependencies:
   flutter_test:
@@ -46,5 +47,9 @@ dependency_overrides:
 
 flutter:
   uses-material-design: true
+  fonts:
+    - family: Manrope
+      fonts:
+        - asset: assets/fonts/Manrope.ttf
   assets:
     - assets/images/

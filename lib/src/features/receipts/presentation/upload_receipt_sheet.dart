@@ -1,15 +1,21 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/config/public_app_config.dart';
 import '../data/receipt_repository.dart';
 import '../models/receipt.dart';
+import '../../getting_started/data/onboarding_analytics.dart';
+import '../../getting_started/presentation/onboarding_widgets.dart';
+
+enum ReceiptSource { camera, gallery, file }
 
 class UploadReceiptSheet extends ConsumerStatefulWidget {
   const UploadReceiptSheet({
@@ -17,11 +23,15 @@ class UploadReceiptSheet extends ConsumerStatefulWidget {
     required this.userId,
     required this.repository,
     required this.onUploaded,
+    this.initialSource,
+    this.guided = false,
   });
 
   final String userId;
   final ReceiptRepository repository;
   final ValueChanged<Receipt> onUploaded;
+  final ReceiptSource? initialSource;
+  final bool guided;
 
   @override
   ConsumerState<UploadReceiptSheet> createState() => _UploadReceiptSheetState();
@@ -33,12 +43,46 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
     'jpeg',
     'png',
     'webp',
+    'heic',
+    'heif',
   };
 
   UploadFileData? _selectedFile;
   bool _uploading = false;
+  bool _picking = false;
   double _progress = 0;
   String? _error;
+  String _uploadId = const Uuid().v4();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      switch (widget.initialSource) {
+        case ReceiptSource.camera:
+          _pickFromCamera();
+        case ReceiptSource.gallery:
+          _pickFromGallery();
+        case ReceiptSource.file:
+          _pickDocument();
+        case null:
+          break;
+      }
+    });
+  }
+
+  void _selected(UploadFileData file, String source) {
+    setState(() {
+      _selectedFile = file;
+      _uploadId = const Uuid().v4();
+      _error = null;
+    });
+    ref.read(onboardingAnalyticsProvider).event('native_receipt_selected', {
+      'source': source,
+      'guided': widget.guided ? 1 : 0,
+    });
+  }
 
   String _fileExtension(String fileName) {
     final dot = fileName.lastIndexOf('.');
@@ -74,12 +118,14 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
       switch (error.code) {
         case 'camera_access_denied':
         case 'camera_access_denied_without_prompt':
-          return 'Camera access is denied. Enable it in Settings to scan receipts.';
+          return 'Camera access is denied. Enable it in Settings, or choose a photo or file instead.';
         case 'photo_access_denied':
         case 'photo_access_denied_without_prompt':
-          return 'Photo access is denied. Enable it in Settings to choose images.';
+          return 'Photo access is denied. Enable it in Settings, or choose a file instead.';
         case 'invalid_image':
           return 'The selected image could not be read. Please try another file.';
+        case 'camera_unavailable':
+          return 'This device has no camera available. Choose a photo or file instead.';
         default:
           break;
       }
@@ -91,6 +137,11 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
   }
 
   Future<void> _pickFromCamera() async {
+    if (_picking || _uploading) return;
+    setState(() {
+      _picking = true;
+      _error = null;
+    });
     try {
       final picker = ImagePicker();
       final image = await picker.pickImage(
@@ -103,24 +154,31 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
       final sizeBytes = await File(image.path).length();
       if (!mounted) return;
 
-      setState(() {
-        _selectedFile = UploadFileData(
+      _selected(
+        UploadFileData(
           name: image.name,
           path: image.path,
           sizeBytes: sizeBytes,
           mimeType: _mimeTypeFromFileName(image.name, fallback: 'image/jpeg'),
-        );
-        _error = null;
-      });
+        ),
+        'camera',
+      );
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _error = _friendlyPickerError(error, isCamera: true);
       });
+    } finally {
+      if (mounted) setState(() => _picking = false);
     }
   }
 
   Future<void> _pickFromGallery() async {
+    if (_picking || _uploading) return;
+    setState(() {
+      _picking = true;
+      _error = null;
+    });
     try {
       final picker = ImagePicker();
       final image = await picker.pickImage(
@@ -132,24 +190,31 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
       final sizeBytes = await File(image.path).length();
       if (!mounted) return;
 
-      setState(() {
-        _selectedFile = UploadFileData(
+      _selected(
+        UploadFileData(
           name: image.name,
           path: image.path,
           sizeBytes: sizeBytes,
           mimeType: _mimeTypeFromFileName(image.name, fallback: 'image/jpeg'),
-        );
-        _error = null;
-      });
+        ),
+        'gallery',
+      );
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _error = _friendlyPickerError(error, isCamera: false);
       });
+    } finally {
+      if (mounted) setState(() => _picking = false);
     }
   }
 
   Future<void> _pickDocument() async {
+    if (_picking || _uploading) return;
+    setState(() {
+      _picking = true;
+      _error = null;
+    });
     try {
       final appConfig =
           ref.read(publicAppConfigProvider).valueOrNull ??
@@ -165,25 +230,28 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
       final file = result.files.first;
       if (!mounted) return;
 
-      setState(() {
-        _selectedFile = UploadFileData(
+      _selected(
+        UploadFileData(
           name: file.name,
           path: file.path,
           bytes: file.path == null ? file.bytes : null,
           sizeBytes: file.size,
           mimeType: null,
-        );
-        _error = null;
-      });
+        ),
+        'file',
+      );
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _error = 'Could not open file picker. Please try again.';
       });
+    } finally {
+      if (mounted) setState(() => _picking = false);
     }
   }
 
   Future<void> _upload() async {
+    if (_uploading || _picking) return;
     final file = _selectedFile;
     if (file == null) return;
     final appConfig =
@@ -204,11 +272,15 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
       _error = null;
       _progress = 0;
     });
+    ref.read(onboardingAnalyticsProvider).event('native_upload_start', {
+      'guided': widget.guided ? 1 : 0,
+    });
 
     try {
       final uploaded = await widget.repository.uploadReceipt(
         userId: widget.userId,
         file: file,
+        uploadId: _uploadId,
         appConfig: appConfig,
         onProgress: (value) {
           if (!mounted) return;
@@ -217,12 +289,23 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
       );
 
       if (!mounted) return;
+      ref.read(onboardingAnalyticsProvider).event('native_upload_accepted', {
+        'guided': widget.guided ? 1 : 0,
+      });
       widget.onUploaded(uploaded);
       Navigator.of(context).pop();
     } catch (e) {
+      ref.read(onboardingAnalyticsProvider).event('native_upload_error', {
+        'guided': widget.guided ? 1 : 0,
+      });
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        final message = e.toString().replaceFirst('Exception: ', '');
+        _error = e is FirebaseException
+            ? 'We couldn’t save your receipt. Check your connection and try again. Your selected file is still here.'
+            : message.startsWith('Free plan')
+            ? message
+            : 'We couldn’t upload this receipt. Please try again or choose another file.';
       });
     } finally {
       if (mounted) {
@@ -237,185 +320,228 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final selected = _selectedFile;
 
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Upload Receipt',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _SourceButton(
-                      icon: Icons.camera_alt_outlined,
-                      label: 'Camera',
-                      onTap: _uploading ? null : _pickFromCamera,
-                      cs: cs,
-                      isDark: isDark,
+    return PopScope(
+      canPop: !_uploading,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        selected == null ? 'Add your receipt' : 'Looking good?',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _SourceButton(
-                      icon: Icons.photo_library_outlined,
-                      label: 'Gallery',
-                      onTap: _uploading ? null : _pickFromGallery,
-                      cs: cs,
-                      isDark: isDark,
+                    IconButton(
+                      onPressed: _uploading
+                          ? null
+                          : () => Navigator.of(context).pop(),
+                      tooltip: 'Close upload',
+                      icon: const Icon(Icons.close_rounded),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _SourceButton(
-                      icon: Icons.description_outlined,
-                      label: 'Files',
-                      onTap: _uploading ? null : _pickDocument,
-                      cs: cs,
-                      isDark: isDark,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              if (selected != null)
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: cs.primary.withValues(alpha: 0.15),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  selected == null
+                      ? 'Take a photo, or choose a receipt you already have.'
+                      : 'Make sure the whole receipt is visible and the text is readable.',
+                  style: TextStyle(color: cs.onSurfaceVariant, height: 1.5),
+                ),
+                const SizedBox(height: 16),
+                if (selected == null || !widget.guided)
+                  Row(
                     children: [
-                      if (_isPreviewableImage(selected))
-                        ClipRRect(
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(15),
-                          ),
-                          child: Image.file(
-                            File(selected.path!),
-                            height: 180,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                          ),
-                        )
-                      else
-                        Container(
-                          height: 80,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: cs.primary.withValues(alpha: 0.06),
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(15),
-                            ),
-                          ),
-                          child: Icon(
-                            Icons.insert_drive_file_outlined,
-                            size: 36,
-                            color: cs.primary.withValues(alpha: 0.4),
-                          ),
+                      Expanded(
+                        child: _SourceButton(
+                          icon: Icons.camera_alt_outlined,
+                          label: 'Camera',
+                          onTap: _uploading || _picking
+                              ? null
+                              : _pickFromCamera,
+                          cs: cs,
+                          isDark: isDark,
                         ),
-                      Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    selected.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${(selected.sizeBytes / 1024).toStringAsFixed(1)} KB',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: cs.onSurface.withValues(
-                                        alpha: 0.5,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (!_uploading)
-                              IconButton(
-                                onPressed: () =>
-                                    setState(() => _selectedFile = null),
-                                icon: Icon(
-                                  Icons.close_rounded,
-                                  size: 20,
-                                  color: cs.onSurface.withValues(alpha: 0.4),
-                                ),
-                              ),
-                          ],
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _SourceButton(
+                          icon: Icons.photo_library_outlined,
+                          label: 'Gallery',
+                          onTap: _uploading || _picking
+                              ? null
+                              : _pickFromGallery,
+                          cs: cs,
+                          isDark: isDark,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _SourceButton(
+                          icon: Icons.description_outlined,
+                          label: 'Files',
+                          onTap: _uploading || _picking ? null : _pickDocument,
+                          cs: cs,
+                          isDark: isDark,
                         ),
                       ),
                     ],
                   ),
-                ),
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: cs.error.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _error!,
-                    style: TextStyle(color: cs.error, fontSize: 13),
-                  ),
-                ),
-              ],
-              if (_uploading) ...[
                 const SizedBox(height: 16),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: _progress == 0 ? null : _progress,
-                    minHeight: 6,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Uploading ${(100 * _progress).toStringAsFixed(0)}%',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: cs.onSurface.withValues(alpha: 0.6),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _uploading || selected == null ? null : _upload,
-                child: _uploading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+                if (selected != null)
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: cs.primary.withValues(alpha: 0.15),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_isPreviewableImage(selected))
+                          ClipRRect(
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(15),
+                            ),
+                            child: Image.file(
+                              File(selected.path!),
+                              height: 180,
+                              width: double.infinity,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, error, stack) => const SizedBox(
+                                height: 100,
+                                child: Center(
+                                  child: Icon(
+                                    Icons.description_outlined,
+                                    size: 36,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          Container(
+                            height: 80,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: cs.primary.withValues(alpha: 0.06),
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(15),
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.insert_drive_file_outlined,
+                              size: 36,
+                              color: cs.primary.withValues(alpha: 0.4),
+                            ),
+                          ),
+                        Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      selected.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${(selected.sizeBytes / 1024).toStringAsFixed(1)} KB',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: cs.onSurface.withValues(
+                                          alpha: 0.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (!_uploading)
+                                IconButton(
+                                  onPressed: () =>
+                                      setState(() => _selectedFile = null),
+                                  icon: Icon(
+                                    Icons.close_rounded,
+                                    size: 20,
+                                    color: cs.onSurface.withValues(alpha: 0.4),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                      )
-                    : const Text('Upload receipt'),
-              ),
-            ],
+                      ],
+                    ),
+                  ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  OnboardingMessage(message: _error!, error: true),
+                ],
+                if (_uploading) ...[
+                  const SizedBox(height: 16),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: _progress == 0 ? null : _progress,
+                      minHeight: 6,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _progress >= 1
+                        ? 'Saving your receipt…'
+                        : 'Uploading ${(100 * _progress).toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _uploading || _picking || selected == null
+                      ? null
+                      : _upload,
+                  child: _uploading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          _error != null && selected != null
+                              ? 'Try upload again'
+                              : 'Upload receipt',
+                        ),
+                ),
+                if (selected != null && !_uploading)
+                  TextButton(
+                    onPressed: () => setState(() {
+                      _selectedFile = null;
+                      _error = null;
+                    }),
+                    child: const Text('Choose another receipt'),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

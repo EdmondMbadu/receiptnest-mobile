@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/utils/formatters.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../getting_started/presentation/getting_started_prompt.dart';
 import '../../receipts/data/receipt_repository.dart';
 import '../../receipts/models/receipt.dart';
 import '../../receipts/presentation/upload_receipt_sheet.dart';
@@ -64,7 +65,13 @@ List<_TimeAxisLabel> _buildHourlyAxisLabels(List<DailySpendingPoint> points) {
 }
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({
+    super.key,
+    this.highlightReceiptId,
+    this.openUploadOnArrival = false,
+  });
+  final String? highlightReceiptId;
+  final bool openUploadOnArrival;
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
@@ -101,6 +108,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     _loadForwardingAddress();
     _scrollController.addListener(_handleScroll);
+    if (widget.openUploadOnArrival) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openUpload();
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.openUploadOnArrival && !oldWidget.openUploadOnArrival) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openUpload();
+      });
+    }
   }
 
   @override
@@ -146,10 +168,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final result = await ref
           .read(receiptRepositoryProvider)
           .generateForwardingAddress();
+      if (!mounted) return;
       setState(() {
         _forwardingAddress = result['emailAddress']?.toString();
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _forwardingError = 'Email forwarding is not configured yet.';
       });
@@ -531,6 +555,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
       builder: (context) {
         return UploadReceiptSheet(
           userId: uid,
@@ -657,6 +683,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Failed to load receipts: $err')),
         data: (_) {
+          if (sortedReceipts.isEmpty) {
+            return EmptyReceiptHome(
+              onAdd: () => context.push('/app/onboarding'),
+              onRefresh: _refreshHome,
+            );
+          }
           final histogramMonthlyData = _buildHistogramMonthlyData(
             sortedReceipts,
             month,
@@ -698,6 +730,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
               children: [
+                if (profile != null && sortedReceipts.length < 5)
+                  GettingStartedPrompt(
+                    key: ValueKey(profile.id),
+                    userId: profile.id,
+                    onAddReceipt: _openUpload,
+                    receiptCount: sortedReceipts.length,
+                  ),
+                if (widget.highlightReceiptId != null ||
+                    sortedReceipts.length < 5) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+                    child: Text(
+                      'YOUR RECENT RECEIPT',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.5,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  _HighlightedReceipt(
+                    receiptId:
+                        widget.highlightReceiptId ?? sortedReceipts.first.id,
+                  ),
+                  const SizedBox(height: 20),
+                ],
                 // ── Spending card ──
                 Container(
                   decoration: BoxDecoration(
@@ -2851,4 +2910,19 @@ class _HistogramChartPainter extends CustomPainter {
     if (points.isEmpty) return false;
     return oldDelegate.points.last.amount != points.last.amount;
   }
+}
+
+class _HighlightedReceipt extends ConsumerWidget {
+  const _HighlightedReceipt({required this.receiptId});
+  final String receiptId;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => ref
+      .watch(receiptWatchProvider(receiptId))
+      .when(
+        data: (receipt) => receipt == null
+            ? const SizedBox.shrink()
+            : _ReceiptTile(receipt: receipt),
+        loading: () => const LinearProgressIndicator(),
+        error: (_, stack) => const SizedBox.shrink(),
+      );
 }

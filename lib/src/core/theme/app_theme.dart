@@ -10,6 +10,7 @@ class AppTheme {
 
   // ─── Light mode ───
   static final light = ThemeData(
+    fontFamily: 'Manrope',
     colorScheme: ColorScheme.fromSeed(
       seedColor: _teal,
       brightness: Brightness.light,
@@ -83,6 +84,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(14),
         ),
         textStyle: const TextStyle(
+          fontFamily: 'Manrope',
           fontSize: 15,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.1,
@@ -97,6 +99,7 @@ class AppTheme {
         ),
         side: BorderSide(color: Colors.grey.shade300),
         textStyle: const TextStyle(
+          fontFamily: 'Manrope',
           fontSize: 14,
           fontWeight: FontWeight.w500,
         ),
@@ -106,6 +109,7 @@ class AppTheme {
       style: TextButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         textStyle: const TextStyle(
+          fontFamily: 'Manrope',
           fontSize: 14,
           fontWeight: FontWeight.w500,
         ),
@@ -188,6 +192,7 @@ class AppTheme {
 
   // ─── Dark mode ───
   static final dark = ThemeData(
+    fontFamily: 'Manrope',
     colorScheme: ColorScheme.fromSeed(
       seedColor: _emerald,
       brightness: Brightness.dark,
@@ -261,6 +266,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(14),
         ),
         textStyle: const TextStyle(
+          fontFamily: 'Manrope',
           fontSize: 15,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.1,
@@ -275,6 +281,7 @@ class AppTheme {
         ),
         side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
         textStyle: const TextStyle(
+          fontFamily: 'Manrope',
           fontSize: 14,
           fontWeight: FontWeight.w500,
         ),
@@ -284,6 +291,7 @@ class AppTheme {
       style: TextButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         textStyle: const TextStyle(
+          fontFamily: 'Manrope',
           fontSize: 14,
           fontWeight: FontWeight.w500,
         ),
