@@ -1,20 +1,22 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../auth/data/auth_repository.dart';
 import '../../receipts/data/receipt_repository.dart';
+import '../../receipts/models/receipt.dart';
 import '../../receipts/presentation/upload_receipt_sheet.dart';
 import '../../share/data/share_repository.dart';
 import '../../share/models/share_models.dart';
 import '../data/ai_repository.dart';
 import '../models/chat_models.dart';
+import 'insights_widgets.dart';
 
 class AiInsightsScreen extends ConsumerStatefulWidget {
   const AiInsightsScreen({super.key});
-
   @override
   ConsumerState<AiInsightsScreen> createState() => _AiInsightsScreenState();
 }
@@ -23,12 +25,19 @@ class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
-
   List<AiChatMessage> _messages = const [];
+  List<String> _insights = const [];
   bool _loading = false;
   bool _insightsLoading = false;
+  bool _uploadOpen = false;
+  bool _historyInitialized = false;
+  int _chatRequest = 0;
   String? _error;
-  List<String> _insights = const [];
+
+  bool _current(String uid, [int? request]) =>
+      mounted &&
+      ref.read(currentUserIdProvider) == uid &&
+      (request == null || request == _chatRequest);
 
   @override
   void dispose() {
@@ -37,171 +46,153 @@ class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
     super.dispose();
   }
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initialize();
-    });
-  }
-
-  Future<void> _initialize() async {
-    final uid = ref.read(currentUserIdProvider);
-    if (uid == null) return;
-
-    final history = ref.read(aiChatHistoryProvider).valueOrNull ?? const [];
-    if (history.isNotEmpty) {
-      final chatId = history.first.id;
-      ref.read(aiActiveChatIdProvider.notifier).state = chatId;
-      await _openChat(chatId);
-    }
-  }
-
   Future<void> _openChat(String chatId) async {
     final uid = ref.read(currentUserIdProvider);
     if (uid == null) return;
-
+    final request = ++_chatRequest;
     setState(() {
       _loading = true;
       _error = null;
     });
-
     try {
       final messages = await ref
           .read(aiRepositoryProvider)
           .loadChat(uid, chatId);
-      setState(() {
-        _messages = messages;
-      });
+      if (!_current(uid, request)) return;
+      setState(() => _messages = messages);
       ref.read(aiActiveChatIdProvider.notifier).state = chatId;
       _scrollToBottom();
-    } catch (e) {
-      setState(() => _error = e.toString());
-    } finally {
-      if (mounted) {
-        setState(() => _loading = false);
+    } catch (_) {
+      if (_current(uid, request)) {
+        setState(
+          () => _error =
+              'We couldn’t open this conversation. Check your connection and try again.',
+        );
       }
+    } finally {
+      if (_current(uid, request)) setState(() => _loading = false);
     }
   }
 
   Future<void> _generateInsights() async {
     final uid = ref.read(currentUserIdProvider);
-    if (uid == null) return;
-
+    if (uid == null || _insightsLoading) return;
     setState(() {
       _insightsLoading = true;
       _error = null;
     });
-
     try {
       final month = ref.read(selectedMonthProvider);
       final year = ref.read(selectedYearProvider);
       final label = ref.read(selectedMonthLabelProvider);
       final receipts = ref.read(receiptsStreamProvider).valueOrNull ?? const [];
-      final monthlySummaries = await ref
+      final summaries = await ref
           .read(receiptRepositoryProvider)
           .getMonthlySummaries(uid);
-
+      if (!_current(uid)) return;
       final payload = ref
           .read(aiRepositoryProvider)
           .buildInsightData(
             receipts: receipts,
-            monthlySummaries: monthlySummaries,
+            monthlySummaries: summaries,
             month: month,
             year: year,
             monthLabel: label,
           );
-
       final insights = await ref
           .read(aiRepositoryProvider)
           .generateInitialInsights(insightData: payload);
-      setState(() => _insights = insights);
-    } catch (e) {
-      setState(() => _error = e.toString());
-    } finally {
-      if (mounted) {
-        setState(() => _insightsLoading = false);
+      if (_current(uid)) setState(() => _insights = insights);
+    } catch (_) {
+      if (_current(uid)) {
+        setState(
+          () => _error =
+              'We couldn’t load your insights. Please try again when you’re connected.',
+        );
       }
+    } finally {
+      if (_current(uid)) setState(() => _insightsLoading = false);
     }
   }
 
   Future<void> _sendMessage([String? seededMessage]) async {
     final uid = ref.read(currentUserIdProvider);
-    if (uid == null) return;
-
     final message = (seededMessage ?? _messageController.text).trim();
-    if (message.isEmpty || _loading) return;
-
-    if (seededMessage == null) {
-      _messageController.clear();
-    }
-
+    if (uid == null || message.isEmpty || _loading) return;
+    final request = ++_chatRequest;
+    final previousMessages = List<AiChatMessage>.of(_messages);
+    final previousChatId = ref.read(aiActiveChatIdProvider);
+    final month = ref.read(selectedMonthProvider);
+    final year = ref.read(selectedYearProvider);
+    final label = ref.read(selectedMonthLabelProvider);
+    final receipts = ref.read(receiptsStreamProvider).valueOrNull ?? const [];
+    if (seededMessage == null) _messageController.clear();
+    FocusScope.of(context).unfocus();
     setState(() {
       _loading = true;
       _error = null;
+      _historyInitialized = true;
     });
-
     try {
-      final currentChatId = ref.read(aiActiveChatIdProvider);
-      final chatId = await ref
-          .read(aiRepositoryProvider)
-          .ensureChat(uid, preferredId: currentChatId);
+      final repository = ref.read(aiRepositoryProvider);
+      final chatId = await repository.ensureChat(
+        uid,
+        preferredId: previousChatId,
+      );
+      if (!_current(uid, request)) return;
       ref.read(aiActiveChatIdProvider.notifier).state = chatId;
-
-      final month = ref.read(selectedMonthProvider);
-      final year = ref.read(selectedYearProvider);
-      final label = ref.read(selectedMonthLabelProvider);
-      final receipts = ref.read(receiptsStreamProvider).valueOrNull ?? const [];
-      final monthlySummaries = await ref
+      final summaries = await ref
           .read(receiptRepositoryProvider)
           .getMonthlySummaries(uid);
-
-      final payload = ref
-          .read(aiRepositoryProvider)
-          .buildInsightData(
-            receipts: receipts,
-            monthlySummaries: monthlySummaries,
-            month: month,
-            year: year,
-            monthLabel: label,
-          );
-
-      final next = await ref
-          .read(aiRepositoryProvider)
-          .sendMessage(
-            userId: uid,
-            chatId: chatId,
-            message: message,
-            currentMessages: _messages,
-            insightData: payload,
-          );
-
-      setState(() {
-        _messages = next;
-      });
+      if (!_current(uid, request)) return;
+      final payload = repository.buildInsightData(
+        receipts: receipts,
+        monthlySummaries: summaries,
+        month: month,
+        year: year,
+        monthLabel: label,
+      );
+      final next = await repository.sendMessage(
+        userId: uid,
+        chatId: chatId,
+        message: message,
+        currentMessages: previousMessages,
+        insightData: payload,
+      );
+      if (!_current(uid, request)) return;
+      setState(() => _messages = next);
       _scrollToBottom();
-    } catch (e) {
-      setState(() => _error = e.toString());
-    } finally {
-      if (mounted) {
-        setState(() => _loading = false);
+    } catch (_) {
+      if (_current(uid, request)) {
+        if (seededMessage == null && _messageController.text.isEmpty) {
+          _messageController.text = message;
+        }
+        setState(
+          () => _error =
+              'We couldn’t send your question. Please check your connection and try again.',
+        );
       }
+    } finally {
+      if (_current(uid, request)) setState(() => _loading = false);
     }
   }
 
-  Future<void> _newChat() async {
+  void _newChat() {
+    ++_chatRequest;
     ref.read(aiActiveChatIdProvider.notifier).state = null;
     setState(() {
       _messages = const [];
       _error = null;
+      _loading = false;
+      _historyInitialized = true;
     });
+    if (_scrollController.hasClients) _scrollController.jumpTo(0);
   }
 
   Future<void> _shareChat() async {
     final uid = ref.read(currentUserIdProvider);
     final chatId = ref.read(aiActiveChatIdProvider);
     if (uid == null || chatId == null || _messages.isEmpty) return;
-
     try {
       final share = await ref
           .read(shareRepositoryProvider)
@@ -220,24 +211,30 @@ class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
                 )
                 .toList(),
           );
-
+      if (!_current(uid)) return;
       await SharePlus.instance.share(
         ShareParams(text: 'https://receiptnest.web.app/share/${share.id}'),
       );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to share chat: $e')));
+    } catch (_) {
+      if (!mounted || !_current(uid)) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'We couldn’t share this conversation. Please try again.',
+          ),
+        ),
+      );
     }
   }
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
+      if (!mounted || !_scrollController.hasClients) return;
       _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent + 80,
-        duration: const Duration(milliseconds: 250),
+        _scrollController.position.maxScrollExtent,
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 250),
         curve: Curves.easeOut,
       );
     });
@@ -245,1036 +242,311 @@ class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
 
   Future<void> _openUploadInChat() async {
     final uid = ref.read(currentUserIdProvider);
-    if (uid == null) return;
-
-    showModalBottomSheet<void>(
+    if (uid == null || _uploadOpen || _loading) return;
+    setState(() => _uploadOpen = true);
+    Receipt? uploaded;
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (context) {
-        return UploadReceiptSheet(
-          userId: uid,
-          repository: ref.read(receiptRepositoryProvider),
-          onUploaded: (receipt) async {
-            final message =
-                'Receipt uploaded: ${receipt.file.originalName}. It is now processing.';
-            final next = [
-              ..._messages,
-              AiChatMessage(
-                id: DateTime.now().microsecondsSinceEpoch.toString(),
-                role: 'assistant',
-                content: message,
-                timestamp: DateTime.now(),
-              ),
-            ];
-            setState(() {
-              _messages = next;
-            });
+      isDismissible: false,
+      enableDrag: false,
+      constraints: const BoxConstraints(maxWidth: 540),
+      builder: (_) => UploadReceiptSheet(
+        userId: uid,
+        repository: ref.read(receiptRepositoryProvider),
+        onUploaded: (receipt) => uploaded = receipt,
+      ),
+    );
+    if (!_current(uid)) return;
+    setState(() => _uploadOpen = false);
+    if (uploaded == null) return;
+    final next = [
+      ..._messages,
+      AiChatMessage(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        role: 'assistant',
+        content:
+            'Receipt uploaded: ${uploaded!.file.originalName}. It is now processing.',
+        timestamp: DateTime.now(),
+      ),
+    ];
+    setState(() => _messages = next);
+    _scrollToBottom();
+    try {
+      final repository = ref.read(aiRepositoryProvider);
+      final chatId = await repository.ensureChat(
+        uid,
+        preferredId: ref.read(aiActiveChatIdProvider),
+      );
+      if (!_current(uid)) return;
+      ref.read(aiActiveChatIdProvider.notifier).state = chatId;
+      await repository.persistChat(uid, chatId, next);
+    } catch (_) {
+      if (_current(uid)) {
+        setState(
+          () => _error =
+              'Your receipt was uploaded, but we couldn’t save the chat note. Your receipt is still available in Home.',
+        );
+      }
+    }
+  }
 
-            final chatId = await ref
-                .read(aiRepositoryProvider)
-                .ensureChat(uid, preferredId: ref.read(aiActiveChatIdProvider));
-            ref.read(aiActiveChatIdProvider.notifier).state = chatId;
-            await ref.read(aiRepositoryProvider).persistChat(uid, chatId, next);
+  Widget _content(Widget child) => Center(
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 720),
+      child: SizedBox(width: double.infinity, child: child),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final profileState = ref.watch(currentUserProfileProvider);
+    final profile = profileState.valueOrNull;
+    if (profile == null && profileState.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (profileState.hasError && profile == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const InsightsNotice(
+                message: 'We couldn’t check your account. Please try again.',
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton(
+                onPressed: () => ref.invalidate(currentUserProfileProvider),
+                child: const Text('Try again'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    final hasAccess = profile?.isAdmin == true || profile?.isPro == true;
+    if (!hasAccess) {
+      return InsightsUpgradeView(onUpgrade: () => context.push('/app/pricing'));
+    }
+
+    final historyState = ref.watch(aiChatHistoryProvider);
+    final history = historyState.valueOrNull ?? const [];
+    final activeChatId = ref.watch(aiActiveChatIdProvider);
+    final questions = ref.watch(aiSuggestedQuestionsProvider);
+    final monthLabel = ref.watch(selectedMonthLabelProvider);
+    final hasReceipts =
+        (ref.watch(receiptsStreamProvider).valueOrNull ?? const []).isNotEmpty;
+    if (!_historyInitialized && historyState.hasValue) {
+      _historyInitialized = true;
+      if (history.isNotEmpty &&
+          _messages.isEmpty &&
+          _messageController.text.isEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _openChat(history.first.id);
+        });
+      }
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 900;
+        Widget historyPanel({bool drawer = false}) => InsightsHistoryPanel(
+          history: history,
+          activeChatId: activeChatId,
+          loading: historyState.isLoading && !historyState.hasValue,
+          error: historyState.hasError,
+          onNewChat: () {
+            if (drawer) Navigator.of(context).pop();
+            _newChat();
+          },
+          onOpen: (id) {
+            if (drawer) Navigator.of(context).pop();
+            _openChat(id);
           },
         );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final history = ref.watch(aiChatHistoryProvider).valueOrNull ?? const [];
-    final profile = ref.watch(currentUserProfileProvider).valueOrNull;
-    final hasAccess = profile?.isAdmin == true || profile?.isPro == true;
-
-    Widget buildHistorySidebar() {
-      return Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF151520) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : Colors.grey.shade200,
-          ),
-        ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 30,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: cs.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.history_rounded,
-                      size: 16,
-                      color: cs.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'History',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: cs.onSurface,
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: cs.primary.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: IconButton(
-                      onPressed: _newChat,
-                      icon: Icon(
-                        Icons.add_rounded,
-                        size: 18,
-                        color: cs.primary,
-                      ),
-                      padding: EdgeInsets.zero,
-                      tooltip: 'New chat',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              height: 1,
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.06)
-                  : Colors.grey.shade100,
-            ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: history.length,
-                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                itemBuilder: (context, index) {
-                  final chat = history[index];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () => _openChat(chat.id),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.chat_bubble_outline_rounded,
-                                size: 16,
-                                color: cs.onSurface.withValues(alpha: 0.35),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      chat.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.w600,
-                                        color: cs.onSurface,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${chat.messageCount} messages',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: cs.onSurface.withValues(
-                                          alpha: 0.35,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final isCompactLayout = MediaQuery.of(context).size.width < 860;
-
-    // ── Full-screen paywall for non-pro users ──
-    if (!hasAccess) {
-      return Scaffold(
-        backgroundColor: isDark
-            ? const Color(0xFF0D0D14)
-            : const Color(0xFFF6F7F9),
-        appBar: AppBar(
-          automaticallyImplyLeading: false,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          title: const Text('AI Insights'),
-          titleTextStyle: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: cs.onSurface,
-          ),
-        ),
-        body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Lock icon container
-                  Container(
-                    width: 96,
-                    height: 96,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          cs.primary.withValues(alpha: 0.15),
-                          cs.primary.withValues(alpha: 0.05),
-                        ],
-                      ),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: cs.primary.withValues(alpha: 0.18),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Icon(
-                          Icons.auto_awesome_rounded,
-                          size: 36,
-                          color: cs.primary.withValues(alpha: 0.35),
-                        ),
-                        Positioned(
-                          bottom: 18,
-                          right: 18,
-                          child: Container(
-                            width: 26,
-                            height: 26,
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? const Color(0xFF1A1A28)
-                                  : Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.12),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              Icons.lock_rounded,
-                              size: 13,
-                              color: cs.primary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  Text(
-                    'AI Insights',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      color: cs.onSurface,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Chat with an AI trained on your receipts.\nGet spending breakdowns, trends, and answers — instantly.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      color: cs.onSurface.withValues(alpha: 0.5),
-                      height: 1.55,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  // Feature list
-                  _ProFeatureRow(
-                    icon: Icons.insights_rounded,
-                    label: 'Monthly spending insights',
-                    cs: cs,
-                    isDark: isDark,
-                  ),
-                  const SizedBox(height: 12),
-                  _ProFeatureRow(
-                    icon: Icons.chat_bubble_outline_rounded,
-                    label: 'Ask anything about your receipts',
-                    cs: cs,
-                    isDark: isDark,
-                  ),
-                  const SizedBox(height: 12),
-                  _ProFeatureRow(
-                    icon: Icons.trending_up_rounded,
-                    label: 'Trend analysis & category breakdowns',
-                    cs: cs,
-                    isDark: isDark,
-                  ),
-                  const SizedBox(height: 36),
-                  // CTA button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: FilledButton(
-                      onPressed: () => context.push('/app/pricing'),
-                      style: FilledButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.diamond_outlined, size: 18),
-                          const SizedBox(width: 8),
-                          const Text('Upgrade to Pro'),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    'Unlock all features with a Pro subscription',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      color: cs.onSurface.withValues(alpha: 0.35),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: isDark
-          ? const Color(0xFF0D0D14)
-          : const Color(0xFFF6F7F9),
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: isCompactLayout
-            ? Padding(
-                padding: const EdgeInsets.only(left: 12),
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: cs.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: IconButton(
-                    onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                    icon: Icon(
-                      Icons.chat_bubble_outline_rounded,
-                      size: 18,
-                      color: cs.primary,
-                    ),
-                    padding: EdgeInsets.zero,
-                    tooltip: 'Conversation history',
-                  ),
-                ),
-              )
-            : null,
-        title: const Text('AI Insights'),
-        titleTextStyle: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
-          color: cs.onSurface,
-        ),
-        actions: [
-          Container(
-            width: 36,
-            height: 36,
-            margin: const EdgeInsets.only(right: 4),
-            decoration: BoxDecoration(
-              color: cs.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: IconButton(
-              onPressed: _newChat,
-              icon: Icon(
-                Icons.add_comment_outlined,
-                size: 18,
-                color: cs.primary,
-              ),
-              padding: EdgeInsets.zero,
-              tooltip: 'New chat',
-            ),
-          ),
-          Container(
-            width: 36,
-            height: 36,
-            margin: const EdgeInsets.only(right: 4),
-            decoration: BoxDecoration(
-              color: cs.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: IconButton(
-              onPressed: _shareChat,
-              icon: Icon(Icons.share_outlined, size: 18, color: cs.primary),
-              padding: EdgeInsets.zero,
-              tooltip: 'Share chat',
-            ),
-          ),
-          PopupMenuButton<String>(
-            icon: Icon(
-              Icons.more_vert_rounded,
-              size: 22,
-              color: cs.onSurface.withValues(alpha: 0.6),
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-            onSelected: (value) {
-              switch (value) {
-                case 'pricing':
-                  context.push('/app/pricing');
-                  break;
-              }
-            },
-            itemBuilder: (context) {
-              return const [
-                PopupMenuItem(value: 'pricing', child: Text('Open Pricing')),
-              ];
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: Row(
-        children: [
-          if (MediaQuery.of(context).size.width >= 860)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 0, 16),
-              child: SizedBox(width: 280, child: buildHistorySidebar()),
-            ),
-          Expanded(
-            child: Column(
-              children: [
-                // ── Action buttons ──
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: SizedBox(
-                          height: 42,
-                          child: OutlinedButton.icon(
-                            onPressed: hasAccess ? _generateInsights : null,
-                            icon: Icon(
-                              _insightsLoading
-                                  ? Icons.hourglass_top_rounded
-                                  : Icons.lightbulb_outline,
-                              size: 18,
-                            ),
-                            label: Text(
-                              _insightsLoading ? 'Generating...' : 'Insights',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              side: BorderSide(
-                                color: isDark
-                                    ? Colors.white.withValues(alpha: 0.1)
-                                    : Colors.grey.shade300,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: SizedBox(
-                          height: 42,
-                          child: OutlinedButton.icon(
-                            onPressed: hasAccess ? _openUploadInChat : null,
-                            icon: const Icon(
-                              Icons.upload_file_outlined,
-                              size: 18,
-                            ),
-                            label: const Text(
-                              'Upload',
-                              style: TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              side: BorderSide(
-                                color: isDark
-                                    ? Colors.white.withValues(alpha: 0.1)
-                                    : Colors.grey.shade300,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // ── Insights card ──
-                if (_insights.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF151520) : Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: isDark
-                              ? Colors.white.withValues(alpha: 0.06)
-                              : Colors.grey.shade200,
-                        ),
-                        boxShadow: isDark
-                            ? null
-                            : [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.04),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 30,
-                                height: 30,
-                                decoration: BoxDecoration(
-                                  color: Colors.amber.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  Icons.lightbulb_rounded,
-                                  size: 16,
-                                  color: Colors.amber.shade700,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                'Insights',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: cs.onSurface,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          ..._insights.map(
-                            (item) => Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    margin: const EdgeInsets.only(top: 6),
-                                    decoration: BoxDecoration(
-                                      color: cs.primary,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      item,
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: cs.onSurface.withValues(
-                                          alpha: 0.8,
-                                        ),
-                                        height: 1.4,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                // ── Error banner ──
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: cs.error.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: cs.error.withValues(alpha: 0.15),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.error_outline_rounded,
-                            size: 16,
-                            color: cs.error,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _error!,
-                              style: TextStyle(
-                                color: cs.error,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                // ── Chat messages ──
-                Expanded(
-                  child: _messages.isEmpty && !_loading
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 72,
-                                height: 72,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      cs.primary.withValues(alpha: 0.12),
-                                      cs.primary.withValues(alpha: 0.04),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Icon(
-                                  Icons.auto_awesome_rounded,
-                                  size: 32,
-                                  color: cs.primary.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Ask about your spending',
-                                style: TextStyle(
-                                  color: cs.onSurface.withValues(alpha: 0.4),
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                'Your AI assistant is ready to help',
-                                style: TextStyle(
-                                  color: cs.onSurface.withValues(alpha: 0.25),
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                          itemCount: _messages.length + (_loading ? 1 : 0),
-                          itemBuilder: (context, index) {
-                            // Typing indicator
-                            if (index == _messages.length) {
-                              return Align(
-                                alignment: Alignment.centerLeft,
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 8,
-                                  ),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(14),
-                                    decoration: BoxDecoration(
-                                      color: isDark
-                                          ? const Color(0xFF1A1A28)
-                                          : Colors.grey.shade100,
-                                      borderRadius: BorderRadius.circular(18),
-                                    ),
-                                    child: SizedBox(
-                                      width: 40,
-                                      height: 12,
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceEvenly,
-                                        children: List.generate(3, (i) {
-                                          return Container(
-                                            width: 7,
-                                            height: 7,
-                                            decoration: BoxDecoration(
-                                              color: cs.primary.withValues(
-                                                alpha: 0.4,
-                                              ),
-                                              shape: BoxShape.circle,
-                                            ),
-                                          );
-                                        }),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }
-
-                            final message = _messages[index];
-                            final userMessage = message.role == 'user';
-
-                            return Align(
-                              alignment: userMessage
-                                  ? Alignment.centerRight
-                                  : Alignment.centerLeft,
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  maxWidth:
-                                      MediaQuery.of(context).size.width * 0.82,
-                                ),
-                                child: Container(
-                                  margin: const EdgeInsets.symmetric(
-                                    vertical: 5,
-                                  ),
-                                  padding: const EdgeInsets.all(15),
-                                  decoration: BoxDecoration(
-                                    color: userMessage
-                                        ? cs.primary
-                                        : (isDark
-                                              ? const Color(0xFF1A1A28)
-                                              : Colors.grey.shade100),
-                                    borderRadius: BorderRadius.only(
-                                      topLeft: const Radius.circular(20),
-                                      topRight: const Radius.circular(20),
-                                      bottomLeft: Radius.circular(
-                                        userMessage ? 20 : 4,
-                                      ),
-                                      bottomRight: Radius.circular(
-                                        userMessage ? 4 : 20,
-                                      ),
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.04,
-                                        ),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: userMessage
-                                      ? Text(
-                                          message.content,
-                                          style: TextStyle(
-                                            color: cs.onPrimary,
-                                            fontSize: 14.5,
-                                            height: 1.4,
-                                          ),
-                                        )
-                                      : MarkdownBody(data: message.content),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                ),
-
-                // ── Input area ──
-                Container(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF0D0D14)
-                        : const Color(0xFFF6F7F9),
-                    border: Border(
-                      top: BorderSide(
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.06)
-                            : Colors.grey.shade200,
-                      ),
-                    ),
-                  ),
+        return Scaffold(
+          key: _scaffoldKey,
+          // The app shell already resizes its body above the keyboard. Resizing a
+          // second Scaffold here would subtract the keyboard inset twice.
+          resizeToAvoidBottomInset: false,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          drawer: compact
+              ? Drawer(
+                  width: math.min(340, constraints.maxWidth - 24),
                   child: SafeArea(
-                    top: false,
-                    child: Column(
-                      children: [
-                        if (ref.watch(aiSuggestedQuestionsProvider).isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: ref
-                                    .watch(aiSuggestedQuestionsProvider)
-                                    .take(3)
-                                    .map(
-                                      (question) => Padding(
-                                        padding: const EdgeInsets.only(
-                                          right: 8,
-                                        ),
-                                        child: ActionChip(
-                                          label: Text(
-                                            question,
-                                            style: const TextStyle(
-                                              fontSize: 12.5,
-                                            ),
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              20,
-                                            ),
-                                          ),
-                                          side: BorderSide(
-                                            color: isDark
-                                                ? Colors.white.withValues(
-                                                    alpha: 0.08,
-                                                  )
-                                                : Colors.grey.shade300,
-                                          ),
-                                          onPressed: hasAccess
-                                              ? () => _sendMessage(question)
-                                              : null,
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                              ),
-                            ),
-                          ),
-                        Row(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: historyPanel(drawer: true),
+                    ),
+                  ),
+                )
+              : null,
+          body: Row(
+            children: [
+              if (!compact)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 0, 20),
+                  child: SizedBox(width: 260, child: historyPanel()),
+                ),
+              Expanded(
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: Scrollbar(
+                        controller: _scrollController,
+                        child: ListView(
+                          key: const ValueKey('insights-content'),
+                          controller: _scrollController,
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                           children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _messageController,
-                                enabled: !_loading && hasAccess,
-                                minLines: 1,
-                                maxLines: 4,
-                                decoration: InputDecoration(
-                                  hintText: 'Ask about your spending...',
-                                  hintStyle: TextStyle(
-                                    color: cs.onSurface.withValues(alpha: 0.3),
-                                  ),
-                                  filled: true,
-                                  fillColor: isDark
-                                      ? const Color(0xFF151520)
-                                      : Colors.white,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 18,
-                                    vertical: 12,
-                                  ),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(24),
-                                    borderSide: BorderSide(
-                                      color: isDark
-                                          ? Colors.white.withValues(alpha: 0.08)
-                                          : Colors.grey.shade200,
-                                    ),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(24),
-                                    borderSide: BorderSide(
-                                      color: isDark
-                                          ? Colors.white.withValues(alpha: 0.08)
-                                          : Colors.grey.shade200,
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(24),
-                                    borderSide: BorderSide(
-                                      color: cs.primary,
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                ),
-                                onSubmitted: (_) => _sendMessage(),
+                            _content(
+                              InsightsHeader(
+                                monthLabel: monthLabel,
+                                compact: compact,
+                                onHistory: () =>
+                                    _scaffoldKey.currentState?.openDrawer(),
+                                onNewChat: _newChat,
+                                onShare: _messages.isEmpty ? null : _shareChat,
+                                onPricing: () => context.push('/app/pricing'),
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            Container(
-                              width: 46,
-                              height: 46,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    cs.primary,
-                                    cs.primary.withValues(alpha: 0.8),
-                                  ],
-                                ),
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: cs.primary.withValues(alpha: 0.3),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
+                            const SizedBox(height: 20),
+                            _content(
+                              Wrap(
+                                spacing: 10,
+                                runSpacing: 10,
+                                children: [
+                                  OutlinedButton.icon(
+                                    key: const ValueKey('insights-generate'),
+                                    onPressed: _insightsLoading
+                                        ? null
+                                        : _generateInsights,
+                                    style: OutlinedButton.styleFrom(
+                                      minimumSize: const Size(0, 44),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 12,
+                                      ),
+                                    ),
+                                    icon: Icon(
+                                      _insightsLoading
+                                          ? Icons.hourglass_top_rounded
+                                          : Icons.lightbulb_outline_rounded,
+                                      size: 19,
+                                    ),
+                                    label: Text(
+                                      _insightsLoading
+                                          ? 'Generating…'
+                                          : 'Generate insights',
+                                    ),
+                                  ),
+                                  OutlinedButton.icon(
+                                    onPressed: _uploadOpen || _loading
+                                        ? null
+                                        : _openUploadInChat,
+                                    style: OutlinedButton.styleFrom(
+                                      minimumSize: const Size(0, 44),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 12,
+                                      ),
+                                    ),
+                                    icon: const Icon(
+                                      Icons.add_photo_alternate_outlined,
+                                      size: 19,
+                                    ),
+                                    label: const Text('Add receipt'),
                                   ),
                                 ],
                               ),
-                              child: IconButton(
-                                onPressed: _loading || !hasAccess
-                                    ? null
-                                    : () => _sendMessage(),
-                                icon: Icon(
-                                  Icons.arrow_upward_rounded,
-                                  color: cs.onPrimary,
-                                  size: 22,
+                            ),
+                            if (_insightsLoading) ...[
+                              const SizedBox(height: 18),
+                              _content(
+                                Semantics(
+                                  label: 'Generating spending insights',
+                                  liveRegion: true,
+                                  child: LinearProgressIndicator(minHeight: 3),
                                 ),
                               ),
-                            ),
+                            ],
+                            if (_insights.isNotEmpty) ...[
+                              const SizedBox(height: 20),
+                              _content(
+                                InsightsSummaryCard(
+                                  key: const ValueKey('generated-insights'),
+                                  insights: _insights,
+                                ),
+                              ),
+                            ],
+                            if (_error != null) ...[
+                              const SizedBox(height: 16),
+                              _content(InsightsNotice(message: _error!)),
+                            ],
+                            if (_messages.isEmpty && !_loading)
+                              _content(
+                                InsightsEmptyConversation(
+                                  questions: questions,
+                                  onQuestion: _sendMessage,
+                                  hasReceipts: hasReceipts,
+                                ),
+                              ),
+                            for (final message in _messages)
+                              _content(
+                                InsightsMessage(
+                                  key: ValueKey(message.id),
+                                  message: message,
+                                ),
+                              ),
+                            if (_loading)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 20),
+                                child: _content(
+                                  const InsightsSurface(
+                                    child: Row(
+                                      children: [
+                                        SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        ),
+                                        SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            'Working on your answer…',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              height: 1.5,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      drawer: isCompactLayout
-          ? Drawer(
-              backgroundColor: isDark
-                  ? const Color(0xFF0D0D14)
-                  : const Color(0xFFF6F7F9),
-              child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: buildHistorySidebar(),
+                    InsightsComposer(
+                      controller: _messageController,
+                      onSend: _sendMessage,
+                      busy: _loading,
+                      compactHeight: constraints.maxHeight < 360,
+                    ),
+                  ],
                 ),
               ),
-            )
-          : null,
-    );
-  }
-}
-
-class _ProFeatureRow extends StatelessWidget {
-  const _ProFeatureRow({
-    required this.icon,
-    required this.label,
-    required this.cs,
-    required this.isDark,
-  });
-
-  final IconData icon;
-  final String label;
-  final ColorScheme cs;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF151520) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.grey.shade200,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: cs.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, size: 16, color: cs.primary),
+            ],
           ),
-          const SizedBox(width: 12),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: cs.onSurface.withValues(alpha: 0.8),
-            ),
-          ),
-          const Spacer(),
-          Icon(
-            Icons.check_circle_rounded,
-            size: 16,
-            color: cs.primary.withValues(alpha: 0.6),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

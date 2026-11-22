@@ -17,10 +17,16 @@ flutterfire configure --project=receipt-nest
 ```bash
 cd ios && pod install --repo-update && cd ..
 ```
-4. Run:
+4. Run iOS with the billing configuration from `.env.development` (when present) or `.env.production`:
 ```bash
-flutter run
+scripts/run_ios.sh -d <device-id>
 ```
+
+Use `.env.production.example` as the configuration template. The launcher passes the RevenueCat public SDK key and offering settings as Dart compile-time defines. A plain `flutter run` does not load these files and leaves App Store billing unconfigured.
+
+For an App Store or TestFlight archive, use `scripts/build_ios_appstore.sh`. It loads `.env.production` and stops before building if the iOS public SDK key is missing. Validate subscription loading, purchase, and restore in TestFlight before submitting a release.
+
+For other platforms, use `flutter run -d <device-id>`.
 
 ## Security Note
 
