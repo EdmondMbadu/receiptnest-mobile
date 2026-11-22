@@ -12,6 +12,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../models/user_profile.dart';
+import 'account_local_state.dart';
 
 final firebaseAuthProvider = Provider<FirebaseAuth>(
   (ref) => FirebaseAuth.instance,
@@ -75,8 +76,46 @@ class AuthRepository {
   final FirebaseAuth _auth;
   final FirebaseFirestore _db;
   final FirebaseFunctions _functions;
+  final Map<String, Future<void>> _accountPreparations = {};
+  final Map<String, Future<void>> _profileRepairs = {};
+  final Set<String> _deletingAccounts = {};
+  int _sessionRevision = 0;
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  /// Auth emits a signed-in user before the sign-in method finishes writing
+  /// their profile. Callables that require a profile must wait for this barrier.
+  Future<void> ensureAccountReady(String uid) {
+    _requireActiveAccount(uid);
+    final existing = _accountPreparations[uid];
+    if (existing != null) return existing;
+    final revision = _sessionRevision;
+    late final Future<void> preparation;
+    preparation =
+        () async {
+          await refreshCurrentUser();
+          _requireActiveAccount(uid, revision: revision);
+          await _upsertUserProfileDocument(_requireCurrentUser());
+        }().catchError((Object error, StackTrace stack) {
+          if (identical(_accountPreparations[uid], preparation)) {
+            _accountPreparations.remove(uid);
+          }
+          Error.throwWithStackTrace(error, stack);
+        });
+    _accountPreparations[uid] = preparation;
+    return preparation;
+  }
+
+  void _requireActiveAccount(String uid, {int? revision}) {
+    if (_auth.currentUser?.uid != uid ||
+        _deletingAccounts.contains(uid) ||
+        (revision != null && revision != _sessionRevision)) {
+      throw const AppAuthException(
+        'auth/session-changed',
+        'Your session changed. Please sign in again.',
+      );
+    }
+  }
 
   NotificationSettings getDefaultNotificationSettings(UserProfile? profile) {
     return _normalizedNotificationSettings(profile?.notificationSettings);
@@ -301,9 +340,29 @@ class AuthRepository {
 
   Future<bool> refreshCurrentUser() async {
     final user = _auth.currentUser;
-    if (user == null) return false;
+    if (user == null || _deletingAccounts.contains(user.uid)) return false;
     final wasVerified = user.emailVerified;
-    await user.reload();
+    try {
+      await user.reload();
+    } on FirebaseAuthException catch (error) {
+      if (![
+        'user-not-found',
+        'user-disabled',
+        'invalid-user-token',
+        'user-token-expired',
+      ].contains(error.code)) {
+        rethrow;
+      }
+      // Deletion from another device/admin does not emit an auth-state event.
+      // Discard that session explicitly, without signing out a newer account.
+      if (_auth.currentUser?.uid == user.uid) {
+        _deletingAccounts.add(user.uid);
+        await logout();
+        await _clearDeletedAccountState(user.uid);
+        _deletingAccounts.remove(user.uid);
+      }
+      return false;
+    }
     final refreshed = _auth.currentUser;
     if (refreshed?.uid != user.uid) return false;
     if (!wasVerified && refreshed!.emailVerified) {
@@ -418,6 +477,7 @@ class AuthRepository {
   }
 
   Future<void> deleteAccount({String? currentPassword}) async {
+    final userId = _requireCurrentUser().uid;
     if (isCurrentUserPasswordAuth()) {
       final trimmedCurrent = currentPassword?.trim() ?? '';
       if (trimmedCurrent.isEmpty) {
@@ -443,12 +503,45 @@ class AuthRepository {
       await currentUser.reauthenticateWithCredential(credential);
     }
 
-    final callable = _functions.httpsCallable('deleteUserAccount');
-    await callable.call(<String, dynamic>{});
-    await logout();
+    _requireActiveAccount(userId);
+    _deletingAccounts.add(userId);
+    try {
+      // Finish already-started repairs before the server removes the tree.
+      // Missing-profile snapshots during deletion must never recreate it.
+      await Future.wait(
+        [
+          if (_accountPreparations[userId] != null)
+            _accountPreparations[userId]!,
+          if (_profileRepairs[userId] != null) _profileRepairs[userId]!,
+        ].map((future) => future.catchError((Object _) {})),
+      );
+      final callable = _functions.httpsCallable('deleteUserAccount');
+      await callable.call(<String, dynamic>{});
+    } catch (_) {
+      _deletingAccounts.remove(userId);
+      _accountPreparations.remove(userId);
+      rethrow;
+    }
+    if (_auth.currentUser?.uid == userId) await logout();
+    await _clearDeletedAccountState(userId);
+    _deletingAccounts.remove(userId);
   }
 
-  Future<void> logout() => _auth.signOut();
+  Future<void> logout() async {
+    _sessionRevision++;
+    _accountPreparations.clear();
+    await _auth.signOut();
+  }
+
+  Future<void> _clearDeletedAccountState(String uid) async {
+    try {
+      await clearDeletedAccountLocalState(uid);
+    } catch (_) {
+      // Cloud deletion has already succeeded; a local storage failure must not
+      // turn it into a misleading "unable to delete account" error.
+      debugPrint('Could not clear deleted account checkpoints.');
+    }
+  }
 
   Future<void> _upsertUserProfileDocument(
     User user, {
@@ -457,70 +550,77 @@ class AuthRepository {
     String? email,
     bool includeLastLoginAt = false,
   }) async {
+    final revision = _sessionRevision;
+    _requireActiveAccount(user.uid, revision: revision);
     final userRef = _db.collection('users').doc(user.uid);
-    final snapshot = await userRef.get();
-    final data = snapshot.data() ?? const <String, dynamic>{};
-    final splitName = _splitDisplayName(user.displayName);
+    // A cached missing profile or two concurrent initializers must not replace
+    // a newly-created server profile and erase onboarding/subscription fields.
+    await _db.runTransaction((transaction) async {
+      final snapshot = await transaction.get(userRef);
+      _requireActiveAccount(user.uid, revision: revision);
+      final data = snapshot.data() ?? const <String, dynamic>{};
+      final splitName = _splitDisplayName(user.displayName);
 
-    final resolvedFirstName = _pickPreferredValue(
-      firstName,
-      data['firstName'] as String?,
-      splitName.$1,
-    );
-    final resolvedLastName = _pickPreferredValue(
-      lastName,
-      data['lastName'] as String?,
-      splitName.$2,
-    );
-    final resolvedEmail = _pickPreferredValue(
-      email,
-      user.email,
-      data['email'] as String?,
-    );
+      final resolvedFirstName = _pickPreferredValue(
+        firstName,
+        data['firstName'] as String?,
+        splitName.$1,
+      );
+      final resolvedLastName = _pickPreferredValue(
+        lastName,
+        data['lastName'] as String?,
+        splitName.$2,
+      );
+      final resolvedEmail = _pickPreferredValue(
+        email,
+        user.email,
+        data['email'] as String?,
+      );
 
-    if (!snapshot.exists) {
-      final createData = <String, dynamic>{
-        'id': user.uid,
-        'firstName': resolvedFirstName,
-        'lastName': resolvedLastName,
-        'email': resolvedEmail,
-        'receiptCount': 0,
-        'role': 'user',
-        'notificationSettings': NotificationSettings.defaults.toMap(),
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-      if (includeLastLoginAt) {
-        createData['lastLoginAt'] = FieldValue.serverTimestamp();
+      if (!snapshot.exists) {
+        final createData = <String, dynamic>{
+          'id': user.uid,
+          'firstName': resolvedFirstName,
+          'lastName': resolvedLastName,
+          'email': resolvedEmail,
+          'receiptCount': 0,
+          'role': 'user',
+          'notificationSettings': NotificationSettings.defaults.toMap(),
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+        if (includeLastLoginAt) {
+          createData['lastLoginAt'] = FieldValue.serverTimestamp();
+        }
+        transaction.set(userRef, createData);
+        return;
       }
-      await userRef.set(createData);
-      return;
-    }
 
-    final updates = <String, dynamic>{};
+      final updates = <String, dynamic>{};
 
-    if (resolvedFirstName.isNotEmpty &&
-        resolvedFirstName != (data['firstName'] as String? ?? '')) {
-      updates['firstName'] = resolvedFirstName;
-    }
-    if (resolvedLastName.isNotEmpty &&
-        resolvedLastName != (data['lastName'] as String? ?? '')) {
-      updates['lastName'] = resolvedLastName;
-    }
-    if (resolvedEmail.isNotEmpty &&
-        resolvedEmail != (data['email'] as String? ?? '')) {
-      updates['email'] = resolvedEmail;
-    }
-    if (data['notificationSettings'] == null) {
-      updates['notificationSettings'] = NotificationSettings.defaults.toMap();
-    }
-    if (includeLastLoginAt) {
-      updates['lastLoginAt'] = FieldValue.serverTimestamp();
-    }
-    if (updates.isEmpty) return;
+      if (resolvedFirstName.isNotEmpty &&
+          resolvedFirstName != (data['firstName'] as String? ?? '')) {
+        updates['firstName'] = resolvedFirstName;
+      }
+      if (resolvedLastName.isNotEmpty &&
+          resolvedLastName != (data['lastName'] as String? ?? '')) {
+        updates['lastName'] = resolvedLastName;
+      }
+      if (resolvedEmail.isNotEmpty &&
+          resolvedEmail != (data['email'] as String? ?? '')) {
+        updates['email'] = resolvedEmail;
+      }
+      if (data['notificationSettings'] == null) {
+        updates['notificationSettings'] = NotificationSettings.defaults.toMap();
+      }
+      if (includeLastLoginAt) {
+        updates['lastLoginAt'] = FieldValue.serverTimestamp();
+      }
+      if (updates.isEmpty) return;
 
-    updates['updatedAt'] = FieldValue.serverTimestamp();
-    await userRef.set(updates, SetOptions(merge: true));
+      updates['updatedAt'] = FieldValue.serverTimestamp();
+      transaction.set(userRef, updates, SetOptions(merge: true));
+    });
   }
 
   bool _userProfileNeedsRepair(Map<String, dynamic> data) {
@@ -534,13 +634,23 @@ class AuthRepository {
   }
 
   void _queueProfileRepair(User user) {
-    unawaited(_repairUserProfile(user));
+    if (_deletingAccounts.contains(user.uid) ||
+        _profileRepairs.containsKey(user.uid)) {
+      return;
+    }
+    _accountPreparations.remove(user.uid);
+    final future = _repairUserProfile(user);
+    _profileRepairs[user.uid] = future;
+    unawaited(future.whenComplete(() => _profileRepairs.remove(user.uid)));
   }
 
   Future<void> _repairUserProfile(User user) async {
     try {
-      await _upsertUserProfileDocument(user);
+      await ensureAccountReady(user.uid);
     } catch (error, stackTrace) {
+      if (error is AppAuthException && error.code == 'auth/session-changed') {
+        return;
+      }
       debugPrint('Profile repair skipped for ${user.uid}: $error');
       debugPrintStack(stackTrace: stackTrace);
     }

@@ -170,7 +170,9 @@ class _NativeOnboardingScreenState
     if (_uploadOpen) return;
     final uid = ref.read(currentUserIdProvider);
     if (uid != null && !_replaying(uid)) await _controller(uid).act('pause');
-    if (mounted) context.go('/app/home');
+    if (mounted && ref.read(currentUserIdProvider) == uid) {
+      context.go('/app/home');
+    }
   }
 
   Future<void> _upload(ReceiptSource source) async {
@@ -243,7 +245,7 @@ class _NativeOnboardingScreenState
     if (!_replaying(uid)) {
       await _controller(uid).act('complete', receiptId: receiptId);
     }
-    if (!mounted) return;
+    if (!mounted || ref.read(currentUserIdProvider) != uid) return;
     if (receiptId != null) {
       ref.read(receiptUploadActivityProvider.notifier).acknowledge(receiptId);
     }

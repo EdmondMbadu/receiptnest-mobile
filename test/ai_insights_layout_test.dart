@@ -128,6 +128,12 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         expect(find.text('AI Insights'), findsOneWidget);
+        final upgrade = find.byKey(const ValueKey('insights-upgrade'));
+        expect(upgrade.hitTestable(), findsOneWidget);
+        expect(
+          tester.getRect(upgrade).bottom,
+          lessThan(tester.getRect(find.byType(NavigationBar)).top),
+        );
         await capture(tester, dark ? 'upgrade-dark' : 'upgrade-light');
         await tester.pumpWidget(const SizedBox.shrink());
       }
@@ -143,14 +149,45 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         if (!pro) {
-          await tester.ensureVisible(find.text('Upgrade to Pro'));
+          final upgrade = find.byKey(const ValueKey('insights-upgrade'));
+          expect(upgrade.hitTestable(), findsOneWidget);
           expect(
-            tester.getRect(find.text('Upgrade to Pro')).bottom,
-            lessThanOrEqualTo(568),
+            tester.getRect(upgrade).bottom,
+            lessThan(tester.getRect(find.byType(NavigationBar)).top),
           );
+          await capture(tester, 'upgrade-small-large-text');
         }
         await tester.pumpWidget(const SizedBox.shrink());
       }
+    },
+  );
+
+  testWidgets(
+    'upgrade stays visible while benefits scroll with device insets',
+    (tester) async {
+      viewport(tester, const Size(320, 568));
+      tester.view.padding = const FakeViewPadding(top: 44, bottom: 34);
+      tester.view.viewPadding = const FakeViewPadding(top: 44, bottom: 34);
+      addTearDown(tester.view.resetPadding);
+      addTearDown(tester.view.resetViewPadding);
+      await tester.pumpWidget(insightsFixture(textScale: 2));
+      await tester.pumpAndSettle();
+      final upgrade = find.byKey(const ValueKey('insights-upgrade'));
+      final initial = tester.getRect(upgrade);
+      expect(upgrade.hitTestable(), findsOneWidget);
+      expect(
+        initial.bottom,
+        lessThan(tester.getRect(find.byType(NavigationBar)).top),
+      );
+      await tester.drag(
+        find.byKey(const ValueKey('insights-upgrade-scroll')),
+        const Offset(0, -1200),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getRect(upgrade), initial);
+      expect(upgrade.hitTestable(), findsOneWidget);
+      expect(find.text('Spending trends').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -176,7 +213,6 @@ void main() {
     addTearDown(router.dispose);
     await tester.pumpWidget(insightsFixture(router: router));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Upgrade to Pro'));
     await tester.tap(find.text('Upgrade to Pro'));
     await tester.pumpAndSettle();
     expect(find.text('Pricing destination'), findsOneWidget);

@@ -47,163 +47,167 @@ class InsightsUpgradeView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return SingleChildScrollView(
-      key: const ValueKey('insights-upgrade-scroll'),
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 540),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.auto_awesome_outlined,
-                    color: cs.primary,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'AI Insights',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 11,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: cs.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      'PRO',
-                      style: TextStyle(
-                        fontSize: 11,
-                        letterSpacing: 1,
-                        fontWeight: FontWeight.w800,
-                        color: cs.primary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              InsightsSurface(
-                tinted: true,
-                padding: const EdgeInsets.all(24),
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            key: const ValueKey('insights-upgrade-scroll'),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 540),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(13),
-                      decoration: BoxDecoration(
-                        color: cs.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Icon(
-                        Icons.insights_rounded,
-                        size: 28,
-                        color: cs.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    Text(
-                      'A clearer view of your spending.',
-                      style: Theme.of(context).textTheme.headlineLarge
-                          ?.copyWith(
-                            fontSize: 30,
-                            height: 1.15,
-                            letterSpacing: -1,
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.auto_awesome_outlined,
+                          color: cs.primary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text(
+                            'AI Insights',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 11,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: cs.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            'PRO',
+                            style: TextStyle(
+                              fontSize: 11,
+                              letterSpacing: 1,
+                              fontWeight: FontWeight.w800,
+                              color: cs.primary,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'Turn your saved receipts into useful answers, spending patterns, and a little more clarity.',
-                      style: TextStyle(
-                        fontSize: 15,
-                        height: 1.6,
-                        color: cs.onSurfaceVariant,
+                    const SizedBox(height: 16),
+                    InsightsSurface(
+                      tinted: true,
+                      padding: const EdgeInsets.all(22),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'A clearer view of your spending.',
+                            style: Theme.of(context).textTheme.headlineLarge
+                                ?.copyWith(
+                                  fontSize: 28,
+                                  height: 1.2,
+                                  letterSpacing: -0.8,
+                                ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Turn your saved receipts into answers, patterns, and useful insights.',
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.5,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Padding(
+                      padding: EdgeInsets.only(left: 2, bottom: 12),
+                      child: Text(
+                        'Included with Pro',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    InsightsSurface(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 4,
+                      ),
+                      child: Column(
+                        children: [
+                          const _FeatureRow(
+                            icon: Icons.pie_chart_outline_rounded,
+                            title: 'Monthly insights',
+                            subtitle: 'See where your money went.',
+                          ),
+                          Divider(
+                            height: 1,
+                            color: cs.outlineVariant.withValues(alpha: 0.5),
+                          ),
+                          const _FeatureRow(
+                            icon: Icons.chat_bubble_outline_rounded,
+                            title: 'Ask about your receipts',
+                            subtitle: 'Get answers from your saved receipts.',
+                          ),
+                          Divider(
+                            height: 1,
+                            color: cs.outlineVariant.withValues(alpha: 0.5),
+                          ),
+                          const _FeatureRow(
+                            icon: Icons.trending_up_rounded,
+                            title: 'Spending trends',
+                            subtitle: 'Explore categories and spot changes.',
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
-              const Padding(
-                padding: EdgeInsets.only(left: 2, bottom: 12),
-                child: Text(
-                  'Included with Pro',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-              ),
-              InsightsSurface(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 4,
-                ),
-                child: Column(
-                  children: [
-                    const _FeatureRow(
-                      icon: Icons.pie_chart_outline_rounded,
-                      title: 'Monthly spending insights',
-                      subtitle: 'See where your money went.',
-                    ),
-                    Divider(
-                      height: 1,
-                      color: cs.outlineVariant.withValues(alpha: 0.5),
-                    ),
-                    const _FeatureRow(
-                      icon: Icons.chat_bubble_outline_rounded,
-                      title: 'Ask about your receipts',
-                      subtitle: 'Get answers from the receipts you’ve saved.',
-                    ),
-                    Divider(
-                      height: 1,
-                      color: cs.outlineVariant.withValues(alpha: 0.5),
-                    ),
-                    const _FeatureRow(
-                      icon: Icons.trending_up_rounded,
-                      title: 'Trends & category breakdowns',
-                      subtitle: 'Spot changes and understand your habits.',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              FilledButton.icon(
-                key: const ValueKey('insights-upgrade'),
-                onPressed: onUpgrade,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(0, 52),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 15,
-                  ),
-                ),
-                icon: const Icon(Icons.diamond_outlined, size: 20),
-                label: const Text('Upgrade to Pro'),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Available with a ReceiptNest Pro subscription.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.5,
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
-      ),
+        // Keep the action outside the scroll area, including with large text
+        // or when the shell's receipt upload activity bar is visible.
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
+            ),
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 540),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  key: const ValueKey('insights-upgrade'),
+                  onPressed: onUpgrade,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 52),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 15,
+                    ),
+                  ),
+                  icon: const Icon(Icons.diamond_outlined, size: 20),
+                  label: const Text('Upgrade to Pro'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -221,7 +225,7 @@ class _FeatureRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.symmetric(vertical: 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -122,7 +123,9 @@ typedef NativeOnboardingCall =
 final nativeOnboardingRepositoryProvider = Provider<NativeOnboardingRepository>(
   (ref) {
     final functions = ref.watch(functionsProvider);
+    final auth = ref.watch(authRepositoryProvider);
     return NativeOnboardingRepository((name, data) async {
+      await auth.ensureAccountReady(data['expectedUserId'] as String);
       final result = await functions
           .httpsCallable(
             name,
@@ -183,9 +186,16 @@ class NativeOnboardingRepository {
         receiptCount: data['receiptCount'] as int,
         progress: progress,
       );
-    } on FirebaseFunctionsException catch (e) {
-      if (['unavailable', 'deadline-exceeded', 'internal'].contains(e.code) &&
-          local.status != 'new') {
+    } catch (e) {
+      final offline =
+          (e is FirebaseException &&
+              [
+                'unavailable',
+                'deadline-exceeded',
+                'internal',
+              ].contains(e.code)) ||
+          (e is FirebaseAuthException && e.code == 'network-request-failed');
+      if (offline && local.status != 'new') {
         final cachedCount = await _local(
           (prefs) async => prefs.getInt('${_key(uid)}:count'),
         );
@@ -196,7 +206,10 @@ class NativeOnboardingRepository {
           );
         }
       }
-      if (e.code != 'not-found' && e.code != 'unimplemented') rethrow;
+      if (e is! FirebaseFunctionsException ||
+          (e.code != 'not-found' && e.code != 'unimplemented')) {
+        rethrow;
+      }
       // UI testing works before the additive backend is released. No web writes.
       final data = await call('getGettingStartedState', {
         'expectedUserId': uid,
@@ -320,23 +333,27 @@ class NativeOnboardingController
   final String uid;
   final NativeOnboardingRepository repository;
   final OnboardingAnalytics analytics;
+  int _loadRevision = 0;
 
   Future<void> load() async {
+    final revision = ++_loadRevision;
     state = const AsyncLoading();
     try {
       final value = await repository.load(uid);
+      if (!mounted || revision != _loadRevision) return;
       analytics.event('native_onboarding_exposure', {
         'cohort': value.progress.cohort,
         'baseline_receipts':
             value.progress.baselineReceiptCount ?? value.receiptCount,
       });
-      if (mounted) state = AsyncData(value);
+      state = AsyncData(value);
     } catch (e, st) {
-      if (mounted) state = AsyncError(e, st);
+      if (mounted && revision == _loadRevision) state = AsyncError(e, st);
     }
   }
 
   Future<void> act(String action, {String? receiptId}) async {
+    if (!mounted) return;
     final current = state.valueOrNull;
     if (current == null) return;
     final progress = current.progress.change(action, receiptId: receiptId);

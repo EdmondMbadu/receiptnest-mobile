@@ -186,6 +186,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     setState(() => _visibleReceiptCount = _receiptBatchSize);
   }
 
+  Future<void> _retryReceipts() async {
+    final uid = ref.read(currentUserIdProvider);
+    if (uid == null) return;
+    try {
+      await ref.read(authRepositoryProvider).refreshCurrentUser();
+    } catch (_) {
+      // A connection failure keeps the current session; retry the receipt
+      // subscription as well rather than replacing it with an empty account.
+    }
+    if (!mounted || ref.read(currentUserIdProvider) != uid) return;
+    ref.invalidate(receiptsStreamProvider);
+  }
+
   void _changeMonth(int delta) {
     final month = ref.read(selectedMonthProvider);
     final year = ref.read(selectedYearProvider);
@@ -690,7 +703,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       body: receiptsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Failed to load receipts: $err')),
+        error: (_, _) => Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.cloud_off_outlined, size: 36, color: cs.primary),
+                const SizedBox(height: 16),
+                Text(
+                  'We couldn’t load your receipts.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Check your connection and try again.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: cs.onSurfaceVariant),
+                ),
+                const SizedBox(height: 20),
+                FilledButton.icon(
+                  onPressed: _retryReceipts,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Try again'),
+                ),
+              ],
+            ),
+          ),
+        ),
         data: (_) {
           if (sortedReceipts.isEmpty) {
             return EmptyReceiptHome(
