@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -375,12 +376,16 @@ class ReceiptRepository {
     final docRef = uploadId == null
         ? receiptsRef.doc()
         : receiptsRef.doc(uploadId);
-    if (uploadId != null) {
-      final existing = await docRef.get();
-      if (existing.exists) return Receipt.fromSnapshot(existing);
+    // Independent server reads share one round trip. Keep all plan checks and
+    // retry identity checks; never trade receipt correctness for apparent speed.
+    final snapshots = await Future.wait([
+      _db.collection('users').doc(userId).get(),
+      if (uploadId != null) docRef.get(),
+    ]);
+    if (uploadId != null && snapshots.last.exists) {
+      return Receipt.fromSnapshot(snapshots.last);
     }
-
-    final userSnap = await _db.collection('users').doc(userId).get();
+    final userSnap = snapshots.first;
     final userData = userSnap.data() ?? const <String, dynamic>{};
     final subscriptionPlan =
         (userData['subscriptionPlan'] as String?)?.toLowerCase() ?? 'free';
@@ -388,13 +393,15 @@ class ReceiptRepository {
         ?.toLowerCase();
     final hasProAccess = subscriptionPlan == 'pro' || adminOverride == 'pro';
     if (!hasProAccess) {
-      final freePlanReceiptLimit = await fetchFreePlanReceiptLimit(_db);
-      final countSnap = await _db
-          .collection('users')
-          .doc(userId)
-          .collection('receipts')
-          .count()
-          .get();
+      final (freePlanReceiptLimit, countSnap) = await (
+        fetchFreePlanReceiptLimit(_db),
+        _db
+            .collection('users')
+            .doc(userId)
+            .collection('receipts')
+            .count()
+            .get(),
+      ).wait;
       final count = countSnap.count ?? 0;
       if (count >= freePlanReceiptLimit) {
         throw Exception(
@@ -445,13 +452,24 @@ class ReceiptRepository {
       'updatedAt': FieldValue.serverTimestamp(),
     });
 
-    final receipt = await getReceipt(userId, docRef.id);
-    if (receipt == null) {
-      throw Exception(
-        'Upload succeeded but receipt record could not be loaded.',
-      );
-    }
-    return receipt;
+    // The write is acknowledged. Return its known identity immediately instead
+    // of making another server read before displaying the saved-file state.
+    // The exact-receipt stream supplies canonical timestamps and extraction.
+    final acceptedAt = DateTime.now();
+    return Receipt(
+      id: docRef.id,
+      userId: userId,
+      status: ReceiptStatuses.uploaded,
+      file: ReceiptFile(
+        storagePath: storagePath,
+        originalName: file.name,
+        mimeType: file.mimeType ?? _inferMimeType(file.name),
+        sizeBytes: file.sizeBytes,
+        uploadedAt: acceptedAt,
+      ),
+      createdAt: acceptedAt,
+      updatedAt: acceptedAt,
+    );
   }
 
   Future<void> updateReceipt(

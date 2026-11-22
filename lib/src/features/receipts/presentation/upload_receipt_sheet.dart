@@ -11,6 +11,10 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/config/public_app_config.dart';
 import '../data/receipt_repository.dart';
+import '../data/receipt_upload_activity.dart';
+import '../../auth/data/auth_repository.dart';
+import 'receipt_upload_outcome.dart';
+import 'receipt_upload_result.dart';
 import '../models/receipt.dart';
 import '../../getting_started/data/onboarding_analytics.dart';
 import '../../getting_started/presentation/onboarding_widgets.dart';
@@ -25,6 +29,7 @@ class UploadReceiptSheet extends ConsumerStatefulWidget {
     required this.onUploaded,
     this.initialSource,
     this.guided = false,
+    this.onFileSelected,
   });
 
   final String userId;
@@ -32,6 +37,7 @@ class UploadReceiptSheet extends ConsumerStatefulWidget {
   final ValueChanged<Receipt> onUploaded;
   final ReceiptSource? initialSource;
   final bool guided;
+  final ValueChanged<UploadFileData>? onFileSelected;
 
   @override
   ConsumerState<UploadReceiptSheet> createState() => _UploadReceiptSheetState();
@@ -48,8 +54,11 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
   };
 
   UploadFileData? _selectedFile;
+  Receipt? _uploaded;
   bool _uploading = false;
+  bool _isFirstUpload = false;
   bool _picking = false;
+  bool _closingForAccountChange = false;
   double _progress = 0;
   String? _error;
   String _uploadId = const Uuid().v4();
@@ -78,6 +87,7 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
       _uploadId = const Uuid().v4();
       _error = null;
     });
+    widget.onFileSelected?.call(file);
     ref.read(onboardingAnalyticsProvider).event('native_receipt_selected', {
       'source': source,
       'guided': widget.guided ? 1 : 0,
@@ -251,7 +261,16 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
   }
 
   Future<void> _upload() async {
-    if (_uploading || _picking) return;
+    if (_uploading ||
+        _picking ||
+        ref.read(currentUserIdProvider) != widget.userId) {
+      return;
+    }
+    _isFirstUpload =
+        ref.read(receiptsStreamProvider).asData?.value.isEmpty == true;
+    final elapsed = Stopwatch()..start();
+    int? firstProgressMs;
+    int? fileTransferredMs;
     final file = _selectedFile;
     if (file == null) return;
     final appConfig =
@@ -284,17 +303,34 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
         appConfig: appConfig,
         onProgress: (value) {
           if (!mounted) return;
-          setState(() => _progress = value);
+          if (value > 0) firstProgressMs ??= elapsed.elapsedMilliseconds;
+          if (value >= 1) fileTransferredMs ??= elapsed.elapsedMilliseconds;
+          setState(() => _progress = value.clamp(0, 1).toDouble());
         },
       );
 
       if (!mounted) return;
+      if (ref.read(currentUserIdProvider) != widget.userId) return;
+      ref
+          .read(receiptUploadActivityProvider.notifier)
+          .track(uploaded, guided: widget.guided, first: _isFirstUpload);
       ref.read(onboardingAnalyticsProvider).event('native_upload_accepted', {
         'guided': widget.guided ? 1 : 0,
+        'elapsed_ms': elapsed.elapsedMilliseconds,
+        if (firstProgressMs != null) 'first_progress_ms': firstProgressMs!,
+        if (fileTransferredMs != null)
+          'file_transferred_ms': fileTransferredMs!,
+        'file_kind': uploaded.isPdf ? 'pdf' : 'image',
       });
       widget.onUploaded(uploaded);
-      Navigator.of(context).pop();
+      if (!mounted) return;
+      if (widget.guided) {
+        Navigator.of(context).pop();
+      } else {
+        setState(() => _uploaded = uploaded);
+      }
     } catch (e) {
+      if (!mounted || ref.read(currentUserIdProvider) != widget.userId) return;
       ref.read(onboardingAnalyticsProvider).event('native_upload_error', {
         'guided': widget.guided ? 1 : 0,
       });
@@ -314,8 +350,124 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
     }
   }
 
+  Widget _uploadProgress() {
+    final cs = Theme.of(context).colorScheme;
+    return PopScope(
+      canPop: false,
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(22, 18, 22, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.cloud_upload_outlined,
+                    size: 19,
+                    color: cs.primary,
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      _progress >= 1
+                          ? 'Saving your receipt'
+                          : 'Uploading your receipt',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: cs.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              ReceiptUploadPreview(file: _selectedFile, height: 140),
+              const SizedBox(height: 22),
+              Text(
+                'On its way.',
+                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -1,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Keep this screen open while we save your file.',
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.6,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _progress >= 1 ? 'Finishing the save…' : 'Uploading',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  if (_progress > 0 && _progress < 1)
+                    Text(
+                      '${(100 * _progress).round()}%',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              LinearProgressIndicator(
+                value: _progress <= 0 || _progress >= 1 ? null : _progress,
+                minHeight: 5,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (ref.watch(currentUserIdProvider) != widget.userId) {
+      if (!_closingForAccountChange) {
+        _closingForAccountChange = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && ref.read(currentUserIdProvider) != widget.userId) {
+            Navigator.of(context).pop();
+          }
+        });
+      }
+      return const PopScope(canPop: true, child: SizedBox.shrink());
+    }
+    if (_uploaded != null) {
+      return ReceiptUploadOutcome(
+        key: ValueKey(_uploaded!.id),
+        userId: widget.userId,
+        first: _isFirstUpload,
+        receiptId: _uploaded!.id,
+        seed: _uploaded,
+        file: _selectedFile,
+        onAnother: () => setState(() {
+          _uploaded = null;
+          _selectedFile = null;
+          _error = null;
+          _progress = 0;
+          _uploadId = const Uuid().v4();
+        }),
+      );
+    }
+    if (_uploading) return _uploadProgress();
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final selected = _selectedFile;

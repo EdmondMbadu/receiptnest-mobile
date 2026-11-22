@@ -84,6 +84,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   _TimeRange _timeRange = _TimeRange.oneMonth;
 
   bool _loadingForwarding = false;
+  bool _openingUpload = false;
   String? _forwardingAddress;
   String? _forwardingError;
 
@@ -553,29 +554,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-  void _openUpload() {
+  Future<void> _openUpload() async {
     final uid = ref.read(currentUserIdProvider);
-    if (uid == null) return;
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      isDismissible: false,
-      enableDrag: false,
-      builder: (context) {
-        return UploadReceiptSheet(
-          userId: uid,
-          repository: ref.read(receiptRepositoryProvider),
-          onUploaded: (_) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Receipt uploaded. Processing started.'),
-              ),
-            );
-          },
-        );
-      },
-    );
+    if (uid == null || _openingUpload) return;
+    _openingUpload = true;
+    try {
+      await showModalBottomSheet<void>(
+        useRootNavigator: true,
+        context: context,
+        isScrollControlled: true,
+        isDismissible: false,
+        enableDrag: false,
+        constraints: BoxConstraints(
+          maxWidth: 540,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.92,
+        ),
+        builder: (context) {
+          return UploadReceiptSheet(
+            userId: uid,
+            repository: ref.read(receiptRepositoryProvider),
+            onUploaded: (_) {},
+          );
+        },
+      );
+    } finally {
+      _openingUpload = false;
+    }
   }
 
   /// Groups receipts by month and returns a flat list of widgets with headers.
@@ -866,20 +870,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                   ),
                                           ),
                                           const SizedBox(width: 6),
-                                          Text(
-                                            mode == _GraphViewMode.month
-                                                ? 'Spending'
-                                                : 'Histogram',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: _graphViewMode == mode
-                                                  ? FontWeight.w700
-                                                  : FontWeight.w500,
-                                              color: _graphViewMode == mode
-                                                  ? cs.onSurface
-                                                  : cs.onSurface.withValues(
-                                                      alpha: 0.45,
-                                                    ),
+                                          Flexible(
+                                            child: Text(
+                                              mode == _GraphViewMode.month
+                                                  ? 'Spending'
+                                                  : 'Histogram',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight:
+                                                    _graphViewMode == mode
+                                                    ? FontWeight.w700
+                                                    : FontWeight.w500,
+                                                color: _graphViewMode == mode
+                                                    ? cs.onSurface
+                                                    : cs.onSurface.withValues(
+                                                        alpha: 0.45,
+                                                      ),
+                                              ),
                                             ),
                                           ),
                                         ],

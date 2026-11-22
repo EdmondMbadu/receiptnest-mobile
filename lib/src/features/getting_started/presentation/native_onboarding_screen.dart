@@ -4,11 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/utils/formatters.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../receipts/data/receipt_repository.dart';
 import '../../receipts/models/receipt.dart';
 import '../../receipts/presentation/upload_receipt_sheet.dart';
+import '../../receipts/presentation/receipt_upload_result.dart';
+import '../../receipts/data/receipt_upload_activity.dart';
 import '../data/native_onboarding_repository.dart';
 import '../data/onboarding_analytics.dart';
 import 'onboarding_widgets.dart';
@@ -116,6 +117,9 @@ class _NativeOnboardingScreenState
   bool _uploadOpen = false;
   bool _choosingAgain = false;
   String? _sessionReceiptId;
+  Receipt? _sessionReceiptSeed;
+  UploadFileData? _sessionFile;
+  bool? _sessionFirstUpload;
   String? _measuredStatus;
   bool _viewed = false;
   Timer? _slowTimer;
@@ -153,9 +157,11 @@ class _NativeOnboardingScreenState
       setState(() {
         _choosingAgain = true;
         _sessionReceiptId = null;
+        _sessionReceiptSeed = null;
         _viewed = false;
         _measuredStatus = null;
       });
+      ref.read(receiptUploadActivityProvider.notifier).acknowledge(receiptId);
       unawaited(_controller(uid).forgetDeletedReceipt(receiptId));
     });
   }
@@ -171,12 +177,18 @@ class _NativeOnboardingScreenState
     if (_uploadOpen) return;
     final uid = ref.read(currentUserIdProvider);
     if (uid == null) return;
+    _sessionFirstUpload =
+        (ref.read(receiptsStreamProvider).asData?.value.length ??
+            ref.read(nativeOnboardingProvider(uid)).valueOrNull?.receiptCount ??
+            0) ==
+        0;
     setState(() => _uploadOpen = true);
     ref.read(onboardingAnalyticsProvider).event('native_source_selected', {
       'source': source.name,
     });
     Receipt? uploaded;
     await showModalBottomSheet<void>(
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       isDismissible: false,
@@ -190,6 +202,7 @@ class _NativeOnboardingScreenState
         repository: ref.read(receiptRepositoryProvider),
         initialSource: source,
         guided: true,
+        onFileSelected: (file) => _sessionFile = file,
         onUploaded: (receipt) => uploaded = receipt,
       ),
     );
@@ -198,6 +211,7 @@ class _NativeOnboardingScreenState
     if (uploaded != null) {
       setState(() {
         _sessionReceiptId = uploaded!.id;
+        _sessionReceiptSeed = uploaded;
         _choosingAgain = false;
         _viewed = false;
         _slow = false;
@@ -230,6 +244,9 @@ class _NativeOnboardingScreenState
       await _controller(uid).act('complete', receiptId: receiptId);
     }
     if (!mounted) return;
+    if (receiptId != null) {
+      ref.read(receiptUploadActivityProvider.notifier).acknowledge(receiptId);
+    }
     final query = <String, String>{if (another) 'addReceipt': '1'};
     context.go(
       Uri(
@@ -266,7 +283,12 @@ class _NativeOnboardingScreenState
       _recoverDeletedReceipt(uid, savedReceiptId);
     }
     final receiptId = deleted ? null : savedReceiptId;
-    final receipt = receiptAsync?.valueOrNull;
+    final receipt = deleted
+        ? null
+        : receiptAsync?.valueOrNull ??
+              (_sessionReceiptSeed?.id == receiptId
+                  ? _sessionReceiptSeed
+                  : null);
     final ready = receipt != null && !receipt.isProcessing;
     final usable = receipt != null && isUsableReceipt(receipt);
     final viewed =
@@ -488,42 +510,10 @@ class _NativeOnboardingScreenState
     );
   }
 
-  Widget _processing() => OnboardingReveal(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const ReceiptIllustration(),
-        const SizedBox(height: 24),
-        Text(
-          'The details,\ncoming together.',
-          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-            fontSize: 34,
-            height: 1.12,
-            letterSpacing: -1,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Your upload is saved. We’re reading the merchant, date, amount, and category.',
-          style: TextStyle(
-            fontSize: 16,
-            height: 1.55,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 28),
-        const LinearProgressIndicator(
-          minHeight: 4,
-          borderRadius: BorderRadius.all(Radius.circular(8)),
-        ),
-        const SizedBox(height: 20),
-        OnboardingMessage(
-          message: _slow
-              ? 'This is taking a little longer. Your receipt is safe here. You can continue and check back later.'
-              : 'You can leave this screen. Your receipt will be here when you return.',
-        ),
-      ],
-    ),
+  Widget _processing() => ReceiptReadingResult(
+    file: _sessionFile,
+    receipt: _sessionReceiptSeed,
+    slow: _slow,
   );
 
   Widget _receiptLoadError(String id) => Column(
@@ -548,117 +538,67 @@ class _NativeOnboardingScreenState
 
   void _restart() {
     final uid = ref.read(currentUserIdProvider);
-    if (uid != null && !_replaying(uid)) _controller(uid).act('restart');
+    if (uid != null) {
+      final id =
+          _sessionReceiptId ??
+          ref
+              .read(nativeOnboardingProvider(uid))
+              .valueOrNull
+              ?.progress
+              .receiptId;
+      if (id != null) {
+        ref.read(receiptUploadActivityProvider.notifier).acknowledge(id);
+      }
+      if (!_replaying(uid)) _controller(uid).act('restart');
+    }
     setState(() {
       _choosingAgain = true;
       _viewed = false;
       _sessionReceiptId = null;
+      _sessionReceiptSeed = null;
+      _sessionFile = null;
     });
   }
 
-  Widget _result(String uid, Receipt receipt, bool usable) {
-    final needsReview = receipt.status != ReceiptStatuses.finalStatus;
-    return OnboardingReveal(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Icon(
-            usable ? Icons.task_alt_rounded : Icons.fact_check_outlined,
-            size: 64,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(height: 24),
-          Text(
-            needsReview
-                ? 'A quick check\nand you’re done.'
-                : 'Your receipt,\nbeautifully organized.',
-            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-              fontSize: 34,
-              height: 1.12,
-              letterSpacing: -1,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            needsReview
-                ? 'Some details need your attention. Open the receipt, check it against the original, then confirm and save.'
-                : 'The details are filled in and the original is safely stored. Let’s take a look.',
-            style: TextStyle(
-              fontSize: 16,
-              height: 1.55,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 28),
-          OnboardingPaper(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'YOUR RECEIPT',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.8,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  receipt.merchant?.canonicalName ??
-                      receipt.merchant?.rawName ??
-                      receipt.file.originalName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  receipt.effectiveTotalAmount == null
-                      ? 'Amount needs review'
-                      : formatCurrency(receipt.effectiveTotalAmount),
-                  style: const TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -1.5,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  children: [
-                    Text(formatDate(receipt.effectiveDate)),
-                    if (receipt.category != null) Text(receipt.category!.name),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: () => _openReceipt(uid, receipt),
-            icon: Icon(
-              needsReview
-                  ? Icons.fact_check_outlined
-                  : Icons.arrow_forward_rounded,
-              size: 19,
-            ),
-            label: Text(
-              needsReview ? 'Check receipt details' : 'View my receipt',
-            ),
-          ),
-          if (!usable)
-            TextButton(
-              onPressed: _restart,
-              child: const Text('Try a clearer receipt instead'),
-            ),
-        ],
-      ),
-    );
+  void _viewMonth(Receipt receipt) {
+    final date = receiptTransactionDate(receipt);
+    if (date == null) return;
+    ref.read(selectedMonthProvider.notifier).state = date.month;
+    ref.read(selectedYearProvider.notifier).state = date.year;
+    ref.read(receiptUploadActivityProvider.notifier).acknowledge(receipt.id);
+    _pause();
   }
+
+  Future<void> _anotherAfterResult(String uid, Receipt receipt) async {
+    // A fully organized receipt is already visible here. Count that useful
+    // result before the user chooses to collect their next receipt.
+    if (!_replaying(uid)) {
+      await _controller(uid).act('view', receiptId: receipt.id);
+    }
+    if (!mounted) return;
+    await _finish(uid, receipt.id, another: true);
+  }
+
+  Widget _result(String uid, Receipt receipt, bool usable) =>
+      ReceiptUploadResult(
+        receipt: receipt,
+        first:
+            _sessionFirstUpload ??
+            (ref
+                        .read(nativeOnboardingProvider(uid))
+                        .valueOrNull
+                        ?.progress
+                        .baselineReceiptCount ??
+                    0) ==
+                0,
+        guided: true,
+        onView: () => _openReceipt(uid, receipt),
+        onViewMonth: () => _viewMonth(receipt),
+        onAnother: receiptUploadNeedsReview(receipt)
+            ? null
+            : () => _anotherAfterResult(uid, receipt),
+        onReplace: usable ? null : _restart,
+      );
 
   Widget _success(String uid, Receipt receipt) => OnboardingReveal(
     child: Column(

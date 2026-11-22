@@ -40,10 +40,15 @@ class GettingStartedScreen extends ConsumerWidget {
     if (uid == null) return;
     var uploaded = false;
     await showModalBottomSheet<void>(
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       isDismissible: false,
       enableDrag: false,
+      constraints: BoxConstraints(
+        maxWidth: 540,
+        maxHeight: MediaQuery.sizeOf(context).height * 0.92,
+      ),
       builder: (_) => UploadReceiptSheet(
         userId: uid,
         repository: ref.read(receiptRepositoryProvider),
@@ -51,10 +56,9 @@ class GettingStartedScreen extends ConsumerWidget {
       ),
     );
     if (!uploaded || !context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Receipt uploaded. Processing started.')),
-    );
-    context.go('/app/home');
+    if (GoRouterState.of(context).uri.path == '/app/help') {
+      context.go('/app/home');
+    }
   }
 
   @override

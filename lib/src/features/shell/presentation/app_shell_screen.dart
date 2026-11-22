@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../auth/data/auth_repository.dart';
 import '../../../core/theme/theme_controller.dart';
+import '../../receipts/presentation/receipt_upload_activity_bar.dart';
 
 class AppShellScreen extends ConsumerWidget {
   const AppShellScreen({
@@ -107,75 +108,81 @@ class AppShellScreen extends ConsumerWidget {
           ],
         ),
         body: child,
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF0D0D14) : Colors.white,
-            border: Border(
-              top: BorderSide(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.grey.shade200,
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ReceiptUploadActivityBar(),
+            Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0D0D14) : Colors.white,
+                border: Border(
+                  top: BorderSide(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : Colors.grey.shade200,
+                  ),
+                ),
+                boxShadow: isDark
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, -4),
+                        ),
+                      ],
+              ),
+              child: NavigationBar(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                indicatorColor: cs.primary.withValues(alpha: 0.1),
+                selectedIndex: currentIndex,
+                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                onDestinationSelected: (index) {
+                  switch (index) {
+                    case 0:
+                      context.go('/app/home');
+                      break;
+                    case 1:
+                      context.go('/app/insights');
+                      break;
+                    case 2:
+                      context.go('/app/folders');
+                      break;
+                  }
+                },
+                destinations: [
+                  NavigationDestination(
+                    icon: Icon(
+                      Icons.home_outlined,
+                      color: cs.onSurface.withValues(alpha: 0.4),
+                    ),
+                    selectedIcon: Icon(Icons.home_rounded, color: cs.primary),
+                    label: 'Home',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(
+                      Icons.auto_awesome_outlined,
+                      color: cs.onSurface.withValues(alpha: 0.4),
+                    ),
+                    selectedIcon: Icon(
+                      Icons.auto_awesome_rounded,
+                      color: cs.primary,
+                    ),
+                    label: 'Insights',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(
+                      Icons.folder_outlined,
+                      color: cs.onSurface.withValues(alpha: 0.4),
+                    ),
+                    selectedIcon: Icon(Icons.folder_rounded, color: cs.primary),
+                    label: 'Collections',
+                  ),
+                ],
               ),
             ),
-            boxShadow: isDark
-                ? null
-                : [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 12,
-                      offset: const Offset(0, -4),
-                    ),
-                  ],
-          ),
-          child: NavigationBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            indicatorColor: cs.primary.withValues(alpha: 0.1),
-            selectedIndex: currentIndex,
-            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-            onDestinationSelected: (index) {
-              switch (index) {
-                case 0:
-                  context.go('/app/home');
-                  break;
-                case 1:
-                  context.go('/app/insights');
-                  break;
-                case 2:
-                  context.go('/app/folders');
-                  break;
-              }
-            },
-            destinations: [
-              NavigationDestination(
-                icon: Icon(
-                  Icons.home_outlined,
-                  color: cs.onSurface.withValues(alpha: 0.4),
-                ),
-                selectedIcon: Icon(Icons.home_rounded, color: cs.primary),
-                label: 'Home',
-              ),
-              NavigationDestination(
-                icon: Icon(
-                  Icons.auto_awesome_outlined,
-                  color: cs.onSurface.withValues(alpha: 0.4),
-                ),
-                selectedIcon: Icon(
-                  Icons.auto_awesome_rounded,
-                  color: cs.primary,
-                ),
-                label: 'Insights',
-              ),
-              NavigationDestination(
-                icon: Icon(
-                  Icons.folder_outlined,
-                  color: cs.onSurface.withValues(alpha: 0.4),
-                ),
-                selectedIcon: Icon(Icons.folder_rounded, color: cs.primary),
-                label: 'Collections',
-              ),
-            ],
-          ),
+          ],
         ),
         drawer: Drawer(
           backgroundColor: isDark ? const Color(0xFF0D0D14) : Colors.white,

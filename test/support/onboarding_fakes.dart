@@ -180,6 +180,11 @@ class MemoryReceiptRepository implements ReceiptRepository {
     return receipt;
   }
 
+  void publishReceipt(Receipt receipt) {
+    records[receipt.id] = receipt;
+    _changes.add(null);
+  }
+
   void finishProcessing(String id) {
     records[id] = exampleReceipt(id: id, createdAt: records[id]?.createdAt);
     _changes.add(null);

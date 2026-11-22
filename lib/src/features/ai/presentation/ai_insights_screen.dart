@@ -244,31 +244,36 @@ class _AiInsightsScreenState extends ConsumerState<AiInsightsScreen> {
     final uid = ref.read(currentUserIdProvider);
     if (uid == null || _uploadOpen || _loading) return;
     setState(() => _uploadOpen = true);
-    Receipt? uploaded;
+    final uploaded = <Receipt>[];
     await showModalBottomSheet<void>(
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       isDismissible: false,
       enableDrag: false,
-      constraints: const BoxConstraints(maxWidth: 540),
+      constraints: BoxConstraints(
+        maxWidth: 540,
+        maxHeight: MediaQuery.sizeOf(context).height * 0.92,
+      ),
       builder: (_) => UploadReceiptSheet(
         userId: uid,
         repository: ref.read(receiptRepositoryProvider),
-        onUploaded: (receipt) => uploaded = receipt,
+        onUploaded: uploaded.add,
       ),
     );
     if (!_current(uid)) return;
     setState(() => _uploadOpen = false);
-    if (uploaded == null) return;
+    if (uploaded.isEmpty) return;
     final next = [
       ..._messages,
-      AiChatMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        role: 'assistant',
-        content:
-            'Receipt uploaded: ${uploaded!.file.originalName}. It is now processing.',
-        timestamp: DateTime.now(),
-      ),
+      for (final receipt in uploaded)
+        AiChatMessage(
+          id: 'upload-${receipt.id}',
+          role: 'assistant',
+          content:
+              'Receipt saved: ${receipt.file.originalName}. You can find its latest details in Home.',
+          timestamp: DateTime.now(),
+        ),
     ];
     setState(() => _messages = next);
     _scrollToBottom();
