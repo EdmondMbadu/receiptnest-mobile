@@ -76,7 +76,7 @@ class AppShellScreen extends ConsumerWidget {
           elevation: 0,
           scrolledUnderElevation: 0,
           title: Text(
-            'ReceiptNest AI',
+            'ReceiptNest',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
@@ -242,7 +242,7 @@ class AppShellScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 18),
                     Text(
-                      profile?.displayName ?? 'ReceiptNest AI',
+                      profile?.displayName ?? 'ReceiptNest',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
@@ -339,7 +339,7 @@ class AppShellScreen extends ConsumerWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'ReceiptNest AI',
+                      'ReceiptNest',
                       style: TextStyle(
                         color: cs.onSurface.withValues(alpha: 0.25),
                         fontWeight: FontWeight.w700,

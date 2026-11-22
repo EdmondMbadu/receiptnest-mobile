@@ -125,7 +125,7 @@ class _ReceiptNestAppState extends ConsumerState<ReceiptNestApp>
     }
 
     return MaterialApp.router(
-      title: 'ReceiptNest AI',
+      title: 'ReceiptNest',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,

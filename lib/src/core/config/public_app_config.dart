@@ -20,9 +20,9 @@ const defaultSupportParagraphs = <String>[
   'Include your account email and a short issue summary so we can help quickly.',
 ];
 
-const defaultTermsTitle = 'ReceiptNest AI Terms';
+const defaultTermsTitle = 'ReceiptNest Terms';
 const defaultTermsParagraphs = <String>[
-  'By using ReceiptNest AI, you agree to process only receipts you are authorized to store and analyze.',
+  'By using ReceiptNest, you agree to process only receipts you are authorized to store and analyze.',
   'Subscription billing is managed by the payment provider available on your platform and renews according to your selected plan.',
   'For the latest legal terms, refer to receipt-nest web terms page.',
 ];

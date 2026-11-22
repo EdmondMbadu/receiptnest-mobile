@@ -568,7 +568,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 _NotifTile(
                   title: 'Weekly summary emails',
-                  subtitle: 'Your weekly ReceiptNest AI spend recap',
+                  subtitle: 'Your weekly ReceiptNest spend recap',
                   value: _notificationSettings.weeklySummaryEmails,
                   onChanged: (v) => setState(
                     () => _notificationSettings = _notificationSettings
@@ -577,7 +577,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 _NotifTile(
                   title: 'Monthly summary emails',
-                  subtitle: 'Your monthly ReceiptNest AI spending statement',
+                  subtitle: 'Your monthly ReceiptNest spending statement',
                   value: _notificationSettings.monthlySummaryEmails,
                   onChanged: (v) => setState(
                     () => _notificationSettings = _notificationSettings

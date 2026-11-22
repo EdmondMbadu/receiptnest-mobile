@@ -97,7 +97,7 @@ class BillingReturnScreen extends ConsumerWidget {
     if (isCheckout && isSuccess && !isPro) {
       title = 'Finalizing your subscription';
       message =
-          'Your payment was accepted. ReceiptNest AI is waiting for billing confirmation, which usually takes a few seconds.';
+          'Your payment was accepted. ReceiptNest is waiting for billing confirmation, which usually takes a few seconds.';
       leading = const SizedBox(
         width: 28,
         height: 28,
@@ -126,7 +126,7 @@ class BillingReturnScreen extends ConsumerWidget {
         color: Color(0xFF00C805),
       );
     } else {
-      title = 'Back in ReceiptNest AI';
+      title = 'Back in ReceiptNest';
       message = 'You can continue where you left off.';
       leading = Icon(Icons.open_in_new_rounded, size: 32, color: cs.primary);
     }

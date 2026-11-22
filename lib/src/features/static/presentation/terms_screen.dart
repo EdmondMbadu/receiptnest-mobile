@@ -20,7 +20,8 @@ class TermsScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(20),
         children: [
           Text(
-            appConfig.termsTitle,
+            // Older shared configuration can still contain the previous name.
+            appConfig.termsTitle.replaceAll('ReceiptNest AI', 'ReceiptNest'),
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
@@ -29,7 +30,12 @@ class TermsScreen extends ConsumerWidget {
               padding: EdgeInsets.only(
                 bottom: index == termsParagraphs.length - 1 ? 0 : 8,
               ),
-              child: Text(termsParagraphs[index]),
+              child: Text(
+                termsParagraphs[index].replaceAll(
+                  'ReceiptNest AI',
+                  'ReceiptNest',
+                ),
+              ),
             ),
         ],
       ),
@@ -42,7 +48,7 @@ class TermsScreen extends ConsumerWidget {
     }
 
     return const [
-      'By using ReceiptNest AI, you agree to process only receipts you are authorized to store and analyze.',
+      'By using ReceiptNest, you agree to process only receipts you are authorized to store and analyze.',
       'Subscriptions purchased in this iOS app are billed by Apple through the App Store and renew according to your selected monthly or yearly plan.',
       'You can manage or cancel App Store subscriptions from your Apple ID subscription settings.',
     ];
