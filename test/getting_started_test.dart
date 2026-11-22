@@ -10,59 +10,48 @@ import 'support/onboarding_fakes.dart';
 import 'package:recieptnest_ai/src/features/getting_started/presentation/getting_started_screen.dart';
 
 void main() {
-  test(
-    'prompt eligibility includes only accounts with zero to four receipts',
-    () {
-      for (final count in [0, 1, 4]) {
-        expect(
-          shouldShowGettingStartedPrompt(receiptCount: count, dismissed: false),
-          isTrue,
-        );
-      }
-      for (final count in [null, -1, 5, 200]) {
-        expect(
-          shouldShowGettingStartedPrompt(receiptCount: count, dismissed: false),
-          isFalse,
-        );
-      }
-      expect(
-        shouldShowGettingStartedPrompt(receiptCount: 0, dismissed: true),
-        isFalse,
-      );
-    },
-  );
-
-  testWidgets('native Home prompt offers collection and a resumable guide', (
-    tester,
-  ) async {
-    SharedPreferences.setMockInitialValues({});
-    var uploads = 0;
-    final cloud = FakeNativeCloud(count: 1, status: 'paused');
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          nativeOnboardingRepositoryProvider.overrideWithValue(
-            cloud.repository(),
-          ),
-          onboardingAnalyticsProvider.overrideWithValue(SilentAnalytics()),
-        ],
-        child: MaterialApp(
-          home: Scaffold(
-            body: GettingStartedPrompt(
-              userId: 'u',
-              receiptCount: 1,
-              onAddReceipt: () => uploads++,
+  testWidgets(
+    'Home offers a small resume link only for unfinished early onboarding',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      for (final scenario in [
+        (1, 'paused', true),
+        (2, 'in_progress', true),
+        (1, 'completed', false),
+        (0, 'paused', false),
+        (3, 'paused', false),
+        (5, 'new', false),
+      ]) {
+        final cloud = FakeNativeCloud(count: scenario.$1, status: scenario.$2);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              nativeOnboardingRepositoryProvider.overrideWithValue(
+                cloud.repository(),
+              ),
+              onboardingAnalyticsProvider.overrideWithValue(SilentAnalytics()),
+            ],
+            child: MaterialApp(
+              home: Scaffold(
+                body: GettingStartedPrompt(
+                  userId: 'u',
+                  receiptCount: scenario.$1,
+                ),
+              ),
             ),
           ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Continue guide'), findsOneWidget);
-    await tester.tap(find.text('Add a receipt'));
-    expect(uploads, 1);
-    expect(find.text('Your first receipt is in.'), findsOneWidget);
-  });
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Continue receipt guide'),
+          scenario.$3 ? findsOneWidget : findsNothing,
+        );
+        expect(find.text('Your first receipt is in.'), findsNothing);
+        expect(find.text('Add a receipt'), findsNothing);
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+    },
+  );
 
   testWidgets(
     'help always offers the video and mobile-specific instructions at phone width',

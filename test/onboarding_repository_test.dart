@@ -112,6 +112,58 @@ void main() {
     },
   );
   test(
+    'deletion clears only the unfinished task that references that receipt',
+    () async {
+      final cloud = FakeNativeCloud(
+        count: 1,
+        status: 'paused',
+        receiptId: 'r1',
+        viewedAt: 200,
+      );
+      final controller = NativeOnboardingController(
+        'u',
+        cloud.repository(),
+        SilentAnalytics(),
+      );
+      addTearDown(controller.dispose);
+      await controller.stream.firstWhere((value) => value.hasValue);
+      await controller.forgetDeletedReceipt('another-receipt');
+      expect(controller.state.value!.progress.receiptId, 'r1');
+      await controller.forgetDeletedReceipt('r1');
+      await controller.sync();
+      expect(controller.state.value!.progress.receiptId, isNull);
+      expect(controller.state.value!.progress.viewedAt, isNull);
+      expect(controller.state.value!.progress.firstOpenedAt, 100);
+      expect(controller.state.value!.progress.baselineReceiptCount, 1);
+      expect(cloud.writes.map((event) => event['action']), ['restart']);
+    },
+  );
+
+  test(
+    'deleting a receipt preserves completed onboarding and its enrollment',
+    () async {
+      final cloud = FakeNativeCloud(
+        count: 1,
+        status: 'completed',
+        receiptId: 'r1',
+        viewedAt: 200,
+      );
+      final controller = NativeOnboardingController(
+        'u',
+        cloud.repository(),
+        SilentAnalytics(),
+      );
+      addTearDown(controller.dispose);
+      await controller.stream.firstWhere((value) => value.hasValue);
+      await controller.forgetDeletedReceipt('r1');
+      expect(controller.state.value!.progress.completed, isTrue);
+      expect(controller.state.value!.progress.firstOpenedAt, 100);
+      expect(controller.state.value!.progress.viewedAt, 200);
+      expect(cloud.writes, isEmpty);
+    },
+  );
+
+  test(
     'offline progress is checkpointed before navigation and retries after process restart',
     () async {
       final cloud = FakeNativeCloud();

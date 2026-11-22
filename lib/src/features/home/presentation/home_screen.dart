@@ -65,12 +65,7 @@ List<_TimeAxisLabel> _buildHourlyAxisLabels(List<DailySpendingPoint> points) {
 }
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({
-    super.key,
-    this.highlightReceiptId,
-    this.openUploadOnArrival = false,
-  });
-  final String? highlightReceiptId;
+  const HomeScreen({super.key, this.openUploadOnArrival = false});
   final bool openUploadOnArrival;
 
   @override
@@ -548,6 +543,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
+  void _startReceiptGuide() => context.push('/app/onboarding?fresh=1');
+
+  void _addReceipt() {
+    if (ref.read(receiptsStreamProvider).asData?.value.isEmpty == true) {
+      _startReceiptGuide();
+    } else {
+      _openUpload();
+    }
+  }
+
   void _openUpload() {
     final uid = ref.read(currentUserIdProvider);
     if (uid == null) return;
@@ -675,7 +680,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       floatingActionButton: FloatingActionButton(
-        onPressed: _openUpload,
+        onPressed: _addReceipt,
         elevation: 2,
         child: const Icon(Icons.add_rounded),
       ),
@@ -685,10 +690,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         data: (_) {
           if (sortedReceipts.isEmpty) {
             return EmptyReceiptHome(
-              onAdd: () => context.push('/app/onboarding'),
+              onAdd: _startReceiptGuide,
               onRefresh: _refreshHome,
             );
           }
+          // Introductory prominence ends at three receipts. Choose by upload
+          // time so an old-dated receipt uploaded today is still easy to find.
+          final recentReceipt = sortedReceipts.length < 3
+              ? sortedReceipts.reduce((a, b) {
+                  final aTime =
+                      a.createdAt ??
+                      a.file.uploadedAt ??
+                      DateTime.fromMillisecondsSinceEpoch(0);
+                  final bTime =
+                      b.createdAt ??
+                      b.file.uploadedAt ??
+                      DateTime.fromMillisecondsSinceEpoch(0);
+                  return bTime.isAfter(aTime) ? b : a;
+                })
+              : null;
           final histogramMonthlyData = _buildHistogramMonthlyData(
             sortedReceipts,
             month,
@@ -730,15 +750,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
               children: [
-                if (profile != null && sortedReceipts.length < 5)
-                  GettingStartedPrompt(
-                    key: ValueKey(profile.id),
-                    userId: profile.id,
-                    onAddReceipt: _openUpload,
-                    receiptCount: sortedReceipts.length,
-                  ),
-                if (widget.highlightReceiptId != null ||
-                    sortedReceipts.length < 5) ...[
+                if (recentReceipt != null) ...[
                   Padding(
                     padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
                     child: Text(
@@ -751,10 +763,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ),
                   ),
-                  _HighlightedReceipt(
-                    receiptId:
-                        widget.highlightReceiptId ?? sortedReceipts.first.id,
+                  _ReceiptTile(
+                    key: const ValueKey('featured-recent-receipt'),
+                    receipt: recentReceipt,
                   ),
+                  if (profile != null)
+                    GettingStartedPrompt(
+                      key: ValueKey(profile.id),
+                      userId: profile.id,
+                      receiptCount: sortedReceipts.length,
+                    ),
                   const SizedBox(height: 20),
                 ],
                 // ── Spending card ──
@@ -1610,7 +1628,7 @@ const _avatarColors = <Color>[
 ];
 
 class _ReceiptTile extends StatelessWidget {
-  const _ReceiptTile({required this.receipt});
+  const _ReceiptTile({super.key, required this.receipt});
 
   final Receipt receipt;
 
@@ -2910,19 +2928,4 @@ class _HistogramChartPainter extends CustomPainter {
     if (points.isEmpty) return false;
     return oldDelegate.points.last.amount != points.last.amount;
   }
-}
-
-class _HighlightedReceipt extends ConsumerWidget {
-  const _HighlightedReceipt({required this.receiptId});
-  final String receiptId;
-  @override
-  Widget build(BuildContext context, WidgetRef ref) => ref
-      .watch(receiptWatchProvider(receiptId))
-      .when(
-        data: (receipt) => receipt == null
-            ? const SizedBox.shrink()
-            : _ReceiptTile(receipt: receipt),
-        loading: () => const LinearProgressIndicator(),
-        error: (_, stack) => const SizedBox.shrink(),
-      );
 }

@@ -52,6 +52,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
   String _categoryId = 'other';
   bool _loaded = false;
   bool _saving = false;
+  bool _deleting = false;
   String? _error;
   String? _success;
   bool _viewRecorded = false;
@@ -84,7 +85,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
   }
 
   Future<void> _save(Receipt receipt) async {
-    if (_saving || receipt.isProcessing) return;
+    if (_saving || _deleting || receipt.isProcessing) return;
     final uid = ref.read(currentUserIdProvider);
     if (uid == null) return;
 
@@ -165,8 +166,10 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
   }
 
   Future<void> _delete(Receipt receipt) async {
+    if (_deleting || _saving) return;
     final uid = ref.read(currentUserIdProvider);
     if (uid == null) return;
+    setState(() => _deleting = true);
 
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -214,14 +217,29 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
       },
     );
 
-    if (confirmed != true) return;
+    if (confirmed != true) {
+      if (mounted) setState(() => _deleting = false);
+      return;
+    }
 
     try {
+      if (!mounted || ref.read(currentUserIdProvider) != uid) return;
       await ref.read(receiptRepositoryProvider).deleteReceipt(uid, receipt);
+      if (!mounted || ref.read(currentUserIdProvider) != uid) return;
+      await ref
+          .read(nativeOnboardingProvider(uid).notifier)
+          .forgetDeletedReceipt(receipt.id);
       if (!mounted) return;
       Navigator.of(context).pop();
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (mounted) {
+        setState(
+          () => _error =
+              'We couldn’t delete this receipt. Please check your connection and try again.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _deleting = false);
     }
   }
 
@@ -960,7 +978,9 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
               SizedBox(
                 height: 50,
                 child: OutlinedButton.icon(
-                  onPressed: _saving ? null : () => _delete(receipt),
+                  onPressed: _saving || _deleting
+                      ? null
+                      : () => _delete(receipt),
                   icon: Icon(Icons.delete_outline, size: 20, color: cs.error),
                   label: Text(
                     'Delete receipt',

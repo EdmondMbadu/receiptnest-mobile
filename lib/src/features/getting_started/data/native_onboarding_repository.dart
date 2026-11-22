@@ -376,4 +376,16 @@ class NativeOnboardingController
       );
     }
   }
+
+  Future<void> forgetDeletedReceipt(String receiptId) async {
+    final progress = state.valueOrNull?.progress;
+    if (progress == null ||
+        progress.completed ||
+        progress.receiptId != receiptId) {
+      return;
+    }
+    // Clear the current task only. Enrollment, completion history and server
+    // activation milestones must survive receipt deletion.
+    await act('restart');
+  }
 }

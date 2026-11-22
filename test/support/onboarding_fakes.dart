@@ -1,4 +1,9 @@
+import 'dart:async';
+
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
+import 'package:recieptnest_ai/src/core/config/public_app_config.dart';
+import 'package:recieptnest_ai/src/features/receipts/data/receipt_repository.dart';
 import 'package:recieptnest_ai/src/features/getting_started/data/native_onboarding_repository.dart';
 import 'package:recieptnest_ai/src/features/getting_started/data/onboarding_analytics.dart';
 import 'package:recieptnest_ai/src/features/receipts/models/receipt.dart';
@@ -86,10 +91,13 @@ class FakeNativeCloud {
 }
 
 Receipt exampleReceipt({
+  String id = 'r1',
+  DateTime? createdAt,
+  String date = '2026-10-01',
   String status = ReceiptStatuses.finalStatus,
   double? amount = 12.5,
 }) => Receipt(
-  id: 'r1',
+  id: id,
   userId: 'u',
   status: status,
   file: const ReceiptFile(
@@ -106,8 +114,8 @@ Receipt exampleReceipt({
     matchedBy: 'manual',
   ),
   totalAmount: amount,
-  date: '2026-10-01',
-  createdAt: DateTime(2026, 11, 22),
+  date: date,
+  createdAt: createdAt ?? DateTime(2026, 11, 22),
   category: const ReceiptCategory(
     id: 'restaurants',
     name: 'Restaurants',
@@ -115,3 +123,78 @@ Receipt exampleReceipt({
     assignedBy: 'ai',
   ),
 );
+
+class MemoryReceiptRepository implements ReceiptRepository {
+  MemoryReceiptRepository([List<Receipt> initial = const []]) {
+    for (final receipt in initial) {
+      records[receipt.id] = receipt;
+    }
+  }
+  final records = <String, Receipt>{};
+  final _changes = StreamController<void>.broadcast();
+  final uploads = <String>[];
+  bool failDelete = false;
+
+  Stream<List<Receipt>> get receiptChanges async* {
+    yield records.values.toList();
+    yield* _changes.stream.map((_) => records.values.toList());
+  }
+
+  Stream<Receipt?> receiptChangesFor(String id) async* {
+    yield records[id];
+    yield* _changes.stream.map((_) => records[id]);
+  }
+
+  @override
+  Stream<List<Receipt>> watchReceipts(String uid) => receiptChanges;
+  @override
+  Future<Map<String, dynamic>> generateForwardingAddress() async => {
+    'emailAddress': 'test@receipts.example',
+  };
+  @override
+  Future<String> getReceiptFileUrl(String path) async =>
+      throw StateError('Preview omitted in the test fixture');
+  @override
+  UploadValidationResult validateFile(
+    UploadFileData file, {
+    PublicAppConfig? appConfig,
+  }) => const UploadValidationResult(valid: true);
+  @override
+  Future<Receipt> uploadReceipt({
+    required String userId,
+    required UploadFileData file,
+    PublicAppConfig? appConfig,
+    ValueChanged<double>? onProgress,
+    String? uploadId,
+  }) async {
+    final id = uploadId!;
+    uploads.add(id);
+    final receipt = exampleReceipt(
+      id: id,
+      status: ReceiptStatuses.processing,
+      createdAt: DateTime.now(),
+    );
+    records[id] = receipt;
+    _changes.add(null);
+    onProgress?.call(1);
+    return receipt;
+  }
+
+  void finishProcessing(String id) {
+    records[id] = exampleReceipt(id: id, createdAt: records[id]?.createdAt);
+    _changes.add(null);
+  }
+
+  @override
+  Future<void> deleteReceipt(String uid, Receipt receipt) async {
+    if (failDelete) throw StateError('Simulated deletion failure');
+    records.remove(receipt.id);
+    _changes.add(null);
+  }
+
+  Future<void> dispose() => _changes.close();
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnsupportedError(
+    'Unexpected receipt call: ${invocation.memberName}',
+  );
+}

@@ -208,15 +208,28 @@ final receiptWatchProvider = StreamProvider.autoDispose
     .family<Receipt?, String>((ref, id) {
       final uid = ref.watch(currentUserIdProvider);
       if (uid == null) return Stream.value(null);
-      return ref
-          .watch(firestoreProvider)
-          .collection('users')
-          .doc(uid)
-          .collection('receipts')
-          .doc(id)
-          .snapshots()
-          .map((doc) => doc.exists ? Receipt.fromSnapshot(doc) : null);
+      return receiptUpdatesFromSnapshots(
+        ref
+            .watch(firestoreProvider)
+            .collection('users')
+            .doc(uid)
+            .collection('receipts')
+            .doc(id)
+            .snapshots(includeMetadataChanges: true),
+      );
     });
+
+Stream<Receipt?> receiptUpdatesFromSnapshots(
+  Stream<DocumentSnapshot<Map<String, dynamic>>> snapshots,
+) => snapshots
+    // Cache misses and optimistic local deletions do not prove deletion.
+    // Metadata updates publish null only after the server confirms removal.
+    .where(
+      (doc) =>
+          doc.exists ||
+          (!doc.metadata.isFromCache && !doc.metadata.hasPendingWrites),
+    )
+    .map((doc) => doc.exists ? Receipt.fromSnapshot(doc) : null);
 
 class MonthOverMonthChange {
   const MonthOverMonthChange({required this.percent, required this.isIncrease});

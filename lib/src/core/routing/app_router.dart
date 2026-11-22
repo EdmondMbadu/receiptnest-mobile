@@ -100,6 +100,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/app/onboarding',
         builder: (context, state) => NativeOnboardingScreen(
           replay: state.uri.queryParameters['replay'] == '1',
+          startFresh: state.uri.queryParameters['fresh'] == '1',
         ),
       ),
       GoRoute(
@@ -121,7 +122,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             pageBuilder: (context, state) => _noTransitionPage(
               state: state,
               child: HomeScreen(
-                highlightReceiptId: state.uri.queryParameters['highlight'],
                 openUploadOnArrival:
                     state.uri.queryParameters['addReceipt'] == '1',
               ),

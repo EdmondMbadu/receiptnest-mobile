@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:recieptnest_ai/src/core/theme/app_theme.dart';
+import 'package:recieptnest_ai/src/core/config/public_app_config.dart';
+import 'package:recieptnest_ai/src/features/auth/models/user_profile.dart';
+import 'package:recieptnest_ai/src/features/home/presentation/home_screen.dart';
+import 'package:recieptnest_ai/src/features/receipts/presentation/receipt_detail_screen.dart';
 import 'package:recieptnest_ai/src/features/auth/data/auth_repository.dart';
 import 'package:recieptnest_ai/src/features/auth/presentation/account_access_screen.dart';
 import 'package:recieptnest_ai/src/features/getting_started/data/native_onboarding_repository.dart';
@@ -49,6 +54,7 @@ Widget fixture({
   FakeNativeCloud? cloud,
   Receipt? receipt,
   Stream<Receipt?>? stream,
+  MemoryReceiptRepository? repository,
   bool dark = false,
   GoRouter? router,
   double textScale = 1,
@@ -56,12 +62,36 @@ Widget fixture({
   final fake = cloud ?? FakeNativeCloud();
   final overrides = [
     currentUserIdProvider.overrideWithValue('u'),
+    currentUserProfileProvider.overrideWith(
+      (ref) => Stream.value(
+        const UserProfile(
+          id: 'u',
+          firstName: 'Test',
+          lastName: '',
+          email: 'test@example.test',
+        ),
+      ),
+    ),
+    publicAppConfigProvider.overrideWith(
+      (ref) => Stream.value(const PublicAppConfig()),
+    ),
+    if (repository != null)
+      receiptRepositoryProvider.overrideWithValue(repository),
+    if (repository != null)
+      receiptFileUrlProvider.overrideWith(
+        (ref, path) => repository.getReceiptFileUrl(path),
+      ),
     nativeOnboardingRepositoryProvider.overrideWithValue(fake.repository()),
     onboardingAnalyticsProvider.overrideWithValue(SilentAnalytics()),
-    sortedReceiptsProvider.overrideWithValue(receipt == null ? [] : [receipt]),
-    receiptWatchProvider(
-      'r1',
-    ).overrideWith((ref) => stream ?? Stream.value(receipt)),
+    receiptsStreamProvider.overrideWith(
+      (ref) =>
+          repository?.receiptChanges ??
+          Stream.value(receipt == null ? [] : [receipt]),
+    ),
+    receiptWatchProvider.overrideWith(
+      (ref, id) =>
+          repository?.receiptChangesFor(id) ?? stream ?? Stream.value(receipt),
+    ),
   ];
   Widget wrap(BuildContext context, Widget? body) => MediaQuery(
     data: MediaQuery.of(
@@ -276,6 +306,408 @@ void main() {
     },
   );
 
+  testWidgets(
+    'a completed guide does not reopen its deleted receipt for a new upload',
+    (tester) async {
+      phone(tester);
+      final cloud = FakeNativeCloud(
+        count: 0,
+        status: 'completed',
+        receiptId: 'r1',
+        viewedAt: 200,
+      );
+      await tester.pumpWidget(
+        fixture(child: const NativeOnboardingScreen(), cloud: cloud),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Take a photo'), findsOneWidget);
+      expect(find.text('Choose a file'), findsOneWidget);
+      expect(
+        find.textContaining('We couldn’t open this receipt'),
+        findsNothing,
+      );
+      expect(cloud.accounts['u']!.completed, isTrue);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'a deleted receipt in an unfinished guide returns directly to source choices',
+    (tester) async {
+      phone(tester);
+      final cloud = FakeNativeCloud(
+        count: 0,
+        status: 'in_progress',
+        receiptId: 'r1',
+      );
+      await tester.pumpWidget(
+        fixture(child: const NativeOnboardingScreen(), cloud: cloud),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Take a photo'), findsOneWidget);
+      expect(
+        find.textContaining('We couldn’t open this receipt'),
+        findsNothing,
+      );
+      expect(cloud.accounts['u']!.receiptId, isNull);
+      expect(cloud.accounts['u']!.firstOpenedAt, 100);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'deleting the last receipt then adding a replacement follows the actual Home flow',
+    (tester) async {
+      phone(tester);
+      final repository = MemoryReceiptRepository([exampleReceipt()]);
+      addTearDown(repository.dispose);
+      final cloud = FakeNativeCloud(
+        count: 1,
+        status: 'completed',
+        receiptId: 'r1',
+        viewedAt: 200,
+      );
+      final router = GoRouter(
+        initialLocation: '/app/home',
+        routes: [
+          GoRoute(path: '/app/home', builder: (_, state) => const HomeScreen()),
+          GoRoute(
+            path: '/app/receipt/:id',
+            builder: (_, state) => ReceiptDetailScreen(
+              receiptId: state.pathParameters['id']!,
+              guided: state.uri.queryParameters['guide'] == '1',
+              onboardingReplay: state.uri.queryParameters['replay'] == '1',
+            ),
+          ),
+          GoRoute(
+            path: '/app/onboarding',
+            builder: (_, state) => NativeOnboardingScreen(
+              startFresh: state.uri.queryParameters['fresh'] == '1',
+            ),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      FilePicker.platform = _SelectedReceiptFilePicker();
+      await tester.pumpWidget(
+        fixture(
+          child: const SizedBox(),
+          cloud: cloud,
+          repository: repository,
+          router: router,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('featured-recent-receipt')));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Delete receipt'),
+        400,
+        scrollable: find
+            .descendant(
+              of: find.byType(ReceiptDetailScreen),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.tap(find.text('Delete receipt'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.pumpAndSettle();
+      expect(repository.records, isEmpty);
+      expect(find.byType(EmptyReceiptHome), findsOneWidget);
+      await tester.ensureVisible(find.text('Add my first receipt'));
+      await tester.tap(find.text('Add my first receipt'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<NativeOnboardingScreen>(find.byType(NativeOnboardingScreen))
+            .startFresh,
+        isTrue,
+      );
+      expect(find.text('Start with\none receipt.'), findsOneWidget);
+      expect(find.text('Take a photo'), findsOneWidget);
+      await tester.tap(find.text('Choose a file'));
+      await tester.pumpAndSettle();
+      expect(find.text('Replacement receipt.pdf'), findsOneWidget);
+      await tester.tap(find.text('Upload receipt'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(repository.uploads, hasLength(1));
+      final replacementId = repository.uploads.single;
+      expect(replacementId, isNot('r1'));
+      expect(find.text('The details,\ncoming together.'), findsOneWidget);
+      repository.finishProcessing(replacementId);
+      await tester.pump();
+      await tester.pumpAndSettle();
+      expect(find.text('View my receipt'), findsOneWidget);
+      expect(find.textContaining('We couldn’t'), findsNothing);
+      expect(cloud.accounts['u']!.completed, isTrue);
+      expect(
+        cloud.accounts['u']!.receiptId,
+        'r1',
+      ); // Completion history is preserved.
+      await tester.tap(find.text('View my receipt'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<ReceiptDetailScreen>(find.byType(ReceiptDetailScreen))
+            .receiptId,
+        replacementId,
+      );
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('View my receipts'));
+      await tester.pumpAndSettle();
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('featured-recent-receipt')),
+        findsOneWidget,
+      );
+      expect(
+        cloud.writes.where((event) => event['action'] != 'observe'),
+        isEmpty,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'cancelled and failed deletions retain both the receipt and its guide',
+    (tester) async {
+      phone(tester);
+      for (final failDelete in [false, true]) {
+        final repository = MemoryReceiptRepository([exampleReceipt()])
+          ..failDelete = failDelete;
+        final cloud = FakeNativeCloud(
+          count: 1,
+          status: 'paused',
+          receiptId: 'r1',
+        );
+        await tester.pumpWidget(
+          fixture(
+            child: const ReceiptDetailScreen(receiptId: 'r1'),
+            cloud: cloud,
+            repository: repository,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.text('Delete receipt'),
+          400,
+          scrollable: find
+              .descendant(
+                of: find.byType(ReceiptDetailScreen),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.tap(find.text('Delete receipt'));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          failDelete
+              ? find.widgetWithText(FilledButton, 'Delete')
+              : find.text('Cancel'),
+        );
+        await tester.pumpAndSettle();
+        expect(repository.records.keys, ['r1']);
+        expect(cloud.accounts['u']!.receiptId, 'r1');
+        expect(
+          cloud.writes.where((event) => event['action'] == 'restart'),
+          isEmpty,
+        );
+        if (failDelete) {
+          expect(
+            find.textContaining('We couldn’t delete this receipt'),
+            findsOneWidget,
+          );
+        }
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await repository.dispose();
+      }
+    },
+  );
+
+  testWidgets(
+    'Home features only the first two receipts and removes completed onboarding prompts',
+    (tester) async {
+      phone(tester);
+      for (final count in [1, 2, 3, 4, 5]) {
+        final receipts = List.generate(
+          count,
+          (index) => exampleReceipt(
+            id: 'r$index',
+            createdAt: DateTime(2026, 11, index + 1),
+          ),
+        );
+        final repository = MemoryReceiptRepository(receipts);
+        final cloud = FakeNativeCloud(count: count, status: 'completed');
+        await tester.pumpWidget(
+          fixture(
+            child: const HomeScreen(),
+            cloud: cloud,
+            repository: repository,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('featured-recent-receipt')),
+          count < 3 ? findsOneWidget : findsNothing,
+        );
+        expect(
+          find.text('YOUR RECENT RECEIPT'),
+          count < 3 ? findsOneWidget : findsNothing,
+        );
+        expect(find.text('Continue receipt guide'), findsNothing);
+        expect(find.text('Your first receipt is in.'), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await repository.dispose();
+      }
+    },
+  );
+
+  testWidgets(
+    'Home leads with the newest upload above its optional resume link',
+    (tester) async {
+      phone(tester);
+      final repository = MemoryReceiptRepository([
+        exampleReceipt(
+          id: 'old',
+          date: '2026-11-22',
+          createdAt: DateTime(2026, 11, 1),
+        ),
+        exampleReceipt(
+          id: 'new',
+          date: '2026-01-01',
+          createdAt: DateTime(2026, 11, 22),
+        ),
+      ]);
+      addTearDown(repository.dispose);
+      final router = GoRouter(
+        initialLocation: '/app/home',
+        routes: [
+          GoRoute(path: '/app/home', builder: (_, state) => const HomeScreen()),
+          GoRoute(
+            path: '/app/receipt/:id',
+            builder: (_, state) =>
+                Scaffold(body: Text('opened:${state.pathParameters['id']}')),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        fixture(
+          child: const SizedBox(),
+          cloud: FakeNativeCloud(count: 2, status: 'paused'),
+          repository: repository,
+          router: router,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final featured = find.byKey(const ValueKey('featured-recent-receipt'));
+      expect(
+        tester.getTopLeft(find.text('Continue receipt guide')).dy,
+        greaterThanOrEqualTo(tester.getBottomLeft(featured).dy),
+      );
+      await tester.tap(featured);
+      await tester.pumpAndSettle();
+      expect(find.text('opened:new'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('a connection error preserves the saved receipt for retry', (
+    tester,
+  ) async {
+    phone(tester);
+    final cloud = FakeNativeCloud(status: 'paused', receiptId: 'r1');
+    await tester.pumpWidget(
+      fixture(
+        child: const NativeOnboardingScreen(),
+        cloud: cloud,
+        stream: Stream.error(Exception('offline')),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Check your connection'), findsOneWidget);
+    expect(find.text('Try again'), findsOneWidget);
+    expect(find.text('Take a photo'), findsNothing);
+    expect(cloud.accounts['u']!.receiptId, 'r1');
+    expect(
+      cloud.writes.where((event) => event['action'] == 'restart'),
+      isEmpty,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets(
+    'a receipt deleted while the guide is open recovers without an error page',
+    (tester) async {
+      phone(tester);
+      final stream = StreamController<Receipt?>();
+      addTearDown(stream.close);
+      final cloud = FakeNativeCloud(
+        count: 1,
+        status: 'in_progress',
+        receiptId: 'r1',
+      );
+      await tester.pumpWidget(
+        fixture(
+          child: const NativeOnboardingScreen(),
+          cloud: cloud,
+          stream: stream.stream,
+        ),
+      );
+      stream.add(exampleReceipt());
+      await tester.pumpAndSettle();
+      expect(find.text('View my receipt'), findsOneWidget);
+      stream.add(null);
+      await tester.pumpAndSettle();
+      expect(find.text('Choose a file'), findsOneWidget);
+      expect(find.textContaining('We couldn’t'), findsNothing);
+      expect(cloud.accounts['u']!.receiptId, isNull);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'explicit fresh entry discards an unfinished task and survives re-entry',
+    (tester) async {
+      phone(tester);
+      final cloud = FakeNativeCloud(
+        status: 'paused',
+        receiptId: 'r1',
+        viewedAt: 200,
+      );
+      await tester.pumpWidget(
+        fixture(
+          child: const NativeOnboardingScreen(startFresh: true),
+          cloud: cloud,
+          receipt: exampleReceipt(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Take a photo'), findsOneWidget);
+      expect(find.text('View my receipts'), findsNothing);
+      expect(cloud.accounts['u']!.receiptId, isNull);
+      expect(cloud.accounts['u']!.viewedAt, isNull);
+      expect(cloud.accounts['u']!.firstOpenedAt, 100);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(
+        fixture(child: const NativeOnboardingScreen(), cloud: cloud),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Take a photo'), findsOneWidget);
+      expect(find.textContaining('We couldn’t'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   testWidgets('failed extraction stays in review and never displays success', (
     tester,
   ) async {
@@ -386,4 +818,28 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+class _SelectedReceiptFilePicker extends FilePicker {
+  @override
+  Future<FilePickerResult?> pickFiles({
+    String? dialogTitle,
+    String? initialDirectory,
+    FileType type = FileType.any,
+    List<String>? allowedExtensions,
+    Function(FilePickerStatus)? onFileLoading,
+    bool allowCompression = false,
+    int compressionQuality = 0,
+    bool allowMultiple = false,
+    bool withData = false,
+    bool withReadStream = false,
+    bool lockParentWindow = false,
+    bool readSequential = false,
+  }) async => FilePickerResult([
+    PlatformFile(
+      name: 'Replacement receipt.pdf',
+      size: 4,
+      bytes: Uint8List.fromList([37, 80, 68, 70]),
+    ),
+  ]);
 }

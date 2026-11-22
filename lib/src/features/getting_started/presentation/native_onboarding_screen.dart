@@ -98,8 +98,13 @@ class NativeOnboardingEntryScreen extends ConsumerWidget {
 }
 
 class NativeOnboardingScreen extends ConsumerStatefulWidget {
-  const NativeOnboardingScreen({super.key, this.replay = false});
+  const NativeOnboardingScreen({
+    super.key,
+    this.replay = false,
+    this.startFresh = false,
+  });
   final bool replay;
+  final bool startFresh;
   @override
   ConsumerState<NativeOnboardingScreen> createState() =>
       _NativeOnboardingScreenState();
@@ -115,10 +120,12 @@ class _NativeOnboardingScreenState
   bool _viewed = false;
   Timer? _slowTimer;
   bool _slow = false;
+  String? _recoveringReceiptId;
 
   @override
   void initState() {
     super.initState();
+    _choosingAgain = widget.startFresh;
     _slowTimer = Timer(const Duration(seconds: 45), () {
       if (mounted) setState(() => _slow = true);
     });
@@ -133,10 +140,30 @@ class _NativeOnboardingScreenState
   NativeOnboardingController _controller(String uid) =>
       ref.read(nativeOnboardingProvider(uid).notifier);
 
+  bool _replaying(String uid) =>
+      widget.replay ||
+      ref.read(nativeOnboardingProvider(uid)).valueOrNull?.progress.completed ==
+          true;
+
+  void _recoverDeletedReceipt(String uid, String receiptId) {
+    if (_recoveringReceiptId == receiptId) return;
+    _recoveringReceiptId = receiptId;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || ref.read(currentUserIdProvider) != uid) return;
+      setState(() {
+        _choosingAgain = true;
+        _sessionReceiptId = null;
+        _viewed = false;
+        _measuredStatus = null;
+      });
+      unawaited(_controller(uid).forgetDeletedReceipt(receiptId));
+    });
+  }
+
   Future<void> _pause() async {
     if (_uploadOpen) return;
     final uid = ref.read(currentUserIdProvider);
-    if (uid != null && !widget.replay) await _controller(uid).act('pause');
+    if (uid != null && !_replaying(uid)) await _controller(uid).act('pause');
     if (mounted) context.go('/app/home');
   }
 
@@ -179,7 +206,7 @@ class _NativeOnboardingScreenState
       _slowTimer = Timer(const Duration(seconds: 45), () {
         if (mounted) setState(() => _slow = true);
       });
-      if (!widget.replay) {
+      if (!_replaying(uid)) {
         await _controller(uid).act('upload', receiptId: uploaded!.id);
       }
     }
@@ -187,7 +214,7 @@ class _NativeOnboardingScreenState
 
   Future<void> _openReceipt(String uid, Receipt receipt) async {
     final reviewed = await context.push<bool>(
-      '/app/receipt/${receipt.id}?guide=1${widget.replay ? '&replay=1' : ''}',
+      '/app/receipt/${receipt.id}?guide=1${_replaying(uid) ? '&replay=1' : ''}',
     );
     if (!mounted || ref.read(currentUserIdProvider) != uid) return;
     if (reviewed == true) setState(() => _viewed = true);
@@ -199,14 +226,11 @@ class _NativeOnboardingScreenState
     bool another = false,
   }) async {
     if (ref.read(currentUserIdProvider) != uid) return;
-    if (!widget.replay) {
+    if (!_replaying(uid)) {
       await _controller(uid).act('complete', receiptId: receiptId);
     }
     if (!mounted) return;
-    final query = <String, String>{
-      'highlight': ?receiptId,
-      if (another) 'addReceipt': '1',
-    };
+    final query = <String, String>{if (another) 'addReceipt': '1'};
     context.go(
       Uri(
         path: '/app/home',
@@ -225,23 +249,29 @@ class _NativeOnboardingScreenState
       _started = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !widget.replay && !state.progress.completed) {
-          _controller(uid).act('introduce');
+          _controller(uid).act(widget.startFresh ? 'restart' : 'introduce');
         }
       });
     }
-    final receiptId = _choosingAgain
+    final replaying = widget.replay || state?.progress.completed == true;
+    final savedReceiptId = _choosingAgain
         ? null
-        : _sessionReceiptId ??
-              (widget.replay ? null : state?.progress.receiptId);
-    final receiptAsync = receiptId == null
+        : _sessionReceiptId ?? (replaying ? null : state?.progress.receiptId);
+    final receiptAsync = savedReceiptId == null
         ? null
-        : ref.watch(receiptWatchProvider(receiptId));
+        : ref.watch(receiptWatchProvider(savedReceiptId));
+    final deleted =
+        receiptAsync is AsyncData<Receipt?> && receiptAsync.value == null;
+    if (deleted && savedReceiptId != null) {
+      _recoverDeletedReceipt(uid, savedReceiptId);
+    }
+    final receiptId = deleted ? null : savedReceiptId;
     final receipt = receiptAsync?.valueOrNull;
     final ready = receipt != null && !receipt.isProcessing;
     final usable = receipt != null && isUsableReceipt(receipt);
     final viewed =
         _viewed ||
-        (!widget.replay &&
+        (!replaying &&
             state?.progress.viewedAt != null &&
             receiptId == state?.progress.receiptId);
     final stage = receiptId == null
@@ -316,10 +346,8 @@ class _NativeOnboardingScreenState
                                           receipt?.status ==
                                               ReceiptStatuses.finalStatus
                                     ? _success(uid, receipt!)
-                                    : receiptAsync?.hasError == true ||
-                                          (receiptAsync?.hasValue == true &&
-                                              receipt == null)
-                                    ? _missingReceipt(receiptId)
+                                    : receiptAsync?.hasError == true
+                                    ? _receiptLoadError(receiptId)
                                     : !ready
                                     ? _processing()
                                     : _result(uid, receipt, usable),
@@ -377,7 +405,8 @@ class _NativeOnboardingScreenState
   );
 
   Widget _choose(NativeOnboardingState state) {
-    final first = state.receiptCount == 0;
+    final liveCount = ref.watch(receiptsStreamProvider).asData?.value.length;
+    final first = (liveCount ?? state.receiptCount) == 0;
     final receipts = ref.watch(sortedReceiptsProvider);
     final existing = receipts.where((r) => !r.isProcessing).firstOrNull;
     return OnboardingReveal(
@@ -445,11 +474,9 @@ class _NativeOnboardingScreenState
                   _sessionReceiptId = existing.id;
                   _choosingAgain = false;
                 });
-                if (!widget.replay) {
-                  final uid = ref.read(currentUserIdProvider);
-                  if (uid != null) {
-                    _controller(uid).act('upload', receiptId: existing.id);
-                  }
+                final uid = ref.read(currentUserIdProvider);
+                if (uid != null && !_replaying(uid)) {
+                  _controller(uid).act('upload', receiptId: existing.id);
                 }
               },
               icon: const Icon(Icons.receipt_long_outlined, size: 18),
@@ -499,12 +526,12 @@ class _NativeOnboardingScreenState
     ),
   );
 
-  Widget _missingReceipt(String id) => Column(
+  Widget _receiptLoadError(String id) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       const OnboardingMessage(
         message:
-            'We couldn’t open this receipt. It may have been removed, or your connection may have dropped.',
+            'We couldn’t load your receipt. Check your connection and try again. Your guide is saved.',
         error: true,
       ),
       const SizedBox(height: 20),
@@ -521,7 +548,7 @@ class _NativeOnboardingScreenState
 
   void _restart() {
     final uid = ref.read(currentUserIdProvider);
-    if (uid != null && !widget.replay) _controller(uid).act('restart');
+    if (uid != null && !_replaying(uid)) _controller(uid).act('restart');
     setState(() {
       _choosingAgain = true;
       _viewed = false;
