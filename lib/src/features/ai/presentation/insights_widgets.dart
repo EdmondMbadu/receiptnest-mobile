@@ -273,75 +273,63 @@ class InsightsHeader extends StatelessWidget {
   const InsightsHeader({
     super.key,
     required this.monthLabel,
-    required this.compact,
     required this.onHistory,
     required this.onNewChat,
     required this.onShare,
-    required this.onPricing,
+    this.compact = false,
   });
   final String monthLabel;
-  final bool compact;
   final VoidCallback onHistory;
-  final VoidCallback onNewChat;
+  final VoidCallback? onNewChat;
   final VoidCallback? onShare;
-  final VoidCallback onPricing;
+  final bool compact;
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'AI Insights',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.7,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                monthLabel,
+              const Text(
+                'Insights',
+                key: ValueKey('insights-heading'),
                 style: TextStyle(
-                  fontSize: 13,
-                  height: 1.5,
-                  color: cs.onSurfaceVariant,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.4,
                 ),
               ),
+              if (!compact) ...[
+                const SizedBox(height: 3),
+                Text(
+                  monthLabel,
+                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                ),
+              ],
             ],
           ),
         ),
-        if (compact)
-          IconButton(
-            onPressed: onHistory,
-            tooltip: 'Conversation history',
-            icon: const Icon(Icons.history_rounded),
-          ),
-        PopupMenuButton<String>(
-          tooltip: 'Conversation options',
-          onSelected: (value) {
-            switch (value) {
-              case 'new':
-                onNewChat();
-              case 'share':
-                onShare?.call();
-              case 'pricing':
-                onPricing();
-            }
-          },
-          itemBuilder: (_) => [
-            const PopupMenuItem(value: 'new', child: Text('New conversation')),
-            PopupMenuItem(
-              value: 'share',
-              enabled: onShare != null,
-              child: const Text('Share conversation'),
-            ),
-            const PopupMenuItem(value: 'pricing', child: Text('View plans')),
-          ],
+        IconButton(
+          onPressed: onHistory,
+          tooltip: 'Conversation history',
+          icon: const Icon(Icons.history_rounded, size: 22),
         ),
+        if (onNewChat != null)
+          IconButton(
+            onPressed: onNewChat,
+            tooltip: 'New question',
+            icon: const Icon(Icons.edit_square, size: 22),
+          ),
+        if (onShare != null)
+          PopupMenuButton<String>(
+            tooltip: 'Conversation options',
+            onSelected: (_) => onShare!(),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'share', child: Text('Share conversation')),
+            ],
+          ),
       ],
     );
   }
@@ -355,26 +343,25 @@ class InsightsEmptyConversation extends StatelessWidget {
     required this.hasReceipts,
   });
   final List<String> questions;
-  final ValueChanged<String>? onQuestion;
+  final ValueChanged<String> onQuestion;
   final bool hasReceipts;
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 56,
-            height: 56,
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: cs.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(
               Icons.auto_awesome_outlined,
-              size: 27,
+              size: 24,
               color: cs.primary,
             ),
           ),
@@ -389,127 +376,48 @@ class InsightsEmptyConversation extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             hasReceipts
-                ? 'Explore categories, compare months, or find a detail in your receipts.'
-                : 'Upload a receipt to start exploring your spending. Your questions and answers will stay together here.',
+                ? 'Ask a question about your saved receipts. We’ll help you make sense of them.'
+                : 'Add your first receipt from Home, then ask about your spending here.',
             style: TextStyle(
               fontSize: 14,
-              height: 1.6,
+              height: 1.5,
               color: cs.onSurfaceVariant,
             ),
           ),
-          if (questions.isNotEmpty) ...[
+          if (hasReceipts && questions.isNotEmpty) ...[
             const SizedBox(height: 24),
-            const Text(
-              'A FEW IDEAS TO GET STARTED',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.1,
-              ),
-            ),
-            const SizedBox(height: 12),
-            for (final question in questions.take(3))
+            for (final question in questions.take(2))
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: Material(
-                  color: cs.primary.withValues(alpha: 0.035),
-                  borderRadius: BorderRadius.circular(16),
-                  child: InkWell(
-                    onTap: onQuestion == null
-                        ? null
-                        : () => onQuestion!(question),
-                    borderRadius: BorderRadius.circular(16),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              question,
-                              style: TextStyle(
-                                fontSize: 13,
-                                height: 1.5,
-                                color: cs.onSurface,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Icon(
-                            Icons.arrow_outward_rounded,
-                            size: 18,
-                            color: cs.primary,
-                          ),
-                        ],
-                      ),
+                child: OutlinedButton(
+                  onPressed: () => onQuestion(question),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
                     ),
+                    side: BorderSide(
+                      color: cs.outlineVariant.withValues(alpha: 0.5),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          question,
+                          style: const TextStyle(fontSize: 13, height: 1.5),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Icon(Icons.arrow_forward_rounded, size: 17),
+                    ],
                   ),
                 ),
               ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class InsightsSummaryCard extends StatelessWidget {
-  const InsightsSummaryCard({super.key, required this.insights});
-  final List<String> insights;
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return InsightsSurface(
-      tinted: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.lightbulb_outline_rounded,
-                size: 21,
-                color: cs.primary,
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Text(
-                  'Your spending insights',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          for (final (index, insight) in insights.indexed)
-            Padding(
-              padding: EdgeInsets.only(
-                bottom: index == insights.length - 1 ? 0 : 14,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 5),
-                    child: Icon(
-                      Icons.check_rounded,
-                      size: 16,
-                      color: cs.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      insight,
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 1.6,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
         ],
       ),
     );
@@ -645,14 +553,18 @@ class InsightsComposer extends StatelessWidget {
   const InsightsComposer({
     super.key,
     required this.controller,
+    required this.focusNode,
     required this.onSend,
     required this.busy,
     required this.compactHeight,
+    this.singleLine = false,
   });
   final TextEditingController controller;
+  final FocusNode focusNode;
   final VoidCallback onSend;
   final bool busy;
   final bool compactHeight;
+  final bool singleLine;
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -664,8 +576,9 @@ class InsightsComposer extends StatelessWidget {
           top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
       child: Center(
+        heightFactor: 1,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
           child: Row(
@@ -675,9 +588,14 @@ class InsightsComposer extends StatelessWidget {
                 child: TextField(
                   key: const ValueKey('insights-message-input'),
                   controller: controller,
-                  enabled: !busy,
+                  focusNode: focusNode,
+                  onTapOutside: (_) => focusNode.unfocus(),
                   minLines: 1,
-                  maxLines: compactHeight ? 2 : 4,
+                  maxLines: singleLine
+                      ? 1
+                      : compactHeight
+                      ? 2
+                      : 3,
                   textCapitalization: TextCapitalization.sentences,
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => onSend(),
@@ -733,6 +651,7 @@ class InsightsHistoryPanel extends StatelessWidget {
     required this.onNewChat,
     this.loading = false,
     this.error = false,
+    required this.onRetry,
   });
   final List<AiChatHistoryItem> history;
   final String? activeChatId;
@@ -740,107 +659,117 @@ class InsightsHistoryPanel extends StatelessWidget {
   final VoidCallback onNewChat;
   final bool loading;
   final bool error;
+  final VoidCallback onRetry;
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return InsightsSurface(
-      padding: EdgeInsets.zero,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 12, 10, 12),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Conversations',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                  ),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 12, 10, 12),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Conversations',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
-                IconButton(
-                  onPressed: onNewChat,
-                  tooltip: 'New conversation',
-                  icon: Icon(
-                    Icons.add_comment_outlined,
-                    color: cs.primary,
-                    size: 21,
-                  ),
+              ),
+              IconButton(
+                onPressed: onNewChat,
+                tooltip: 'New question',
+                icon: Icon(
+                  Icons.add_comment_outlined,
+                  color: cs.primary,
+                  size: 21,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.5)),
-          Expanded(
-            child: loading
-                ? const Center(child: CircularProgressIndicator())
-                : history.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.all(22),
-                    child: Center(
-                      child: Text(
-                        error
-                            ? 'Your conversations couldn’t load. Please try again when you’re connected.'
-                            : 'Your conversations will appear here.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: cs.onSurfaceVariant,
-                          height: 1.6,
+        ),
+        Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.5)),
+        Expanded(
+          child: loading
+              ? const Center(child: CircularProgressIndicator())
+              : history.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.all(22),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          error
+                              ? 'Your conversations couldn’t load. Please try again when you’re connected.'
+                              : 'Your conversations will appear here.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: cs.onSurfaceVariant,
+                            height: 1.6,
+                          ),
                         ),
-                      ),
+                        if (error)
+                          TextButton(
+                            onPressed: onRetry,
+                            child: const Text('Try again'),
+                          ),
+                      ],
                     ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.all(8),
-                    itemCount: history.length,
-                    separatorBuilder: (_, index) => const SizedBox(height: 4),
-                    itemBuilder: (context, index) {
-                      final chat = history[index];
-                      return Material(
-                        color: chat.id == activeChatId
-                            ? cs.primary.withValues(alpha: 0.09)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(14),
-                        child: ListTile(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          leading: Icon(
-                            Icons.chat_bubble_outline_rounded,
-                            size: 19,
-                            color: cs.primary,
-                          ),
-                          title: Text(
-                            chat.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              height: 1.5,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          subtitle: Padding(
-                            padding: const EdgeInsets.only(top: 3),
-                            child: Text(
-                              '${chat.messageCount} messages',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: cs.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          onTap: () => onOpen(chat.id),
-                        ),
-                      );
-                    },
                   ),
-          ),
-        ],
-      ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.all(8),
+                  itemCount: history.length,
+                  separatorBuilder: (_, index) => const SizedBox(height: 4),
+                  itemBuilder: (context, index) {
+                    final chat = history[index];
+                    return Material(
+                      color: chat.id == activeChatId
+                          ? cs.primary.withValues(alpha: 0.09)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(14),
+                      child: ListTile(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        leading: Icon(
+                          Icons.chat_bubble_outline_rounded,
+                          size: 19,
+                          color: cs.primary,
+                        ),
+                        title: Text(
+                          chat.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            height: 1.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Text(
+                            MaterialLocalizations.of(
+                              context,
+                            ).formatShortDate(chat.updatedAt),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        onTap: () => onOpen(chat.id),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }

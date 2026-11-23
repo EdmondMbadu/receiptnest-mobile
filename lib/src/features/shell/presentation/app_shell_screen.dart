@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../auth/data/auth_repository.dart';
 import '../../../core/theme/theme_controller.dart';
+import '../../../core/widgets/keyboard_inset_scope.dart';
 import '../../receipts/presentation/receipt_upload_activity_bar.dart';
 
 class AppShellScreen extends ConsumerWidget {
@@ -28,6 +29,8 @@ class AppShellScreen extends ConsumerWidget {
     final isHomeTab = currentIndex == 0;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final typingInInsights = currentIndex == 1 && keyboardInset > 0;
 
     Future<void> openFromDrawer(String route) async {
       Navigator.of(context).pop();
@@ -71,118 +74,145 @@ class AppShellScreen extends ConsumerWidget {
         backgroundColor: isDark
             ? const Color(0xFF0D0D14)
             : const Color(0xFFF6F7F9),
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          title: Text(
-            'ReceiptNest',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.3,
-              color: cs.onSurface,
-            ),
-          ),
-          actions: [
-            Container(
-              width: 36,
-              height: 36,
-              margin: const EdgeInsets.only(right: 4),
-              decoration: BoxDecoration(
-                color: cs.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: IconButton(
-                icon: Icon(
-                  isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-                  size: 18,
-                  color: cs.primary,
-                ),
-                padding: EdgeInsets.zero,
-                tooltip: isDark ? 'Light mode' : 'Dark mode',
-                onPressed: () => ref.read(themeModeProvider.notifier).toggle(),
-              ),
-            ),
-            const SizedBox(width: 12),
-          ],
-        ),
-        body: child,
-        bottomNavigationBar: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const ReceiptUploadActivityBar(),
-            Container(
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0D0D14) : Colors.white,
-                border: Border(
-                  top: BorderSide(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.06)
-                        : Colors.grey.shade200,
-                  ),
-                ),
-                boxShadow: isDark
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 12,
-                          offset: const Offset(0, -4),
-                        ),
-                      ],
-              ),
-              child: NavigationBar(
+        appBar: typingInInsights
+            ? null
+            : AppBar(
                 backgroundColor: Colors.transparent,
                 elevation: 0,
-                indicatorColor: cs.primary.withValues(alpha: 0.1),
-                selectedIndex: currentIndex,
-                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-                onDestinationSelected: (index) {
-                  switch (index) {
-                    case 0:
-                      context.go('/app/home');
-                      break;
-                    case 1:
-                      context.go('/app/insights');
-                      break;
-                    case 2:
-                      context.go('/app/folders');
-                      break;
-                  }
-                },
-                destinations: [
-                  NavigationDestination(
-                    icon: Icon(
-                      Icons.home_outlined,
-                      color: cs.onSurface.withValues(alpha: 0.4),
-                    ),
-                    selectedIcon: Icon(Icons.home_rounded, color: cs.primary),
-                    label: 'Home',
+                scrolledUnderElevation: 0,
+                title: Text(
+                  'ReceiptNest',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3,
+                    color: cs.onSurface,
                   ),
-                  NavigationDestination(
-                    icon: Icon(
-                      Icons.auto_awesome_outlined,
-                      color: cs.onSurface.withValues(alpha: 0.4),
+                ),
+                actions: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    margin: const EdgeInsets.only(right: 4),
+                    decoration: BoxDecoration(
+                      color: cs.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    selectedIcon: Icon(
-                      Icons.auto_awesome_rounded,
-                      color: cs.primary,
+                    child: IconButton(
+                      icon: Icon(
+                        isDark
+                            ? Icons.light_mode_rounded
+                            : Icons.dark_mode_rounded,
+                        size: 18,
+                        color: cs.primary,
+                      ),
+                      padding: EdgeInsets.zero,
+                      tooltip: isDark ? 'Light mode' : 'Dark mode',
+                      onPressed: () =>
+                          ref.read(themeModeProvider.notifier).toggle(),
                     ),
-                    label: 'Insights',
                   ),
-                  NavigationDestination(
-                    icon: Icon(
-                      Icons.folder_outlined,
-                      color: cs.onSurface.withValues(alpha: 0.4),
-                    ),
-                    selectedIcon: Icon(Icons.folder_rounded, color: cs.primary),
-                    label: 'Collections',
-                  ),
+                  const SizedBox(width: 12),
                 ],
               ),
+        // The shell owns the keyboard inset once. Nested page scaffolds must
+        // not subtract it again, and the tabs stay above the keyboard.
+        body: KeyboardInsetScope(
+          bottom: keyboardInset,
+          child: SafeArea(
+            top: typingInInsights,
+            bottom: false,
+            child: MediaQuery.removeViewInsets(
+              context: context,
+              removeBottom: true,
+              child: child,
             ),
-          ],
+          ),
+        ),
+        bottomNavigationBar: Padding(
+          padding: EdgeInsets.only(bottom: keyboardInset),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const ReceiptUploadActivityBar(),
+              Container(
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0D0D14) : Colors.white,
+                  border: Border(
+                    top: BorderSide(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.06)
+                          : Colors.grey.shade200,
+                    ),
+                  ),
+                  boxShadow: isDark
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 12,
+                            offset: const Offset(0, -4),
+                          ),
+                        ],
+                ),
+                child: NavigationBar(
+                  key: const ValueKey('primary-navigation'),
+                  height: keyboardInset > 0 ? 64 : 80,
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  indicatorColor: cs.primary.withValues(alpha: 0.1),
+                  selectedIndex: currentIndex,
+                  labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                  onDestinationSelected: (index) {
+                    FocusScope.of(context).unfocus();
+                    switch (index) {
+                      case 0:
+                        context.go('/app/home');
+                        break;
+                      case 1:
+                        context.go('/app/insights');
+                        break;
+                      case 2:
+                        context.go('/app/folders');
+                        break;
+                    }
+                  },
+                  destinations: [
+                    NavigationDestination(
+                      icon: Icon(
+                        Icons.home_outlined,
+                        color: cs.onSurface.withValues(alpha: 0.4),
+                      ),
+                      selectedIcon: Icon(Icons.home_rounded, color: cs.primary),
+                      label: 'Home',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(
+                        Icons.auto_awesome_outlined,
+                        color: cs.onSurface.withValues(alpha: 0.4),
+                      ),
+                      selectedIcon: Icon(
+                        Icons.auto_awesome_rounded,
+                        color: cs.primary,
+                      ),
+                      label: 'Insights',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(
+                        Icons.folder_outlined,
+                        color: cs.onSurface.withValues(alpha: 0.4),
+                      ),
+                      selectedIcon: Icon(
+                        Icons.folder_rounded,
+                        color: cs.primary,
+                      ),
+                      label: 'Collections',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
         drawer: Drawer(
           backgroundColor: isDark ? const Color(0xFF0D0D14) : Colors.white,

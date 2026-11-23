@@ -18,8 +18,6 @@ final aiRepositoryProvider = Provider<AiRepository>((ref) {
   );
 });
 
-final aiActiveChatIdProvider = StateProvider<String?>((ref) => null);
-
 final aiChatHistoryProvider = StreamProvider<List<AiChatHistoryItem>>((ref) {
   final uid = ref.watch(currentUserIdProvider);
   if (uid == null) {
@@ -139,7 +137,7 @@ class AiRepository {
       'type': 'chat',
       'message': message.trim(),
       'history': history
-          .take(10)
+          .skip(history.length > 10 ? history.length - 10 : 0)
           .map((m) => {'role': m.role, 'content': m.content})
           .toList(),
       'data': insightData,

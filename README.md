@@ -28,6 +28,14 @@ For an App Store or TestFlight archive, use `scripts/build_ios_appstore.sh`. It 
 
 For other platforms, use `flutter run -d <device-id>`.
 
+## Optimized release builds
+
+Run `scripts/build_release.sh --no-pub` to validate and build a signed iOS IPA/archive, a Google Play AAB, and separate Android APKs for ARM32, ARM64, and x86-64. Shared Flutter arguments such as `--build-number=10` are forwarded to each build; choose an unused build number before uploading. The iOS build loads the production RevenueCat configuration as above.
+
+Each run saves its artifacts, Dart symbols, Android R8 mappings, native iOS dSYMs (inside the archive), and `sizes.json` under a dated `output/releases/` directory. Preserve the complete directory with each distributed build so crash traces can be symbolicated. The default iOS export also includes native symbols for App Store processing. Do not compare the entire IPA or AAB upload size with a user's download size.
+
+When a development signing profile is available, the same archive is also exported locally with device thinning to generate `App Thinning Size Report.txt`. This is a development estimate; App Store Connect and Google Play provide the final delivery sizes. Nothing in these scripts uploads or publishes a build. Rebuild after further source changes before distributing the next testing or store release.
+
 ## Security Note
 
 This repo ignores local/secret config files including:
@@ -37,6 +45,13 @@ This repo ignores local/secret config files including:
 - `macos/Runner/GoogleService-Info.plist`
 - `.env*`
 - Android signing keys / keystore files
+
+## Insights
+
+- Pro Insights starts with a question box and two optional example questions. Saved conversations open from History; the page does not automatically load a long previous thread. New question starts a separate conversation, and sharing is available from the conversation menu.
+- The app shell handles keyboard layout once and keeps Home, Insights, and Collections above the keyboard. Introductory prompts recede while typing. Drafts, the current conversation, scroll position, and pending answers survive tab changes within the same account/session; changing accounts clears that state.
+- Messages render lazily, and a new answer keeps the reader near its beginning. Follow-up requests send the most recent ten messages as context while preserving the full saved conversation.
+- Regression coverage includes keyboard navigation, small screens, landscape, enlarged text, late responses, account changes, failed requests, and history selection. Existing release artifacts must be rebuilt after these source changes before distribution.
 
 ## Getting started and welcome email
 

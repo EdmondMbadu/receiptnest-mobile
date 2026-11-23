@@ -49,4 +49,21 @@ if [[ -n "${REVENUECAT_IOS_ANNUAL_PACKAGE_ID:-}" ]]; then
   dart_defines+=("--dart-define=REVENUECAT_IOS_ANNUAL_PACKAGE_ID=${REVENUECAT_IOS_ANNUAL_PACKAGE_ID}")
 fi
 
-flutter build ipa --release "${dart_defines[@]}"
+# Keep symbols outside the app and retain them alongside this build's artifacts.
+release_dir="${RECEIPTNEST_RELEASE_DIR:-output/releases/$(date -u +%Y%m%dT%H%M%SZ)}"
+mkdir -p "$release_dir/symbols/ios"
+if [[ -d build/ios/ipa ]]; then
+  # An old IPA must not be mistaken for a successful export of this build.
+  mkdir -p output/previous-ios-exports
+  previous_exports="output/previous-ios-exports/$(date -u +%Y%m%dT%H%M%SZ)"
+  mv build/ios/ipa "$previous_exports"
+fi
+flutter build ipa --release \
+  --split-debug-info="$release_dir/symbols/ios" \
+  "${dart_defines[@]}" "$@"
+shopt -s nullglob
+ipas=(build/ios/ipa/*.ipa)
+if [[ ${#ipas[@]} -ne 1 ]]; then
+  echo 'The archive was built, but no fresh IPA was exported. Check the signing/export errors above.' >&2
+  exit 1
+fi
