@@ -53,7 +53,7 @@ This repo ignores local/secret config files including:
 
 ## Email receipts
 
-- Forward an email is available in the first-receipt guide, empty Home, the Add Receipt sheet, and Settings. All entry points open the same instructions and account-specific address; the existing backend allocates addresses without requiring a prior receipt. Existing addresses are reused.
+- Forward an email is available when choosing a receipt source in the first-receipt guide, in the Add Receipt sheet, and in Settings. The empty Home screen keeps the focus on Add my first receipt. All forwarding entry points open the same instructions and account-specific address; the existing backend allocates addresses without requiring a prior receipt. Existing addresses are reused.
 - Copying the address does not complete onboarding or claim a receipt arrived. New email receipts appear in the existing receipt activity and result flow, with their original purchase month and review requirements. The guide can continue with the received receipt.
 - The first receipt snapshot is a baseline, so historical emails do not trigger arrival notices. Copying saves a short-lived, account-specific checkpoint containing only a timestamp and receipt IDs, allowing arrival recovery after restarting the app. Confirmed account deletion clears that checkpoint.
 - Messages render lazily, and a new answer keeps the reader near its beginning. Follow-up requests send the most recent ten messages as context while preserving the full saved conversation.

@@ -95,15 +95,6 @@ class EmptyReceiptHome extends StatelessWidget {
                             label: const Text('Add my first receipt'),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        TextButton.icon(
-                          onPressed: () => context.push('/app/forward-email'),
-                          icon: const Icon(
-                            Icons.mail_outline_rounded,
-                            size: 19,
-                          ),
-                          label: const Text('Forward an email'),
-                        ),
                         const SizedBox(height: 10),
                         TextButton(
                           onPressed: () => context.push('/app/help'),

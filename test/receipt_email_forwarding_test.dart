@@ -514,16 +514,14 @@ void main() {
   );
 
   testWidgets(
-    'new users can find forwarding on empty Home and in the first-receipt guide',
+    'empty Home keeps one clear first-receipt action; forwarding appears with source choices',
     (tester) async {
       final repo = _ForwardRepository();
-      final router = await _screen(tester, repo, initial: '/app/home');
+      await _screen(tester, repo, initial: '/app/home');
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Forward an email'));
-      await tester.tap(find.text('Forward an email'));
-      await tester.pumpAndSettle();
-      expect(find.text(repo.address), findsOneWidget);
-      router.go('/app/onboarding');
+      expect(find.text('Forward an email'), findsNothing);
+      await tester.ensureVisible(find.text('Add my first receipt'));
+      await tester.tap(find.text('Add my first receipt'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Forward an email'));
       await screenshot(tester, 'choose');
