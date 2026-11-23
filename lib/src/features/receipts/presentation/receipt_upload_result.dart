@@ -216,6 +216,7 @@ class ReceiptUploadResult extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final needsReview = receiptUploadNeedsReview(receipt);
+    final fromEmail = receipt.source == 'email';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -228,6 +229,8 @@ class ReceiptUploadResult extends StatelessWidget {
                     : Icons.task_alt_rounded,
                 label: needsReview
                     ? 'A quick check needed'
+                    : fromEmail
+                    ? 'Receipt saved'
                     : 'Receipt organized',
               ),
             ),
@@ -243,15 +246,21 @@ class ReceiptUploadResult extends StatelessWidget {
         Text(
           needsReview
               ? 'A quick check\nand you’re done.'
+              : fromEmail
+              ? 'Your receipt is here.'
               : first
               ? 'Your first receipt,\nall together.'
               : 'Another receipt,\ntaken care of.',
-          style: _title(context),
+          style: fromEmail
+              ? _title(context).copyWith(fontWeight: FontWeight.w600)
+              : _title(context),
         ),
         const SizedBox(height: 12),
         Text(
           needsReview
               ? 'Your original is saved. Check the details against it, then confirm and save.'
+              : fromEmail
+              ? 'Forwarded from your email. The details are ready for you to review.'
               : 'The details are filled in and the original is safely stored.',
           style: _body(context),
         ),
@@ -282,7 +291,7 @@ class ReceiptUploadResult extends StatelessWidget {
             label: Text(
               needsReview
                   ? 'Check receipt details'
-                  : first || guided
+                  : !fromEmail && (first || guided)
                   ? 'View my receipt'
                   : 'View receipt',
             ),
@@ -325,6 +334,7 @@ class ReceiptUploadSummary extends StatelessWidget {
         'USD';
     final month = date == null ? null : DateFormat('MMMM').format(date);
     return OnboardingPaper(
+      neutral: receipt.source == 'email',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

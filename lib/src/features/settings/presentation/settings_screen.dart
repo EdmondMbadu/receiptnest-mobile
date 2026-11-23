@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/models/user_profile.dart';
+import '../../receipts/presentation/forward_email_screen.dart';
 
 enum _SettingsTab { general, account, notifications }
 
@@ -415,6 +416,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           // ── General ──
           if (_activeTab == _SettingsTab.general) ...[
+            const ReceiptForwardingCard(),
+            const SizedBox(height: 16),
             _SettingsSection(
               title: 'Profile',
               icon: Icons.person_outline_rounded,

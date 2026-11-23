@@ -50,6 +50,12 @@ This repo ignores local/secret config files including:
 
 - Pro Insights starts with a question box and two optional example questions. Saved conversations open from History; the page does not automatically load a long previous thread. New question starts a separate conversation, and sharing is available from the conversation menu.
 - The app shell handles keyboard layout once and keeps Home, Insights, and Collections above the keyboard. Introductory prompts recede while typing. Drafts, the current conversation, scroll position, and pending answers survive tab changes within the same account/session; changing accounts clears that state.
+
+## Email receipts
+
+- Forward an email is available in the first-receipt guide, empty Home, the Add Receipt sheet, and Settings. All entry points open the same instructions and account-specific address; the existing backend allocates addresses without requiring a prior receipt. Existing addresses are reused.
+- Copying the address does not complete onboarding or claim a receipt arrived. New email receipts appear in the existing receipt activity and result flow, with their original purchase month and review requirements. The guide can continue with the received receipt.
+- The first receipt snapshot is a baseline, so historical emails do not trigger arrival notices. Copying saves a short-lived, account-specific checkpoint containing only a timestamp and receipt IDs, allowing arrival recovery after restarting the app. Confirmed account deletion clears that checkpoint.
 - Messages render lazily, and a new answer keeps the reader near its beginning. Follow-up requests send the most recent ten messages as context while preserving the full saved conversation.
 - Regression coverage includes keyboard navigation, small screens, landscape, enlarged text, late responses, account changes, failed requests, and history selection. Existing release artifacts must be rebuilt after these source changes before distribution.
 

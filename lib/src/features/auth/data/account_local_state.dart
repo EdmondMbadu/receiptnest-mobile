@@ -9,6 +9,7 @@ Future<void> clearDeletedAccountLocalState(String uid) async {
     'native_onboarding_v2:$uid:pending',
     'native_onboarding_v2:$uid:count',
     'receipt_upload_activity_v1:$uid',
+    'receipt_email_pending_v1:$uid',
     'getting_started_prompt_v1:$uid',
   ]) {
     await preferences.remove(key);

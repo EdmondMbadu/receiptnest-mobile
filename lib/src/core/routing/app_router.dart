@@ -21,6 +21,7 @@ import '../../features/getting_started/presentation/native_onboarding_screen.dar
 import '../../features/pricing/presentation/billing_return_screen.dart';
 import '../../features/pricing/presentation/pricing_screen.dart';
 import '../../features/receipts/presentation/receipt_detail_screen.dart';
+import '../../features/receipts/presentation/forward_email_screen.dart';
 import '../../features/share/presentation/share_view_screen.dart';
 import '../../features/shell/presentation/app_shell_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
@@ -152,6 +153,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 _noTransitionPage(state: state, child: const SettingsScreen()),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/app/forward-email',
+        builder: (context, state) => const ForwardEmailScreen(),
       ),
       GoRoute(
         path: '/app/receipt/:id',

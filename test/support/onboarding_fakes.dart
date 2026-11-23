@@ -96,9 +96,12 @@ Receipt exampleReceipt({
   String date = '2026-10-01',
   String status = ReceiptStatuses.finalStatus,
   double? amount = 12.5,
+  String? source,
+  String userId = 'u',
 }) => Receipt(
   id: id,
-  userId: 'u',
+  userId: userId,
+  source: source,
   status: status,
   file: const ReceiptFile(
     storagePath: 'users/u/receipts/r1.jpg',

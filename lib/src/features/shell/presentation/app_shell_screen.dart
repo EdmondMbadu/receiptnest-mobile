@@ -6,6 +6,7 @@ import '../../auth/data/auth_repository.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../core/widgets/keyboard_inset_scope.dart';
 import '../../receipts/presentation/receipt_upload_activity_bar.dart';
+import '../../receipts/data/receipt_email_forwarding.dart';
 
 class AppShellScreen extends ConsumerWidget {
   const AppShellScreen({
@@ -25,6 +26,7 @@ class AppShellScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(emailReceiptArrivalProvider);
     final profile = ref.watch(currentUserProfileProvider).valueOrNull;
     final isHomeTab = currentIndex == 0;
     final cs = Theme.of(context).colorScheme;

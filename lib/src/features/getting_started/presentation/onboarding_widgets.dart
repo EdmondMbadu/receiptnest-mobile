@@ -4,18 +4,38 @@ const onboardingInk = Color(0xFF123B36);
 const onboardingTeal = Color(0xFF0F766E);
 
 class OnboardingCanvas extends StatelessWidget {
-  const OnboardingCanvas({super.key, required this.child});
+  const OnboardingCanvas({
+    super.key,
+    required this.child,
+    this.neutral = false,
+  });
   final Widget child;
+  final bool neutral;
   @override
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: Theme.of(context).brightness == Brightness.dark
-            ? const [Color(0xFF102722), Color(0xFF0D1516), Color(0xFF10191C)]
-            : const [Color(0xFFECF6EF), Color(0xFFF9FAF5), Color(0xFFF1F7F7)],
-      ),
+      color: neutral
+          ? (Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF0D0D12)
+                : Colors.white)
+          : null,
+      gradient: neutral
+          ? null
+          : LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: Theme.of(context).brightness == Brightness.dark
+                  ? const [
+                      Color(0xFF102722),
+                      Color(0xFF0D1516),
+                      Color(0xFF10191C),
+                    ]
+                  : const [
+                      Color(0xFFECF6EF),
+                      Color(0xFFF9FAF5),
+                      Color(0xFFF1F7F7),
+                    ],
+            ),
     ),
     child: child,
   );
@@ -131,9 +151,11 @@ class OnboardingPaper extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(24),
+    this.neutral = false,
   });
   final Widget child;
   final EdgeInsetsGeometry padding;
+  final bool neutral;
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
@@ -141,18 +163,28 @@ class OnboardingPaper extends StatelessWidget {
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: dark ? const Color(0xFF182622) : Colors.white,
+        color: dark
+            ? (neutral ? const Color(0xFF16161F) : const Color(0xFF182622))
+            : Colors.white,
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: dark ? const Color(0xFF294039) : const Color(0xFFE0E9E2),
+          color: neutral
+              ? Theme.of(
+                  context,
+                ).colorScheme.outlineVariant.withValues(alpha: 0.5)
+              : dark
+              ? const Color(0xFF294039)
+              : const Color(0xFFE0E9E2),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: onboardingInk.withValues(alpha: dark ? 0.08 : 0.055),
-            blurRadius: 40,
-            offset: const Offset(0, 12),
-          ),
-        ],
+        boxShadow: neutral
+            ? const []
+            : [
+                BoxShadow(
+                  color: onboardingInk.withValues(alpha: dark ? 0.08 : 0.055),
+                  blurRadius: 40,
+                  offset: const Offset(0, 12),
+                ),
+              ],
       ),
       child: child,
     );

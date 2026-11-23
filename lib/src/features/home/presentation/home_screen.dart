@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -11,6 +10,8 @@ import '../../../core/utils/formatters.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../getting_started/presentation/getting_started_prompt.dart';
 import '../../receipts/data/receipt_repository.dart';
+import '../../receipts/data/receipt_email_forwarding.dart';
+import '../../receipts/presentation/forward_email_screen.dart';
 import '../../receipts/models/receipt.dart';
 import '../../receipts/presentation/upload_receipt_sheet.dart';
 import '../../share/data/share_repository.dart';
@@ -83,26 +84,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   _GraphViewMode _graphViewMode = _GraphViewMode.month;
   _TimeRange _timeRange = _TimeRange.oneMonth;
 
-  bool _loadingForwarding = false;
   bool _openingUpload = false;
-  String? _forwardingAddress;
-  String? _forwardingError;
-
-  bool _shouldRefreshStoredForwardingAddress(String? address) {
-    final normalized = address?.trim().toLowerCase();
-    if (normalized == null || normalized.isEmpty) {
-      return true;
-    }
-
-    final localPart = normalized.split('@').first;
-    return RegExp(r'^user\.[a-z0-9]{8}$').hasMatch(localPart) ||
-        RegExp(r'^(r-)?[a-f0-9]{20}$').hasMatch(localPart);
-  }
 
   @override
   void initState() {
     super.initState();
-    _loadForwardingAddress();
     _scrollController.addListener(_handleScroll);
     if (widget.openUploadOnArrival) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -143,46 +129,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
-  Future<void> _loadForwardingAddress() async {
-    final profile = ref.read(currentUserProfileProvider).valueOrNull;
-    final storedAddress = profile?.receiptForwardingAddress?.trim();
-    if (!_shouldRefreshStoredForwardingAddress(storedAddress)) {
-      setState(() {
-        _loadingForwarding = false;
-        _forwardingError = null;
-        _forwardingAddress = storedAddress;
-      });
-      return;
-    }
-
-    setState(() {
-      _loadingForwarding = true;
-      _forwardingError = null;
-    });
-
-    try {
-      final result = await ref
-          .read(receiptRepositoryProvider)
-          .generateForwardingAddress();
-      if (!mounted) return;
-      setState(() {
-        _forwardingAddress = result['emailAddress']?.toString();
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _forwardingError = 'Email forwarding is not configured yet.';
-      });
-    } finally {
-      if (mounted) {
-        setState(() => _loadingForwarding = false);
-      }
-    }
-  }
-
   Future<void> _refreshHome() async {
-    await _loadForwardingAddress();
-    if (!mounted) return;
+    ref.invalidate(receiptForwardingAddressProvider);
     setState(() => _visibleReceiptCount = _receiptBatchSize);
   }
 
@@ -678,11 +626,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final receiptsAsync = ref.watch(receiptsStreamProvider);
     final sortedReceipts = ref.watch(sortedReceiptsProvider);
     final profile = ref.watch(currentUserProfileProvider).valueOrNull;
-    final profileForwardingAddress = profile?.receiptForwardingAddress?.trim();
-    final displayedForwardingAddress =
-        !_shouldRefreshStoredForwardingAddress(profileForwardingAddress)
-        ? profileForwardingAddress
-        : _forwardingAddress;
+    ref.watch(receiptForwardingAddressProvider);
     final today = DateTime.now();
     final isCurrentMonth = month == today.month && year == today.year;
     final totalDaysInMonth = DateTime(year, month + 1, 0).day;
@@ -1205,174 +1149,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 const SizedBox(height: 16),
 
                 // ── Email forwarding ──
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: isDark
-                          ? [const Color(0xFF1A1A2E), const Color(0xFF16161F)]
-                          : [Colors.white, const Color(0xFFF8FAFE)],
-                    ),
-                    border: Border.all(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.06)
-                          : Colors.grey.shade200,
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    cs.primary.withValues(alpha: 0.15),
-                                    cs.primary.withValues(alpha: 0.05),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                Icons.email_outlined,
-                                size: 18,
-                                color: cs.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Email Forwarding',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                      color: cs.onSurface,
-                                      letterSpacing: -0.2,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Forward receipts to auto-track',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: cs.onSurface.withValues(
-                                        alpha: 0.45,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        if (_loadingForwarding)
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              minHeight: 3,
-                              backgroundColor: cs.primary.withValues(
-                                alpha: 0.08,
-                              ),
-                            ),
-                          )
-                        else if (_forwardingError != null)
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: cs.error.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              _forwardingError!,
-                              style: TextStyle(
-                                color: cs.error,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          )
-                        else if (displayedForwardingAddress != null) ...[
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 12,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? Colors.white.withValues(alpha: 0.04)
-                                  : const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: SelectableText(
-                              displayedForwardingAddress,
-                              style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w500,
-                                color: cs.onSurface.withValues(alpha: 0.75),
-                                letterSpacing: -0.2,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _ActionChip(
-                                  icon: Icons.copy_rounded,
-                                  label: 'Copy',
-                                  onTap: () {
-                                    Clipboard.setData(
-                                      ClipboardData(
-                                        text: displayedForwardingAddress,
-                                      ),
-                                    );
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Copied to clipboard'),
-                                      ),
-                                    );
-                                  },
-                                  color: cs.primary,
-                                  isDark: isDark,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: _ActionChip(
-                                  icon: Icons.refresh_rounded,
-                                  label: 'Refresh',
-                                  onTap: _loadForwardingAddress,
-                                  color: cs.primary,
-                                  isDark: isDark,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ] else
-                          Text(
-                            'No forwarding address yet.',
-                            style: TextStyle(
-                              color: cs.onSurface.withValues(alpha: 0.45),
-                              fontSize: 13,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
+                const ReceiptForwardingCard(),
                 const SizedBox(height: 20),
 
                 // ── Search ──

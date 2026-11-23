@@ -10,6 +10,7 @@ import '../../receipts/models/receipt.dart';
 import '../../receipts/presentation/upload_receipt_sheet.dart';
 import '../../receipts/presentation/receipt_upload_result.dart';
 import '../../receipts/data/receipt_upload_activity.dart';
+import '../../receipts/data/receipt_email_forwarding.dart';
 import '../data/native_onboarding_repository.dart';
 import '../data/onboarding_analytics.dart';
 import 'onboarding_widgets.dart';
@@ -228,6 +229,23 @@ class _NativeOnboardingScreenState
     }
   }
 
+  Future<void> _forwardEmail() async {
+    if (_uploadOpen) return;
+    final uid = ref.read(currentUserIdProvider);
+    if (uid == null) return;
+    setState(() => _uploadOpen = true);
+    ref.read(onboardingAnalyticsProvider).event('native_source_selected', {
+      'source': 'email',
+    });
+    try {
+      await context.push('/app/forward-email');
+    } finally {
+      if (mounted && ref.read(currentUserIdProvider) == uid) {
+        setState(() => _uploadOpen = false);
+      }
+    }
+  }
+
   Future<void> _openReceipt(String uid, Receipt receipt) async {
     final reviewed = await context.push<bool>(
       '/app/receipt/${receipt.id}?guide=1${_replaying(uid) ? '&replay=1' : ''}',
@@ -276,6 +294,27 @@ class _NativeOnboardingScreenState
     final savedReceiptId = _choosingAgain
         ? null
         : _sessionReceiptId ?? (replaying ? null : state?.progress.receiptId);
+    ref.watch(emailReceiptArrivalProvider);
+    ref.listen(emailReceiptArrivalProvider, (previous, next) {
+      if (next == null ||
+          next.id == previous?.id ||
+          next.userId != uid ||
+          savedReceiptId != null ||
+          _sessionReceiptId != null) {
+        return;
+      }
+      setState(() {
+        _sessionReceiptId = next.id;
+        _sessionReceiptSeed = next;
+        _sessionFirstUpload =
+            (ref.read(receiptsStreamProvider).valueOrNull?.length ?? 0) == 1;
+        _choosingAgain = false;
+        _viewed = false;
+      });
+      if (!_replaying(uid)) {
+        unawaited(_controller(uid).act('upload', receiptId: next.id));
+      }
+    });
     final receiptAsync = savedReceiptId == null
         ? null
         : ref.watch(receiptWatchProvider(savedReceiptId));
@@ -322,6 +361,7 @@ class _NativeOnboardingScreenState
       },
       child: Scaffold(
         body: OnboardingCanvas(
+          neutral: true,
           child: SafeArea(
             child: Column(
               children: [
@@ -443,13 +483,14 @@ class _NativeOnboardingScreenState
                 : 'Make your next\nreceipt effortless.',
             style: Theme.of(context).textTheme.headlineLarge?.copyWith(
               fontSize: 36,
+              fontWeight: FontWeight.w600,
               height: 1.12,
               letterSpacing: -1.3,
             ),
           ),
           const SizedBox(height: 14),
           Text(
-            'A paper receipt, a photo, or a PDF. Choose what you have and we’ll take care of the details.',
+            'Choose what’s easiest for you.',
             style: TextStyle(
               fontSize: 16,
               height: 1.55,
@@ -458,37 +499,48 @@ class _NativeOnboardingScreenState
           ),
           const SizedBox(height: 28),
           OnboardingPaper(
+            neutral: true,
             padding: const EdgeInsets.all(10),
             child: Column(
               children: [
                 _SourceTile(
                   icon: Icons.camera_alt_outlined,
                   title: 'Take a photo',
-                  subtitle: 'For a paper receipt',
+                  subtitle: 'A paper receipt',
                   onTap: () => _upload(ReceiptSource.camera),
-                  primary: true,
                 ),
                 const SizedBox(height: 6),
                 _SourceTile(
                   icon: Icons.photo_library_outlined,
                   title: 'Choose a photo',
-                  subtitle: 'An image already on your phone',
+                  subtitle: 'Saved on your phone',
                   onTap: () => _upload(ReceiptSource.gallery),
                 ),
                 const SizedBox(height: 6),
                 _SourceTile(
                   icon: Icons.description_outlined,
                   title: 'Choose a file',
-                  subtitle: 'A PDF or saved receipt',
+                  subtitle: 'A PDF or document',
                   onTap: () => _upload(ReceiptSource.file),
+                ),
+                const SizedBox(height: 6),
+                _SourceTile(
+                  icon: Icons.mail_outline_rounded,
+                  title: 'Forward an email',
+                  subtitle: 'A receipt in your inbox',
+                  onTap: _forwardEmail,
                 ),
               ],
             ),
           ),
           const SizedBox(height: 20),
-          const OnboardingMessage(
-            message:
-                'We’ll read the merchant, date, amount, and category. You can check or edit them anytime.',
+          Text(
+            'We’ll organize the details. You can review them anytime.',
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.6,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           if (!first && existing != null) ...[
             const SizedBox(height: 16),
@@ -662,24 +714,22 @@ class _SourceTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
-    this.primary = false,
   });
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-  final bool primary;
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Material(
-      color: primary ? cs.primary.withValues(alpha: 0.07) : Colors.transparent,
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Row(
             children: [
               Container(

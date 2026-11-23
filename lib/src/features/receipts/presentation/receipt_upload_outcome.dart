@@ -20,6 +20,7 @@ class ReceiptUploadOutcome extends ConsumerStatefulWidget {
     this.seed,
     this.file,
     this.onAnother,
+    this.showCloseButton = true,
     this.first = false,
   });
   final String userId;
@@ -28,6 +29,7 @@ class ReceiptUploadOutcome extends ConsumerStatefulWidget {
   final UploadFileData? file;
   final VoidCallback? onAnother;
   final bool first;
+  final bool showCloseButton;
   @override
   ConsumerState<ReceiptUploadOutcome> createState() =>
       _ReceiptUploadOutcomeState();
@@ -137,7 +139,7 @@ class _ReceiptUploadOutcomeState extends ConsumerState<ReceiptUploadOutcome> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (!ready)
+              if (!ready && widget.showCloseButton)
                 Align(
                   alignment: Alignment.centerRight,
                   child: IconButton(
@@ -179,7 +181,9 @@ class _ReceiptUploadOutcomeState extends ConsumerState<ReceiptUploadOutcome> {
                 ReceiptUploadResult(
                   receipt: receipt,
                   first: widget.first,
-                  onClose: () => _close(receipt),
+                  onClose: widget.showCloseButton
+                      ? () => _close(receipt)
+                      : null,
                   onView: _view,
                   onViewMonth: () => _month(receipt),
                   onAnother: widget.onAnother == null ? null : _another,

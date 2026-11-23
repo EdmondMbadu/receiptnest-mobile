@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
@@ -544,6 +545,21 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
                         ),
                       ),
                     ],
+                  ),
+                if (selected == null && !widget.guided)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: TextButton.icon(
+                      onPressed: _uploading || _picking
+                          ? null
+                          : () {
+                              final router = GoRouter.of(context);
+                              Navigator.of(context).pop();
+                              router.push('/app/forward-email');
+                            },
+                      icon: const Icon(Icons.mail_outline_rounded, size: 19),
+                      label: const Text('Forward an email'),
+                    ),
                   ),
                 const SizedBox(height: 16),
                 if (selected != null)
