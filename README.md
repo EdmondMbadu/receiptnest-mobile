@@ -46,6 +46,10 @@ This repo ignores local/secret config files including:
 - `.env*`
 - Android signing keys / keystore files
 
+## Help & getting started
+
+The Help page offers one guided action and three short, expandable topics: finding or editing receipts, email forwarding, and exports. Only one answer opens at a time, with a link to the relevant app screen. The captioned video and support remain secondary links. The layout supports both themes and scrolls naturally with enlarged text.
+
 ## Insights
 
 - Pro Insights starts with a question box and two optional example questions. Saved conversations open from History; the page does not automatically load a long previous thread. New question starts a separate conversation, and sharing is available from the conversation menu.
@@ -58,6 +62,13 @@ This repo ignores local/secret config files including:
 - The first receipt snapshot is a baseline, so historical emails do not trigger arrival notices. Copying saves a short-lived, account-specific checkpoint containing only a timestamp and receipt IDs, allowing arrival recovery after restarting the app. Confirmed account deletion clears that checkpoint.
 - Messages render lazily, and a new answer keeps the reader near its beginning. Follow-up requests send the most recent ten messages as context while preserving the full saved conversation.
 - Regression coverage includes keyboard navigation, small screens, landscape, enlarged text, late responses, account changes, failed requests, and history selection. Existing release artifacts must be rebuilt after these source changes before distribution.
+
+## Original receipt viewer
+
+- Photos and PDFs open directly in the app, with an inline original and a full-screen viewer. PDF pages use the platform's native renderer through `pdfx`; receipt viewing does not use a WebView or a hosted Google document viewer.
+- Originals are downloaded directly from Firebase Storage under the current account. The inline and full-screen views share an in-memory download, released when both close. Decoded images and PDF pages have bounded dimensions, and PDFs render one page at a time.
+- Full-screen viewing supports pinch and double-tap zoom, fit-to-screen, and previous/next PDF pages. Download and renderer failures offer retry. Other document types retain a clearly labeled original-file fallback.
+- Native cleanup waits for page rendering before closing the document, including when navigating away or switching accounts. Preview tests cover painted image pixels, page navigation, retry, empty files, account isolation, and late native responses.
 
 ## Getting started and welcome email
 

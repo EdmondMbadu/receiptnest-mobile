@@ -190,22 +190,22 @@ class AppShellScreen extends ConsumerWidget {
                     ),
                     NavigationDestination(
                       icon: Icon(
-                        Icons.auto_awesome_outlined,
+                        Icons.bar_chart_outlined,
                         color: cs.onSurface.withValues(alpha: 0.4),
                       ),
                       selectedIcon: Icon(
-                        Icons.auto_awesome_rounded,
+                        Icons.bar_chart_rounded,
                         color: cs.primary,
                       ),
                       label: 'Insights',
                     ),
                     NavigationDestination(
                       icon: Icon(
-                        Icons.folder_outlined,
+                        Icons.layers_outlined,
                         color: cs.onSurface.withValues(alpha: 0.4),
                       ),
                       selectedIcon: Icon(
-                        Icons.folder_rounded,
+                        Icons.layers_rounded,
                         color: cs.primary,
                       ),
                       label: 'Collections',

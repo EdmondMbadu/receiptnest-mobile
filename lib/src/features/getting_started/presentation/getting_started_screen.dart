@@ -5,8 +5,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../auth/data/auth_repository.dart';
 import '../data/native_onboarding_repository.dart';
-import '../../receipts/data/receipt_repository.dart';
-import '../../receipts/presentation/upload_receipt_sheet.dart';
 
 const gettingStartedVideoUrl =
     'https://receipt-nest.com/getting-started#walkthrough';
@@ -32,178 +30,317 @@ Future<void> openGettingStartedVideo(BuildContext context) async {
   );
 }
 
-class GettingStartedScreen extends ConsumerWidget {
+class GettingStartedScreen extends ConsumerStatefulWidget {
   const GettingStartedScreen({super.key});
 
-  Future<void> _addReceipt(BuildContext context, WidgetRef ref) async {
-    final uid = ref.read(currentUserIdProvider);
-    if (uid == null) return;
-    var uploaded = false;
-    await showModalBottomSheet<void>(
-      useRootNavigator: true,
-      context: context,
-      isScrollControlled: true,
-      isDismissible: false,
-      enableDrag: false,
-      constraints: BoxConstraints(
-        maxWidth: 540,
-        maxHeight: MediaQuery.sizeOf(context).height * 0.92,
-      ),
-      builder: (_) => UploadReceiptSheet(
-        userId: uid,
-        repository: ref.read(receiptRepositoryProvider),
-        onUploaded: (_) => uploaded = true,
-      ),
-    );
-    if (!uploaded || !context.mounted) return;
-    if (GoRouterState.of(context).uri.path == '/app/help') {
-      context.go('/app/home');
-    }
-  }
+  @override
+  ConsumerState<GettingStartedScreen> createState() =>
+      _GettingStartedScreenState();
+}
+
+class _GettingStartedScreenState extends ConsumerState<GettingStartedScreen> {
+  int? _expanded;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final colors = Theme.of(context).colorScheme;
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
     final uid = ref.watch(currentUserIdProvider);
-    final completed = uid == null
-        ? false
-        : ref
-                  .watch(nativeOnboardingProvider(uid))
-                  .valueOrNull
-                  ?.progress
-                  .completed ??
-              false;
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        Text(
-          'Help & getting started',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Snap. Organize.\nDownload.',
-          style: Theme.of(
-            context,
-          ).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'Start with one receipt. ReceiptNest takes care of the details in most cases.',
-        ),
-        const SizedBox(height: 20),
-        FilledButton.icon(
-          onPressed: () => _addReceipt(context, ref),
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('Add a receipt'),
-        ),
-        const SizedBox(height: 10),
-        OutlinedButton.icon(
-          onPressed: () => context.push(
-            completed ? '/app/onboarding?replay=1' : '/app/onboarding',
-          ),
-          icon: const Icon(Icons.auto_awesome_outlined),
-          label: const Text('Replay the guided receipt walkthrough'),
-        ),
-        const SizedBox(height: 24),
-        Card(
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () => openGettingStartedVideo(context),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    final completed =
+        uid != null &&
+        (ref
+                .watch(nativeOnboardingProvider(uid))
+                .valueOrNull
+                ?.progress
+                .completed ??
+            false);
+    return ColoredBox(
+      color: dark ? const Color(0xFF0D0D12) : Colors.white,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxHeight < 680;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: ListView(
+                key: const ValueKey('help-content'),
+                padding: EdgeInsets.fromLTRB(20, compact ? 16 : 24, 20, 24),
                 children: [
-                  Icon(
-                    Icons.play_circle_fill_rounded,
-                    size: 52,
-                    color: colors.primary,
-                  ),
-                  const SizedBox(height: 12),
                   Text(
-                    'Watch the 85-second walkthrough',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
+                    'Help & getting started',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.5,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'See the core workflow on the web. Captions included. The mobile steps are below.',
+                  SizedBox(height: compact ? 16 : 24),
+                  Card(
+                    margin: EdgeInsets.zero,
+                    child: Padding(
+                      padding: EdgeInsets.all(compact ? 16 : 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Container(
+                              width: compact ? 36 : 42,
+                              height: compact ? 36 : 42,
+                              decoration: BoxDecoration(
+                                color: colors.primary.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.receipt_long_outlined,
+                                size: 23,
+                                color: colors.primary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Start with one receipt.',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -0.4,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Add it. We’ll organize the details.',
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.5,
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          FilledButton(
+                            onPressed: uid == null
+                                ? null
+                                : () => context.push(
+                                    completed
+                                        ? '/app/onboarding?replay=1'
+                                        : '/app/onboarding',
+                                  ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Flexible(child: Text('Show me how')),
+                                SizedBox(width: 12),
+                                Icon(Icons.arrow_forward_rounded, size: 19),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Quick help',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Card(
+                    margin: EdgeInsets.zero,
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: [
+                        _HelpTopic(
+                          key: const ValueKey('help-find'),
+                          icon: Icons.search_rounded,
+                          title: 'Find or edit a receipt',
+                          answer:
+                              'Search on Home. Open a receipt to review or edit its details.',
+                          action: 'Open my receipts',
+                          onAction: () => context.go('/app/home'),
+                          expanded: _expanded == 0,
+                          onToggle: () => setState(
+                            () => _expanded = _expanded == 0 ? null : 0,
+                          ),
+                        ),
+                        const _TopicDivider(),
+                        _HelpTopic(
+                          key: const ValueKey('help-email'),
+                          icon: Icons.mail_outline_rounded,
+                          title: 'Forward an email',
+                          answer:
+                              'Send a receipt email to your personal ReceiptNest address. It will appear with your other receipts.',
+                          action: 'Get my receipt address',
+                          onAction: () => context.push('/app/forward-email'),
+                          expanded: _expanded == 1,
+                          onToggle: () => setState(
+                            () => _expanded = _expanded == 1 ? null : 1,
+                          ),
+                        ),
+                        const _TopicDivider(),
+                        _HelpTopic(
+                          key: const ValueKey('help-export'),
+                          icon: Icons.file_download_outlined,
+                          title: 'Export receipts',
+                          answer:
+                              'In Collections, choose a category and period, then export a CSV or PDF.',
+                          action: 'Open Collections',
+                          onAction: () => context.go('/app/folders'),
+                          expanded: _expanded == 2,
+                          onToggle: () => setState(
+                            () => _expanded = _expanded == 2 ? null : 2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => openGettingStartedVideo(context),
+                      icon: const Icon(
+                        Icons.play_circle_outline_rounded,
+                        size: 21,
+                      ),
+                      label: const Text('Watch the video · 85 sec'),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 10,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => context.push('/support'),
+                      icon: const Icon(
+                        Icons.chat_bubble_outline_rounded,
+                        size: 21,
+                      ),
+                      label: const Text('Contact support'),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 10,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _TopicDivider extends StatelessWidget {
+  const _TopicDivider();
+  @override
+  Widget build(BuildContext context) => const Padding(
+    padding: EdgeInsets.symmetric(horizontal: 16),
+    child: Divider(height: 1),
+  );
+}
+
+class _HelpTopic extends StatelessWidget {
+  const _HelpTopic({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.answer,
+    required this.action,
+    required this.onAction,
+    required this.expanded,
+    required this.onToggle,
+  });
+  final IconData icon;
+  final String title;
+  final String answer;
+  final String action;
+  final VoidCallback onAction;
+  final bool expanded;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          button: true,
+          expanded: expanded,
+          child: InkWell(
+            onTap: onToggle,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+              child: Row(
+                children: [
+                  Icon(icon, size: 21, color: colors.onSurface),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(fontSize: 14, height: 1.5),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    expanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    size: 22,
                   ),
                 ],
               ),
             ),
           ),
         ),
-        const SizedBox(height: 24),
-        const _Step(
-          number: '1',
-          title: 'Add your receipt',
-          description:
-              'On Home, tap +. Choose Camera to take a photo, Gallery for an existing image, or Files for a document. Check the preview, then tap Upload receipt.',
-        ),
-        const _Step(
-          number: '2',
-          title: 'Let ReceiptNest organize it',
-          description:
-              'ReceiptNest reads the merchant, amount and date, assigns a category, and saves your receipt automatically. For most receipts, that is all you need to do. Open a receipt to check or edit its details when needed.',
-        ),
-        const _Step(
-          number: '3',
-          title: 'Find and export',
-          description:
-              'Search on Home, then tap a receipt to see its details and original file. For exports, open Collections, choose a category and period, then tap Export for CSV or PDF and save or share the file.',
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: () => context.go('/app/home'),
-          icon: const Icon(Icons.home_outlined),
-          label: const Text('Open my receipts'),
-        ),
-        TextButton(
-          onPressed: () => context.push('/support'),
-          child: const Text('Contact support'),
+        AnimatedSize(
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 180),
+          alignment: Alignment.topCenter,
+          curve: Curves.easeOutCubic,
+          child: expanded
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        answer,
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 1.6,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: onAction,
+                          child: Text(action),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : const SizedBox(width: double.infinity),
         ),
       ],
     );
   }
-}
-
-class _Step extends StatelessWidget {
-  const _Step({
-    required this.number,
-    required this.title,
-    required this.description,
-  });
-  final String number;
-  final String title;
-  final String description;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 24),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        CircleAvatar(radius: 16, child: Text(number)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 8),
-              Text(description, style: const TextStyle(height: 1.5)),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
 }
