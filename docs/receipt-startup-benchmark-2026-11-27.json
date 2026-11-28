@@ -1,0 +1,364 @@
+{
+  "node": "v22.20.0",
+  "platform": "darwin",
+  "architecture": "arm64",
+  "warmupsPerVariant": 2,
+  "summary": [
+    {
+      "variant": "baseline",
+      "samples": 12,
+      "p50LoadMs": 132.371917,
+      "p50CpuMs": 168.136,
+      "p50RssMiB": 93.03125,
+      "modules": 798,
+      "emailParserModules": 18
+    },
+    {
+      "variant": "optimized",
+      "samples": 12,
+      "p50LoadMs": 82.7547495,
+      "p50CpuMs": 98.8535,
+      "p50RssMiB": 80.0234375,
+      "modules": 535,
+      "emailParserModules": 0
+    }
+  ],
+  "samples": [
+    {
+      "variant": "baseline",
+      "iteration": 0,
+      "loadMs": 138.30795899999998,
+      "cpuMs": 176.386,
+      "rssMiB": 93.09375,
+      "modules": 798,
+      "emailParserModules": 18,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "optimized",
+      "iteration": 0,
+      "loadMs": 81.212167,
+      "cpuMs": 96.985,
+      "rssMiB": 80.09375,
+      "modules": 535,
+      "emailParserModules": 0,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "optimized",
+      "iteration": 1,
+      "loadMs": 83.218875,
+      "cpuMs": 99.837,
+      "rssMiB": 80.078125,
+      "modules": 535,
+      "emailParserModules": 0,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "baseline",
+      "iteration": 1,
+      "loadMs": 131.31145899999999,
+      "cpuMs": 168.56,
+      "rssMiB": 93.03125,
+      "modules": 798,
+      "emailParserModules": 18,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "baseline",
+      "iteration": 2,
+      "loadMs": 135.09033300000002,
+      "cpuMs": 175.059,
+      "rssMiB": 93.03125,
+      "modules": 798,
+      "emailParserModules": 18,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "optimized",
+      "iteration": 2,
+      "loadMs": 88.529375,
+      "cpuMs": 105.172,
+      "rssMiB": 80.03125,
+      "modules": 535,
+      "emailParserModules": 0,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "optimized",
+      "iteration": 3,
+      "loadMs": 82.441667,
+      "cpuMs": 98.957,
+      "rssMiB": 79.8125,
+      "modules": 535,
+      "emailParserModules": 0,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "baseline",
+      "iteration": 3,
+      "loadMs": 146.22025000000002,
+      "cpuMs": 190.019,
+      "rssMiB": 93.03125,
+      "modules": 798,
+      "emailParserModules": 18,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "baseline",
+      "iteration": 4,
+      "loadMs": 146.235333,
+      "cpuMs": 188.244,
+      "rssMiB": 93.40625,
+      "modules": 798,
+      "emailParserModules": 18,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "optimized",
+      "iteration": 4,
+      "loadMs": 82.48537499999999,
+      "cpuMs": 98.543,
+      "rssMiB": 80.03125,
+      "modules": 535,
+      "emailParserModules": 0,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "optimized",
+      "iteration": 5,
+      "loadMs": 82.148708,
+      "cpuMs": 97.861,
+      "rssMiB": 80.09375,
+      "modules": 535,
+      "emailParserModules": 0,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "baseline",
+      "iteration": 5,
+      "loadMs": 129.896167,
+      "cpuMs": 165.887,
+      "rssMiB": 92.84375,
+      "modules": 798,
+      "emailParserModules": 18,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "baseline",
+      "iteration": 6,
+      "loadMs": 130.073166,
+      "cpuMs": 166.365,
+      "rssMiB": 92.546875,
+      "modules": 798,
+      "emailParserModules": 18,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "optimized",
+      "iteration": 6,
+      "loadMs": 81.8475,
+      "cpuMs": 97.666,
+      "rssMiB": 80.09375,
+      "modules": 535,
+      "emailParserModules": 0,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "optimized",
+      "iteration": 7,
+      "loadMs": 83.01854200000001,
+      "cpuMs": 98.924,
+      "rssMiB": 80.015625,
+      "modules": 535,
+      "emailParserModules": 0,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "baseline",
+      "iteration": 7,
+      "loadMs": 137.111625,
+      "cpuMs": 175.703,
+      "rssMiB": 93.234375,
+      "modules": 798,
+      "emailParserModules": 18,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "baseline",
+      "iteration": 8,
+      "loadMs": 132.456917,
+      "cpuMs": 167.965,
+      "rssMiB": 93.140625,
+      "modules": 798,
+      "emailParserModules": 18,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "optimized",
+      "iteration": 8,
+      "loadMs": 82.674583,
+      "cpuMs": 98.719,
+      "rssMiB": 79.859375,
+      "modules": 535,
+      "emailParserModules": 0,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "optimized",
+      "iteration": 9,
+      "loadMs": 82.834916,
+      "cpuMs": 98.697,
+      "rssMiB": 79.984375,
+      "modules": 535,
+      "emailParserModules": 0,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "baseline",
+      "iteration": 9,
+      "loadMs": 133.28075,
+      "cpuMs": 170.015,
+      "rssMiB": 93.109375,
+      "modules": 798,
+      "emailParserModules": 18,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "baseline",
+      "iteration": 10,
+      "loadMs": 131.2395,
+      "cpuMs": 166.904,
+      "rssMiB": 92.796875,
+      "modules": 798,
+      "emailParserModules": 18,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "optimized",
+      "iteration": 10,
+      "loadMs": 84.868208,
+      "cpuMs": 101.004,
+      "rssMiB": 80.21875,
+      "modules": 535,
+      "emailParserModules": 0,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "optimized",
+      "iteration": 11,
+      "loadMs": 84.242625,
+      "cpuMs": 101.268,
+      "rssMiB": 79.796875,
+      "modules": 535,
+      "emailParserModules": 0,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "baseline",
+      "iteration": 11,
+      "loadMs": 131.686083,
+      "cpuMs": 167.816,
+      "rssMiB": 92.875,
+      "modules": 798,
+      "emailParserModules": 18,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "baseline",
+      "iteration": 12,
+      "loadMs": 130.8355,
+      "cpuMs": 166.955,
+      "rssMiB": 92.75,
+      "modules": 798,
+      "emailParserModules": 18,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "optimized",
+      "iteration": 12,
+      "loadMs": 85.961042,
+      "cpuMs": 101.733,
+      "rssMiB": 79.890625,
+      "modules": 535,
+      "emailParserModules": 0,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "optimized",
+      "iteration": 13,
+      "loadMs": 82.545625,
+      "cpuMs": 98.783,
+      "rssMiB": 80.03125,
+      "modules": 535,
+      "emailParserModules": 0,
+      "exports": [
+        "processReceipt"
+      ]
+    },
+    {
+      "variant": "baseline",
+      "iteration": 13,
+      "loadMs": 132.286917,
+      "cpuMs": 168.307,
+      "rssMiB": 93.171875,
+      "modules": 798,
+      "emailParserModules": 18,
+      "exports": [
+        "processReceipt"
+      ]
+    }
+  ]
+}
