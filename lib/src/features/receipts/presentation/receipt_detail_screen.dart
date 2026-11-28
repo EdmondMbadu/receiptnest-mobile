@@ -1,8 +1,6 @@
-import '../models/receipt_file_label.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/utils/formatters.dart';
 import '../../auth/data/auth_repository.dart';
 import '../data/receipt_repository.dart';
 import '../models/category.dart';
@@ -237,11 +235,6 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
     }
   }
 
-  Future<void> _openFile(Receipt receipt) async {
-    if (ref.read(currentUserIdProvider) != receipt.userId) return;
-    await openReceiptOriginal(context, receipt);
-  }
-
   Widget _buildPreviewCard(Receipt receipt) => ReceiptFilePreview(
     key: ValueKey(
       '${receipt.userId}:${receipt.id}:${receipt.file.storagePath}',
@@ -451,104 +444,6 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
                 const SizedBox(height: 14),
               ],
 
-              // ── File card ──
-              Container(
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF151520) : Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.06)
-                        : Colors.grey.shade200,
-                  ),
-                  boxShadow: isDark
-                      ? null
-                      : [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 20,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () => _openFile(receipt),
-                    borderRadius: BorderRadius.circular(20),
-                    child: Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  cs.primary.withValues(alpha: 0.15),
-                                  cs.primary.withValues(alpha: 0.05),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Icon(
-                              receipt.isPdf
-                                  ? Icons.picture_as_pdf_outlined
-                                  : Icons.insert_drive_file_outlined,
-                              color: cs.primary,
-                              size: 22,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  receiptFileLabel(receipt.file.originalName),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14,
-                                    color: cs.onSurface,
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  '${formatCurrency(receipt.effectiveTotalAmount)} \u2022 ${formatDate(receipt.effectiveDate)}',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: cs.onSurface.withValues(alpha: 0.45),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: cs.primary.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              Icons.open_in_full_rounded,
-                              size: 18,
-                              color: cs.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 14),
               _buildPreviewCard(receipt),
               const SizedBox(height: 14),
 

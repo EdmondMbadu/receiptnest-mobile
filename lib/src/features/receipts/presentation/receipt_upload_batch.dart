@@ -180,11 +180,14 @@ class ReceiptUploadBatch extends ConsumerWidget {
     var reading = 0;
     var ready = 0;
     var review = 0;
+    var checking = 0;
     for (final item in items.where((item) => item.receipt != null)) {
       final value = live[item.id]!;
       if (value is AsyncData<Receipt?> && value.value == null) continue;
       final receipt = value.valueOrNull ?? item.receipt!;
-      if (value.hasError || receipt.isProcessing) {
+      if (value.hasError) {
+        checking++;
+      } else if (receipt.isProcessing) {
         reading++;
       } else if (receiptUploadNeedsReview(receipt)) {
         review++;
@@ -193,9 +196,14 @@ class ReceiptUploadBatch extends ConsumerWidget {
       }
     }
     final status = [
-      if (ready > 0) '$ready ready',
+      if (ready > 0) '$ready of $saved ready',
       if (review > 0) '$review to review',
-      if (reading > 0) '$reading reading details',
+      if (reading > 0)
+        ready + review == 0
+            ? 'Reading $reading ${reading == 1 ? 'receipt' : 'receipts'}…'
+            : '$reading still processing',
+      if (checking > 0)
+        '$checking ${checking == 1 ? 'needs' : 'need'} a connection check',
     ].join(' · ');
     return PopScope(
       canPop: !uploading,
@@ -274,6 +282,11 @@ class ReceiptUploadBatch extends ConsumerWidget {
                                       .clamp(0, 1),
                               minHeight: 4,
                               borderRadius: BorderRadius.circular(6),
+                            ),
+                            const SizedBox(height: 12),
+                          ] else if (reading > 0) ...[
+                            const _ReceiptProcessingBar(
+                              key: ValueKey('batch-processing'),
                             ),
                             const SizedBox(height: 12),
                           ],
@@ -436,6 +449,36 @@ class _BatchItem extends ConsumerWidget {
                 ),
               );
             },
+    );
+  }
+}
+
+/// A single indeterminate bar shows activity without inventing a completion
+/// percentage. Reduced motion retains a quiet static line and status label.
+class _ReceiptProcessingBar extends StatelessWidget {
+  const _ReceiptProcessingBar({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.primary;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return Semantics(
+        label: 'Reading receipt details',
+        child: Container(
+          height: 3,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: .25),
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+      );
+    }
+    return LinearProgressIndicator(
+      value: null,
+      minHeight: 3,
+      borderRadius: BorderRadius.circular(3),
+      color: color,
+      backgroundColor: color.withValues(alpha: .12),
+      semanticsLabel: 'Reading receipt details',
     );
   }
 }

@@ -20,6 +20,13 @@ Future<void> openReceiptOriginal(BuildContext context, Receipt receipt) =>
       ),
     );
 
+// Actual document names can help identify a file. Generated picker labels add
+// no information above the receipt itself, so omit them from the viewer.
+String? _meaningfulFileName(Receipt receipt) {
+  final name = receipt.file.originalName.trim();
+  return name.isNotEmpty && receiptFileLabel(name) == name ? name : null;
+}
+
 class ReceiptFilePreview extends ConsumerWidget {
   const ReceiptFilePreview({super.key, required this.receipt});
   final Receipt receipt;
@@ -30,6 +37,7 @@ class ReceiptFilePreview extends ConsumerWidget {
       return const SizedBox.shrink();
     }
     final cs = Theme.of(context).colorScheme;
+    final fileName = _meaningfulFileName(receipt);
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
@@ -37,7 +45,7 @@ class ReceiptFilePreview extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
+            padding: EdgeInsets.fromLTRB(16, 8, 8, fileName == null ? 8 : 0),
             child: Row(
               children: [
                 Icon(
@@ -62,19 +70,20 @@ class ReceiptFilePreview extends ConsumerWidget {
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Text(
-              receiptFileLabel(receipt.file.originalName),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.5,
-                color: cs.onSurfaceVariant,
+          if (fileName != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Text(
+                fileName,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.5,
+                  color: cs.onSurfaceVariant,
+                ),
               ),
             ),
-          ),
           SizedBox(
             height: (MediaQuery.sizeOf(context).height * 0.5).clamp(
               280.0,
@@ -94,6 +103,7 @@ class ReceiptOriginalScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final active = ref.watch(currentUserIdProvider) == receipt.userId;
+    final fileName = _meaningfulFileName(receipt);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Original receipt'),
@@ -109,19 +119,20 @@ class ReceiptOriginalScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                    child: Text(
-                      receiptFileLabel(receipt.file.originalName),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 1.5,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  if (fileName != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                      child: Text(
+                        fileName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.5,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
-                  ),
                   Expanded(
                     child: _ReceiptOriginalBody(
                       receipt: receipt,

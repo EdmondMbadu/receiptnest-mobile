@@ -133,19 +133,27 @@ PlatformFile pdf(String name, {int size = 4}) => PlatformFile(
   bytes: Uint8List.fromList([37, 80, 68, 70]),
 );
 
+// Processing indicators animate until a real result arrives. Advance route and
+// stream frames explicitly instead of waiting for an indeterminate spinner.
+Future<void> pumpUploadUi(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
+  await tester.pump();
+}
+
 Future<void> openSheet(WidgetTester tester) async {
   await tester.tap(find.byType(FloatingActionButton));
-  await tester.pumpAndSettle();
+  await pumpUploadUi(tester);
 }
 
 Future<void> selectFiles(WidgetTester tester) async {
   await tester.tap(find.text('Files'));
-  await tester.pumpAndSettle();
+  await pumpUploadUi(tester);
 }
 
 Future<void> upload(WidgetTester tester, int count) async {
   await tester.tap(find.text('Upload $count files'));
-  await tester.pumpAndSettle();
+  await pumpUploadUi(tester);
 }
 
 GoRouter sheetRouter(BatchRepository repository, {bool guided = false}) =>
@@ -206,7 +214,7 @@ void main() {
       final router = flow.testRouter();
       addTearDown(router.dispose);
       await tester.pumpWidget(flow.app(repository, router));
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       await openSheet(tester);
       await selectFiles(tester);
       expect(picker.multiple, isTrue);
@@ -219,7 +227,7 @@ void main() {
       expect(repository.maximumActive, 1);
       repository.failures.clear();
       await tester.tap(find.text('Retry 1 file'));
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       expect(find.textContaining('3 of 3 files saved'), findsOneWidget);
       expect(repository.attemptsByName['First.pdf'], hasLength(1));
       expect(repository.attemptsByName['Third.pdf'], hasLength(1));
@@ -244,7 +252,7 @@ void main() {
     final router = flow.testRouter();
     addTearDown(router.dispose);
     await tester.pumpWidget(flow.app(repository, router));
-    await tester.pumpAndSettle();
+    await pumpUploadUi(tester);
     await openSheet(tester);
     await selectFiles(tester);
     await upload(tester, 3);
@@ -254,13 +262,13 @@ void main() {
     expect(find.text('Continue browsing'), findsOneWidget);
     final id = repository.uploads[1];
     repository.finishProcessing(id);
-    await tester.pumpAndSettle();
+    await pumpUploadUi(tester);
     expect(find.text('Your local café'), findsOneWidget);
     expect(find.text(r'$12.50 · Oct 1, 2026'), findsOneWidget);
-    expect(find.text('1 ready · 2 reading details'), findsOneWidget);
+    expect(find.text('1 of 3 ready · 2 still processing'), findsOneWidget);
     await flow.shot(tester, 'batch-mixed-results-dark');
     await tester.tap(find.text('View receipt'));
-    await tester.pumpAndSettle();
+    await pumpUploadUi(tester);
     expect(find.text('Receipt details destination'), findsOneWidget);
     expect(find.text(id), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -277,7 +285,7 @@ void main() {
       addTearDown(router.dispose);
       picker.files = [pdf('First.pdf'), pdf('Second.pdf')];
       await tester.pumpWidget(flow.app(repository, router));
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       await openSheet(tester);
       await selectFiles(tester);
       picker.cancel = true;
@@ -288,7 +296,7 @@ void main() {
       expect(find.text('2 files selected'), findsOneWidget);
       expect(find.textContaining('Could not open file picker'), findsOneWidget);
       await tester.tap(find.byTooltip('Remove Second.pdf'));
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       expect(find.text('1 file selected'), findsOneWidget);
       expect(find.text('Upload receipt'), findsOneWidget);
       await tester.tap(find.text('Upload receipt'));
@@ -320,7 +328,7 @@ void main() {
       pdf('Large.pdf', size: 11 * 1024 * 1024),
     ];
     await tester.pumpWidget(flow.app(repository, router));
-    await tester.pumpAndSettle();
+    await pumpUploadUi(tester);
     await openSheet(tester);
     await selectFiles(tester);
     await upload(tester, 3);
@@ -329,9 +337,9 @@ void main() {
     expect(find.textContaining('File too large'), findsOneWidget);
     expect(repository.attemptsByName.keys, ['Good.pdf']);
     await tester.tap(find.byTooltip('Remove Empty.pdf'));
-    await tester.pumpAndSettle();
+    await pumpUploadUi(tester);
     await tester.tap(find.byTooltip('Remove Large.pdf'));
-    await tester.pumpAndSettle();
+    await pumpUploadUi(tester);
     expect(find.text('Continue browsing'), findsOneWidget);
     expect(repository.uploads, hasLength(1));
     expect(tester.takeException(), isNull);
@@ -347,7 +355,7 @@ void main() {
       final router = flow.testRouter();
       addTearDown(router.dispose);
       await tester.pumpWidget(flow.app(repository, router));
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       await openSheet(tester);
       await selectFiles(tester);
       await upload(tester, 3);
@@ -356,7 +364,7 @@ void main() {
       expect(find.text('Retry 2 files'), findsOneWidget);
       repository.limitAt = null;
       await tester.tap(find.text('Retry 2 files'));
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       expect(repository.uploads, hasLength(3));
       expect(repository.attemptsByName['First.pdf'], hasLength(1));
       expect(tester.takeException(), isNull);
@@ -374,7 +382,7 @@ void main() {
     final router = flow.testRouter();
     addTearDown(router.dispose);
     await tester.pumpWidget(flow.app(repository, router, userState: user));
-    await tester.pumpAndSettle();
+    await pumpUploadUi(tester);
     await openSheet(tester);
     await selectFiles(tester);
     final scope = ProviderScope.containerOf(
@@ -390,9 +398,9 @@ void main() {
     await tester.pump();
     expect(find.byType(ReceiptUploadBatch), findsOneWidget);
     scope.read(user.notifier).state = 'other';
-    await tester.pumpAndSettle();
+    await pumpUploadUi(tester);
     repository.gate!.complete();
-    await tester.pumpAndSettle();
+    await pumpUploadUi(tester);
     expect(repository.attemptsByName, hasLength(1));
     expect(scope.read(receiptUploadActivityProvider), isEmpty);
     expect(find.byType(UploadReceiptSheet), findsNothing);
@@ -411,7 +419,7 @@ void main() {
       final router = flow.testRouter();
       addTearDown(router.dispose);
       await tester.pumpWidget(flow.app(repository, router, userState: user));
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       await openSheet(tester);
       final scope = ProviderScope.containerOf(
         tester.element(find.byType(UploadReceiptSheet)),
@@ -419,9 +427,9 @@ void main() {
       await tester.tap(find.text('Files'));
       await tester.pump();
       scope.read(user.notifier).state = 'other';
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       picker.pending!.complete(FilePickerResult(picker.files));
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       expect(repository.uploads, isEmpty);
       expect(find.byType(UploadReceiptSheet), findsNothing);
       expect(tester.takeException(), isNull);
@@ -454,13 +462,13 @@ void main() {
       await tester.pumpWidget(
         flow.app(repository, router, imagePicker: imagePicker),
       );
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       await openSheet(tester);
       await tester.tap(find.text('Gallery'));
       await tester.runAsync(() async {
         await Future<void>.delayed(const Duration(milliseconds: 50));
       });
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       expect(imagePicker.multiCalls, 1);
       expect(imagePicker.singleCalls, 0);
       expect(find.text('2 files selected'), findsOneWidget);
@@ -469,14 +477,14 @@ void main() {
       await tester.runAsync(() async {
         await Future<void>.delayed(const Duration(milliseconds: 50));
       });
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       expect(find.text('2 files selected'), findsOneWidget);
       imagePicker.images = [images.last];
       await tester.tap(find.text('Camera'));
       await tester.runAsync(() async {
         await Future<void>.delayed(const Duration(milliseconds: 50));
       });
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       expect(imagePicker.singleCalls, 1);
       expect(find.text('3 files selected'), findsOneWidget);
       await upload(tester, 3);
@@ -511,7 +519,7 @@ void main() {
         ),
       ];
       await tester.pumpWidget(flow.app(repository, router));
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       await openSheet(tester);
       await selectFiles(tester);
       expect(find.text('4 files selected'), findsOneWidget);
@@ -538,14 +546,14 @@ void main() {
     addTearDown(router.dispose);
     picker.files = [pdf('First.pdf'), pdf('Second.pdf')];
     await tester.pumpWidget(flow.app(repository, router));
-    await tester.pumpAndSettle();
+    await pumpUploadUi(tester);
     await openSheet(tester);
     await selectFiles(tester);
     await upload(tester, 2);
     await tester.tap(find.byTooltip('Remove First.pdf'));
-    await tester.pumpAndSettle();
+    await pumpUploadUi(tester);
     await tester.tap(find.byTooltip('Remove Second.pdf'));
-    await tester.pumpAndSettle();
+    await pumpUploadUi(tester);
     expect(find.text('Add receipts'), findsOneWidget);
     expect(find.text('Upload receipts'), findsOneWidget);
     expect(find.text('0 of 0 files saved'), findsNothing);
@@ -561,7 +569,7 @@ void main() {
     addTearDown(router.dispose);
     picker.files = [pdf('First.pdf')];
     await tester.pumpWidget(flow.app(repository, router));
-    await tester.pumpAndSettle();
+    await pumpUploadUi(tester);
     await openSheet(tester);
     await selectFiles(tester);
     expect(picker.multiple, isFalse);
@@ -610,7 +618,7 @@ void main() {
       const second = 'image_picker_D4E5F6.pdf';
       picker.files = [pdf(first), pdf(second)];
       await tester.pumpWidget(flow.app(repository, router));
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       await openSheet(tester);
       await selectFiles(tester);
       expect(find.text('Receipt 1'), findsOneWidget);
@@ -641,11 +649,11 @@ void main() {
       addTearDown(router.dispose);
       picker.files = [pdf('First.pdf'), pdf('Second.pdf')];
       await tester.pumpWidget(flow.app(repository, router));
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       await openSheet(tester);
       await selectFiles(tester);
       await upload(tester, 2);
-      expect(find.text('2 reading details'), findsOneWidget);
+      expect(find.text('Reading 2 receipts…'), findsOneWidget);
       expect(
         find.text('Your receipts are saved. We’ll keep reading the details.'),
         findsOneWidget,
@@ -654,13 +662,13 @@ void main() {
         tester.element(find.byType(UploadReceiptSheet)),
       );
       await tester.tap(find.text('Continue browsing'));
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       expect(find.byType(UploadReceiptSheet), findsNothing);
       expect(scope.read(receiptUploadActivityProvider), hasLength(2));
       repository.finishProcessing(repository.uploads.first);
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       await tester.tap(find.byKey(const ValueKey('receipt-upload-activity')));
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       expect(find.text('Receipt organized'), findsOneWidget);
       expect(find.text('Upload saved · Reading details'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -678,7 +686,7 @@ void main() {
       addTearDown(router.dispose);
       picker.files = [pdf('First.pdf'), pdf('Second.pdf')];
       await tester.pumpWidget(flow.app(repository, router));
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       await openSheet(tester);
       await selectFiles(tester);
       await upload(tester, 2);
@@ -691,8 +699,8 @@ void main() {
           file: repository.records[id]!.file,
         ),
       );
-      await tester.pumpAndSettle();
-      expect(find.text('1 to review · 1 reading details'), findsOneWidget);
+      await pumpUploadUi(tester);
+      expect(find.text('1 to review · 1 still processing'), findsOneWidget);
       expect(
         find.text(
           'Amount needs review · Date needs review · Details need review',
@@ -700,8 +708,75 @@ void main() {
         findsOneWidget,
       );
       await tester.tap(find.text('Review receipt'));
-      await tester.pumpAndSettle();
+      await pumpUploadUi(tester);
       expect(find.text(id), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'reduced motion retains visible processing cues without animation',
+    (tester) async {
+      flow.viewport(tester);
+      final repository = BatchRepository();
+      addTearDown(repository.dispose);
+      final router = flow.testRouter();
+      addTearDown(router.dispose);
+      picker.files = [pdf('First.pdf'), pdf('Second.pdf')];
+      await tester.pumpWidget(flow.app(repository, router, reduceMotion: true));
+      await pumpUploadUi(tester);
+      await openSheet(tester);
+      await selectFiles(tester);
+      await upload(tester, 2);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byKey(const ValueKey('batch-processing')), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      repository.finishProcessing(repository.uploads.first);
+      await pumpUploadUi(tester);
+      expect(find.byKey(const ValueKey('batch-processing')), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.byIcon(Icons.check_circle_outline_rounded), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'connection failures stop processing animation and offer checking progress',
+    (tester) async {
+      flow.viewport(tester);
+      final repository = BatchRepository();
+      addTearDown(repository.dispose);
+      final down = StateProvider<bool>((ref) => false);
+      final router = flow.testRouter();
+      addTearDown(router.dispose);
+      picker.files = [pdf('First.pdf'), pdf('Second.pdf')];
+      await tester.pumpWidget(
+        flow.app(repository, router, connectionDown: down),
+      );
+      await pumpUploadUi(tester);
+      await openSheet(tester);
+      await selectFiles(tester);
+      await upload(tester, 2);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      final scope = ProviderScope.containerOf(
+        tester.element(find.byType(UploadReceiptSheet)),
+      );
+      scope.read(down.notifier).state = true;
+      await pumpUploadUi(tester);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('2 need a connection check'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.byKey(const ValueKey('batch-processing')), findsNothing);
+      expect(find.text('Saved · Check progress'), findsNWidgets(2));
+      scope.read(down.notifier).state = false;
+      repository.finishProcessing(repository.uploads.first);
+      await pumpUploadUi(tester);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(find.byIcon(Icons.check_circle_outline_rounded), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     },
@@ -721,21 +796,37 @@ void main() {
           pdf('image_picker_SECOND.pdf'),
         ];
         await tester.pumpWidget(flow.app(repository, router, dark: dark));
-        await tester.pumpAndSettle();
+        await pumpUploadUi(tester);
         await openSheet(tester);
         await selectFiles(tester);
         await upload(tester, 2);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(find.byType(LinearProgressIndicator), findsOneWidget);
+        expect(
+          tester
+              .widgetList<LinearProgressIndicator>(
+                find.byType(LinearProgressIndicator),
+              )
+              .every((indicator) => indicator.value == null),
+          isTrue,
+        );
         repository.finishProcessing(repository.uploads.first);
-        await tester.pumpAndSettle();
+        await pumpUploadUi(tester);
         expect(find.text('Your local café'), findsOneWidget);
         expect(find.text('Receipt 2'), findsOneWidget);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(find.byType(LinearProgressIndicator), findsOneWidget);
+        expect(find.byIcon(Icons.check_circle_outline_rounded), findsNothing);
         expect(find.text('View receipt'), findsOneWidget);
         expect(find.text('View progress'), findsOneWidget);
         expect(find.textContaining('image_picker'), findsNothing);
         await flow.shot(tester, 'batch-results-${dark ? 'dark' : 'light'}');
         repository.finishProcessing(repository.uploads.last);
-        await tester.pumpAndSettle();
-        expect(find.text('2 ready'), findsOneWidget);
+        await pumpUploadUi(tester);
+        expect(find.text('2 of 2 ready'), findsOneWidget);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(find.byIcon(Icons.check_circle_outline_rounded), findsNothing);
+        expect(find.byType(LinearProgressIndicator), findsNothing);
         expect(find.text('View receipt'), findsNWidgets(2));
         expect(find.text('Continue browsing'), findsOneWidget);
         expect(
@@ -761,7 +852,7 @@ void main() {
         await tester.pumpWidget(
           flow.app(repository, router, dark: dark, textScale: 1.6),
         );
-        await tester.pumpAndSettle();
+        await pumpUploadUi(tester);
         await openSheet(tester);
         await selectFiles(tester);
         final button = find.text('Upload 25 files');
@@ -772,10 +863,10 @@ void main() {
         expect(tester.getRect(find.text('Retry 1 file')).bottom, lessThan(568));
         expect(tester.takeException(), isNull);
         repository.finishProcessing(repository.uploads.first);
-        await tester.pumpAndSettle();
+        await pumpUploadUi(tester);
         await tester.scrollUntilVisible(find.text('View receipt'), 120);
         await tester.ensureVisible(find.text('View receipt'));
-        await tester.pumpAndSettle();
+        await pumpUploadUi(tester);
         expect(find.text('View receipt').hitTestable(), findsOneWidget);
         expect(
           tester.getRect(find.text('View receipt')).bottom,

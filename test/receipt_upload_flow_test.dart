@@ -111,6 +111,7 @@ Widget app(
   GoRouter router, {
   ImagePicker? imagePicker,
   bool dark = true,
+  bool reduceMotion = false,
   double textScale = 1,
   StateProvider<String?>? userState,
   StateProvider<bool>? connectionDown,
@@ -165,9 +166,10 @@ Widget app(
     themeMode: dark ? ThemeMode.dark : ThemeMode.light,
     routerConfig: router,
     builder: (context, child) => MediaQuery(
-      data: MediaQuery.of(
-        context,
-      ).copyWith(textScaler: TextScaler.linear(textScale)),
+      data: MediaQuery.of(context).copyWith(
+        textScaler: TextScaler.linear(textScale),
+        disableAnimations: reduceMotion,
+      ),
       child: RepaintBoundary(key: captureKey, child: child!),
     ),
   ),

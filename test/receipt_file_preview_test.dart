@@ -374,7 +374,7 @@ void main() {
   );
 
   testWidgets(
-    'the file card opens a full-screen native viewer with one shared download',
+    'the single preview expand action opens the native PDF viewer with one shared download',
     (tester) async {
       final files = _Files();
       final docs = <_Pdf>[];
@@ -389,7 +389,9 @@ void main() {
         },
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Receipt.pdf').first);
+      expect(find.text('Receipt.pdf'), findsOneWidget);
+      expect(find.byTooltip('View full receipt'), findsOneWidget);
+      await tester.tap(find.byTooltip('View full receipt'));
       await tester.pumpAndSettle();
       expect(find.byType(ReceiptOriginalScreen), findsOneWidget);
       expect(find.byType(InteractiveViewer), findsOneWidget);
@@ -405,6 +407,45 @@ void main() {
       expect(docs.every((doc) => doc.closed), isTrue);
     },
   );
+
+  for (final dark in [false, true]) {
+    testWidgets(
+      'receipt details keep one clean preview and reveal details sooner in ${dark ? 'dark' : 'light'} mode',
+      (tester) async {
+        final files = _Files()..data = _png;
+        const name = 'image_picker_B23E927B-42DA-46F2-8CE5-93CDDFCB5B0D.jpg';
+        await _screen(
+          tester,
+          files: files,
+          receipt: _receipt(name: name, mime: 'image/jpeg'),
+          details: true,
+          dark: dark,
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(ReceiptFilePreview), findsOneWidget);
+        expect(find.byTooltip('View full receipt'), findsOneWidget);
+        expect(find.text('Original receipt'), findsOneWidget);
+        expect(find.text('Receipt photo'), findsNothing);
+        expect(find.text(name), findsNothing);
+        expect(tester.getRect(find.text('Details')).bottom, lessThan(844));
+        await _screenshot(tester, 'details-clean-${dark ? 'dark' : 'light'}');
+        // The receipt image itself remains a second way to use the same viewer.
+        await tester.tap(find.byType(Image).first);
+        await tester.pumpAndSettle();
+        expect(find.byType(ReceiptOriginalScreen), findsOneWidget);
+        expect(find.byType(InteractiveViewer), findsOneWidget);
+        expect(find.text('Receipt photo'), findsNothing);
+        expect(find.text(name), findsNothing);
+        expect(files.downloads, 1);
+        await tester.tap(find.byTooltip('Close receipt'));
+        await tester.pumpAndSettle();
+        expect(find.byType(ReceiptDetailScreen), findsOneWidget);
+        expect(files.externalRequests, 0);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
 
   testWidgets('photos open in a zoomable viewer in dark mode', (tester) async {
     final files = _Files()..data = _png;
