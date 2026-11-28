@@ -8,6 +8,7 @@ import '../../auth/data/auth_repository.dart';
 import '../../receipts/data/receipt_repository.dart';
 import '../../receipts/models/receipt.dart';
 import '../../receipts/presentation/upload_receipt_sheet.dart';
+import '../../receipts/presentation/receipt_upload_sheet_route.dart';
 import '../../receipts/presentation/receipt_upload_result.dart';
 import '../../receipts/data/receipt_upload_activity.dart';
 import '../../receipts/data/receipt_email_forwarding.dart';
@@ -190,24 +191,14 @@ class _NativeOnboardingScreenState
       'source': source.name,
     });
     Receipt? uploaded;
-    await showModalBottomSheet<void>(
-      useRootNavigator: true,
+    await showReceiptUploadSheet(
       context: context,
-      isScrollControlled: true,
-      isDismissible: false,
-      enableDrag: false,
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * 0.92,
-        maxWidth: 520,
-      ),
-      builder: (_) => UploadReceiptSheet(
-        userId: uid,
-        repository: ref.read(receiptRepositoryProvider),
-        initialSource: source,
-        guided: true,
-        onFileSelected: (file) => _sessionFile = file,
-        onUploaded: (receipt) => uploaded = receipt,
-      ),
+      userId: uid,
+      repository: ref.read(receiptRepositoryProvider),
+      initialSource: source,
+      guided: true,
+      onFileSelected: (file) => _sessionFile = file,
+      onUploaded: (receipt) => uploaded = receipt,
     );
     if (!mounted || ref.read(currentUserIdProvider) != uid) return;
     setState(() => _uploadOpen = false);

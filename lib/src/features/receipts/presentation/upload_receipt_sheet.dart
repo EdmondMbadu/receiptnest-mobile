@@ -35,6 +35,7 @@ class UploadReceiptSheet extends ConsumerStatefulWidget {
     this.initialSource,
     this.guided = false,
     this.onFileSelected,
+    this.onTransferStateChanged,
   });
 
   final String userId;
@@ -43,6 +44,7 @@ class UploadReceiptSheet extends ConsumerStatefulWidget {
   final ReceiptSource? initialSource;
   final bool guided;
   final ValueChanged<UploadFileData>? onFileSelected;
+  final ValueChanged<bool>? onTransferStateChanged;
 
   @override
   ConsumerState<UploadReceiptSheet> createState() => _UploadReceiptSheetState();
@@ -312,6 +314,7 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
       _error = null;
       _progress = 0;
     });
+    widget.onTransferStateChanged?.call(true);
     // Serialize transfers so the existing free-plan count check observes each
     // accepted receipt. Extraction starts independently as soon as each saves.
     for (final item in pending) {
@@ -395,6 +398,7 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
       _batchFinished = batch;
       if (!batch) _uploaded = _items.single.receipt;
     });
+    widget.onTransferStateChanged?.call(false);
     if (mounted && widget.guided && _uploaded != null) {
       Navigator.of(context).pop();
     }

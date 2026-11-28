@@ -13,7 +13,7 @@ import '../../receipts/data/receipt_repository.dart';
 import '../../receipts/data/receipt_email_forwarding.dart';
 import '../../receipts/presentation/forward_email_screen.dart';
 import '../../receipts/models/receipt.dart';
-import '../../receipts/presentation/upload_receipt_sheet.dart';
+import '../../receipts/presentation/receipt_upload_sheet_route.dart';
 import '../../share/data/share_repository.dart';
 import '../../share/models/share_models.dart';
 
@@ -520,23 +520,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (uid == null || _openingUpload) return;
     _openingUpload = true;
     try {
-      await showModalBottomSheet<void>(
-        useRootNavigator: true,
+      await showReceiptUploadSheet(
         context: context,
-        isScrollControlled: true,
-        isDismissible: false,
-        enableDrag: false,
-        constraints: BoxConstraints(
-          maxWidth: 540,
-          maxHeight: MediaQuery.sizeOf(context).height * 0.92,
-        ),
-        builder: (context) {
-          return UploadReceiptSheet(
-            userId: uid,
-            repository: ref.read(receiptRepositoryProvider),
-            onUploaded: (_) {},
-          );
-        },
+        userId: uid,
+        repository: ref.read(receiptRepositoryProvider),
+        onUploaded: (_) {},
       );
     } finally {
       _openingUpload = false;

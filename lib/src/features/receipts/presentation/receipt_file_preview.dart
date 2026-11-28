@@ -1,4 +1,3 @@
-import '../models/receipt_file_label.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -12,6 +11,7 @@ import '../../auth/data/auth_repository.dart';
 import '../data/receipt_file_preview.dart';
 import '../data/receipt_repository.dart';
 import '../models/receipt.dart';
+import '../models/receipt_file_label.dart';
 
 Future<void> openReceiptOriginal(BuildContext context, Receipt receipt) =>
     Navigator.of(context, rootNavigator: true).push<void>(
@@ -370,7 +370,6 @@ class _NativeReceiptPdfState extends State<_NativeReceiptPdf> {
                         onRetry: () => _show(_page),
                         onOriginal: widget.onOriginal,
                         onExpand: widget.onExpand,
-                        showHint: false,
                       ),
                     ),
                     if (_busy)
@@ -407,12 +406,6 @@ class _NativeReceiptPdfState extends State<_NativeReceiptPdf> {
               ),
             ],
           ),
-        if (!widget.fullScreen && !_error)
-          TextButton.icon(
-            onPressed: widget.onExpand,
-            icon: const Icon(Icons.open_in_full_rounded, size: 16),
-            label: const Text('View full receipt'),
-          ),
       ],
     );
   }
@@ -426,14 +419,12 @@ class _ReceiptImage extends StatefulWidget {
     required this.onRetry,
     required this.onOriginal,
     required this.onExpand,
-    this.showHint = true,
   });
   final Uint8List bytes;
   final bool fullScreen;
   final VoidCallback onRetry;
   final VoidCallback onOriginal;
   final VoidCallback onExpand;
-  final bool showHint;
   @override
   State<_ReceiptImage> createState() => _ReceiptImageState();
 }
@@ -540,12 +531,6 @@ class _ReceiptImageState extends State<_ReceiptImage> {
               ),
               const SizedBox(width: 8),
             ],
-          )
-        else if (widget.showHint)
-          TextButton.icon(
-            onPressed: widget.onExpand,
-            icon: const Icon(Icons.open_in_full_rounded, size: 16),
-            label: const Text('View full receipt'),
           ),
       ],
     );

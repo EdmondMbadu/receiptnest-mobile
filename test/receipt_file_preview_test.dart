@@ -391,6 +391,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Receipt.pdf'), findsOneWidget);
       expect(find.byTooltip('View full receipt'), findsOneWidget);
+      expect(find.text('View full receipt'), findsNothing);
       await tester.tap(find.byTooltip('View full receipt'));
       await tester.pumpAndSettle();
       expect(find.byType(ReceiptOriginalScreen), findsOneWidget);
@@ -424,6 +425,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(ReceiptFilePreview), findsOneWidget);
         expect(find.byTooltip('View full receipt'), findsOneWidget);
+        expect(find.text('View full receipt'), findsNothing);
         expect(find.text('Original receipt'), findsOneWidget);
         expect(find.text('Receipt photo'), findsNothing);
         expect(find.text(name), findsNothing);

@@ -18,6 +18,7 @@ import 'package:recieptnest_ai/src/features/receipts/models/receipt_file_label.d
 import 'package:recieptnest_ai/src/features/receipts/presentation/receipt_upload_batch.dart';
 import 'package:recieptnest_ai/src/features/receipts/presentation/upload_receipt_sheet.dart';
 import 'receipt_upload_flow_test.dart' as flow;
+import 'package:recieptnest_ai/src/features/receipts/presentation/receipt_upload_sheet_route.dart';
 
 class BatchRepository extends flow.UploadTestRepository {
   final attemptsByName = <String, List<String>>{};
@@ -164,21 +165,12 @@ GoRouter sheetRouter(BatchRepository repository, {bool guided = false}) =>
           path: '/app/home',
           builder: (context, state) => Scaffold(
             floatingActionButton: FloatingActionButton(
-              onPressed: () => showModalBottomSheet<void>(
+              onPressed: () => showReceiptUploadSheet(
                 context: context,
-                isScrollControlled: true,
-                isDismissible: false,
-                enableDrag: false,
-                constraints: BoxConstraints(
-                  maxWidth: 540,
-                  maxHeight: MediaQuery.sizeOf(context).height * .92,
-                ),
-                builder: (_) => UploadReceiptSheet(
-                  userId: 'u',
-                  guided: guided,
-                  repository: repository,
-                  onUploaded: (_) {},
-                ),
+                userId: 'u',
+                guided: guided,
+                repository: repository,
+                onUploaded: (_) {},
               ),
               child: const Icon(Icons.add),
             ),
@@ -714,6 +706,176 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  testWidgets(
+    'outside tap closes the batch after viewing a receipt and preserves remaining progress',
+    (tester) async {
+      flow.viewport(tester);
+      final repository = BatchRepository();
+      addTearDown(repository.dispose);
+      final router = flow.testRouter();
+      addTearDown(router.dispose);
+      picker.files = [pdf('First.pdf'), pdf('Second.pdf')];
+      await tester.pumpWidget(flow.app(repository, router));
+      await pumpUploadUi(tester);
+      await openSheet(tester);
+      await selectFiles(tester);
+      await upload(tester, 2);
+      final scope = ProviderScope.containerOf(
+        tester.element(find.byType(UploadReceiptSheet)),
+      );
+      repository.finishProcessing(repository.uploads.first);
+      await pumpUploadUi(tester);
+      await tester.tap(find.text('View receipt'));
+      await pumpUploadUi(tester);
+      expect(find.text(repository.uploads.first), findsOneWidget);
+      router.pop();
+      await pumpUploadUi(tester);
+      expect(find.byType(ReceiptUploadBatch), findsOneWidget);
+      await tester.tapAt(const Offset(10, 10));
+      await pumpUploadUi(tester);
+      expect(find.byType(UploadReceiptSheet), findsNothing);
+      expect(scope.read(receiptUploadActivityProvider).map((task) => task.id), [
+        repository.uploads.last,
+      ]);
+      expect(find.text('Your receipt is being organized'), findsOneWidget);
+      repository.finishProcessing(repository.uploads.last);
+      await pumpUploadUi(tester);
+      expect(find.text('Your receipt is ready'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  for (final ready in [false, true]) {
+    testWidgets(
+      'swipe closes a saved batch while ${ready ? 'ready' : 'processing'} and preserves its activity',
+      (tester) async {
+        flow.viewport(tester);
+        final repository = BatchRepository();
+        addTearDown(repository.dispose);
+        final router = flow.testRouter();
+        addTearDown(router.dispose);
+        picker.files = [pdf('First.pdf'), pdf('Second.pdf')];
+        await tester.pumpWidget(flow.app(repository, router));
+        await pumpUploadUi(tester);
+        await openSheet(tester);
+        await selectFiles(tester);
+        await upload(tester, 2);
+        if (ready) {
+          for (final id in repository.uploads) {
+            repository.finishProcessing(id);
+          }
+          await pumpUploadUi(tester);
+        }
+        final scope = ProviderScope.containerOf(
+          tester.element(find.byType(UploadReceiptSheet)),
+        );
+        final sheet = tester.getRect(find.byType(BottomSheet).last);
+        expect(
+          tester.widget<BottomSheet>(find.byType(BottomSheet).last).enableDrag,
+          isTrue,
+        );
+        await tester.flingFrom(
+          Offset(sheet.center.dx, sheet.top + 20),
+          const Offset(0, 450),
+          1000,
+        );
+        await pumpUploadUi(tester);
+        expect(find.byType(UploadReceiptSheet), findsNothing);
+        expect(scope.read(receiptUploadActivityProvider), hasLength(2));
+        expect(find.text('2 recent uploads'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
+  testWidgets(
+    'barrier and swipe stay blocked during transfer then enable without losing the batch state',
+    (tester) async {
+      flow.viewport(tester);
+      final repository = BatchRepository()..gate = Completer<void>();
+      addTearDown(repository.dispose);
+      final router = flow.testRouter();
+      addTearDown(router.dispose);
+      picker.files = [pdf('First.pdf'), pdf('Second.pdf')];
+      await tester.pumpWidget(flow.app(repository, router));
+      await pumpUploadUi(tester);
+      await openSheet(tester);
+      await selectFiles(tester);
+      await tester.tap(find.text('Upload 2 files'));
+      await pumpUploadUi(tester);
+      expect(
+        tester.widget<BottomSheet>(find.byType(BottomSheet).last).enableDrag,
+        isFalse,
+      );
+      expect(
+        tester
+            .widget<BottomSheet>(find.byType(BottomSheet).last)
+            .showDragHandle,
+        isFalse,
+      );
+      await tester.tapAt(const Offset(10, 10));
+      await pumpUploadUi(tester);
+      expect(find.byType(ReceiptUploadBatch), findsOneWidget);
+      final sheet = tester.getRect(find.byType(BottomSheet).last);
+      await tester.flingFrom(
+        Offset(sheet.center.dx, sheet.top + 20),
+        const Offset(0, 450),
+        1000,
+      );
+      await pumpUploadUi(tester);
+      expect(find.byType(ReceiptUploadBatch), findsOneWidget);
+      expect(repository.attemptsByName, hasLength(1));
+      repository.gate!.complete();
+      await pumpUploadUi(tester);
+      expect(repository.uploads.toSet(), hasLength(2));
+      expect(find.text('2 of 2 files saved.'), findsOneWidget);
+      expect(
+        tester.widget<BottomSheet>(find.byType(BottomSheet).last).enableDrag,
+        isTrue,
+      );
+      final scope = ProviderScope.containerOf(
+        tester.element(find.byType(UploadReceiptSheet)),
+      );
+      await tester.tapAt(const Offset(10, 10));
+      await pumpUploadUi(tester);
+      expect(find.byType(UploadReceiptSheet), findsNothing);
+      expect(scope.read(receiptUploadActivityProvider), hasLength(2));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('outside dismissal also preserves a single saved receipt', (
+    tester,
+  ) async {
+    flow.viewport(tester);
+    final repository = BatchRepository();
+    addTearDown(repository.dispose);
+    final router = flow.testRouter();
+    addTearDown(router.dispose);
+    picker.files = [pdf('Single.pdf')];
+    await tester.pumpWidget(flow.app(repository, router));
+    await pumpUploadUi(tester);
+    await openSheet(tester);
+    await selectFiles(tester);
+    await tester.tap(find.text('Upload receipt'));
+    await pumpUploadUi(tester);
+    final scope = ProviderScope.containerOf(
+      tester.element(find.byType(UploadReceiptSheet)),
+    );
+    await tester.tapAt(const Offset(10, 10));
+    await pumpUploadUi(tester);
+    expect(find.byType(UploadReceiptSheet), findsNothing);
+    expect(
+      scope.read(receiptUploadActivityProvider).single.id,
+      repository.uploads.single,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets(
     'reduced motion retains visible processing cues without animation',

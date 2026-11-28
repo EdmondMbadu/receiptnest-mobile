@@ -9,7 +9,7 @@ import '../data/receipt_upload_activity.dart';
 import '../models/receipt.dart';
 import 'receipt_upload_outcome.dart';
 import 'receipt_upload_result.dart';
-import 'upload_receipt_sheet.dart';
+import 'receipt_upload_sheet_route.dart';
 
 class ReceiptUploadActivityBar extends ConsumerWidget {
   const ReceiptUploadActivityBar({super.key});
@@ -124,21 +124,11 @@ class ReceiptUploadActivityBar extends ConsumerWidget {
                     seed: task.seed,
                     onAnother: () {
                       Navigator.of(sheetContext).pop();
-                      showModalBottomSheet<void>(
-                        useRootNavigator: true,
+                      showReceiptUploadSheet(
                         context: context,
-                        isScrollControlled: true,
-                        isDismissible: false,
-                        enableDrag: false,
-                        constraints: BoxConstraints(
-                          maxWidth: 540,
-                          maxHeight: MediaQuery.sizeOf(context).height * 0.92,
-                        ),
-                        builder: (_) => UploadReceiptSheet(
-                          userId: uid,
-                          repository: ref.read(receiptRepositoryProvider),
-                          onUploaded: (_) {},
-                        ),
+                        userId: uid,
+                        repository: ref.read(receiptRepositoryProvider),
+                        onUploaded: (_) {},
                       );
                     },
                   ),
