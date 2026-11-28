@@ -1,3 +1,4 @@
+import '../models/receipt_file_label.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -45,6 +46,7 @@ class ReceiptUploadPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final name = file?.name ?? receipt?.file.originalName ?? 'Your receipt';
+    final label = receiptFileLabel(name);
     final pdf = name.toLowerCase().endsWith('.pdf') || receipt?.isPdf == true;
     final path = file?.path;
     final image = !pdf && path != null;
@@ -73,7 +75,7 @@ class ReceiptUploadPreview extends StatelessWidget {
             _document(context, pdf),
           const SizedBox(height: 12),
           Text(
-            name,
+            label,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,

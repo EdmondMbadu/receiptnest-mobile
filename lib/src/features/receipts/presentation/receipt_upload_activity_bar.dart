@@ -1,6 +1,6 @@
+import '../models/receipt_file_label.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../auth/data/auth_repository.dart';
 
@@ -106,10 +106,9 @@ class ReceiptUploadActivityBar extends ConsumerWidget {
                     ref.read(currentUserIdProvider) != uid) {
                   return;
                 }
-                if (task.guided) {
-                  context.push('/app/onboarding');
-                  return;
-                }
+                // Activity always follows this receipt's identity. A guided
+                // checkpoint can outlive the guide, so it must not reopen the
+                // onboarding source chooser when someone wants their receipt.
                 await showModalBottomSheet<void>(
                   useRootNavigator: true,
                   context: context,
@@ -224,7 +223,7 @@ class _RecentUploadTile extends ConsumerWidget {
       ),
       title: Text(
         reading
-            ? receipt?.file.originalName ?? 'Your receipt'
+            ? receiptFileLabel(receipt?.file.originalName)
             : receiptDisplayMerchant(receipt),
         maxLines: 2,
         overflow: TextOverflow.ellipsis,

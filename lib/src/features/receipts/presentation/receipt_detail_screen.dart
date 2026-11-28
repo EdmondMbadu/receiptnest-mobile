@@ -1,3 +1,4 @@
+import '../models/receipt_file_label.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -35,6 +36,11 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
   final _notesController = TextEditingController();
 
   String _categoryId = 'other';
+  ReceiptCategory? _savedCategory;
+  List<ExpenseCategory> get _categoryOptions => categoryOptionsIncluding(
+    _savedCategory?.id,
+    savedName: _savedCategory?.name,
+  );
   bool _loaded = false;
   bool _saving = false;
   bool _deleting = false;
@@ -65,6 +71,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
     _dateController.text =
         receipt.date ?? receipt.extraction?.date?.value?.toString() ?? '';
     _notesController.text = receipt.notes ?? '';
+    _savedCategory = receipt.category;
     _categoryId = receipt.category?.id ?? 'other';
     _loaded = true;
   }
@@ -108,7 +115,9 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
 
     try {
       final amount = double.tryParse(_amountController.text.trim());
-      final category = categoryById(_categoryId);
+      final category = _categoryOptions.singleWhere(
+        (option) => option.id == _categoryId,
+      );
 
       final updates = <String, dynamic>{
         'merchant': {
@@ -499,7 +508,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  receipt.file.originalName,
+                                  receiptFileLabel(receipt.file.originalName),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
@@ -636,6 +645,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String>(
                       initialValue: _categoryId,
+                      isExpanded: true,
                       decoration: InputDecoration(
                         labelText: 'Category',
                         prefixIcon: Icon(
@@ -644,11 +654,15 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
                           color: cs.onSurface.withValues(alpha: 0.4),
                         ),
                       ),
-                      items: defaultCategories
+                      items: _categoryOptions
                           .map(
                             (category) => DropdownMenuItem<String>(
                               value: category.id,
-                              child: Text('${category.icon} ${category.name}'),
+                              child: Text(
+                                '${category.icon} ${category.name}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           )
                           .toList(),

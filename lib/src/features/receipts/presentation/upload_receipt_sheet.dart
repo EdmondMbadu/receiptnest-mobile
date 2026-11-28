@@ -1,5 +1,4 @@
-import 'dart:io';
-
+import '../models/receipt_file_label.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
@@ -16,11 +15,16 @@ import '../data/receipt_upload_activity.dart';
 import '../../auth/data/auth_repository.dart';
 import 'receipt_upload_outcome.dart';
 import 'receipt_upload_result.dart';
+import 'receipt_upload_batch.dart';
 import '../models/receipt.dart';
 import '../../getting_started/data/onboarding_analytics.dart';
 import '../../getting_started/presentation/onboarding_widgets.dart';
 
 enum ReceiptSource { camera, gallery, file }
+
+final receiptImagePickerProvider = Provider<ImagePicker>(
+  (ref) => ImagePicker(),
+);
 
 class UploadReceiptSheet extends ConsumerStatefulWidget {
   const UploadReceiptSheet({
@@ -45,16 +49,12 @@ class UploadReceiptSheet extends ConsumerStatefulWidget {
 }
 
 class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
-  static const Set<String> _previewableImageExtensions = {
-    'jpg',
-    'jpeg',
-    'png',
-    'webp',
-    'heic',
-    'heif',
-  };
-
-  UploadFileData? _selectedFile;
+  final List<ReceiptUploadItem> _items = [];
+  UploadFileData? get _selectedFile => _items.firstOrNull?.file;
+  bool _batch = false;
+  bool _batchFinished = false;
+  bool get _sameAccount =>
+      mounted && ref.read(currentUserIdProvider) == widget.userId;
   Receipt? _uploaded;
   bool _uploading = false;
   bool _isFirstUpload = false;
@@ -62,7 +62,6 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
   bool _closingForAccountChange = false;
   double _progress = 0;
   String? _error;
-  String _uploadId = const Uuid().v4();
 
   @override
   void initState() {
@@ -82,18 +81,42 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
     });
   }
 
-  void _selected(UploadFileData file, String source) {
+  void _selected(List<UploadFileData> files, String source) {
+    if (!_sameAccount || files.isEmpty) return;
     setState(() {
-      _selectedFile = file;
-      _uploadId = const Uuid().v4();
+      if (widget.guided) _items.clear();
+      for (final file in widget.guided ? files.take(1) : files) {
+        // Only deduplicate an identical local selection. Different files with
+        // the same name/size must remain independently uploadable.
+        if (_items.any(
+          (item) => file.path != null
+              ? item.file.path == file.path
+              : item.file.name == file.name &&
+                    item.file.sizeBytes == file.sizeBytes &&
+                    listEquals(item.file.bytes, file.bytes),
+        )) {
+          continue;
+        }
+        _items.add(ReceiptUploadItem(file: file, id: const Uuid().v4()));
+      }
       _error = null;
     });
-    widget.onFileSelected?.call(file);
+    if (widget.guided) widget.onFileSelected?.call(_items.single.file);
     ref.read(onboardingAnalyticsProvider).event('native_receipt_selected', {
       'source': source,
       'guided': widget.guided ? 1 : 0,
+      'file_count': files.length,
     });
   }
+
+  void _reset() => setState(() {
+    _items.clear();
+    _uploaded = null;
+    _batch = false;
+    _batchFinished = false;
+    _error = null;
+    _progress = 0;
+  });
 
   String _fileExtension(String fileName) {
     final dot = fileName.lastIndexOf('.');
@@ -117,11 +140,6 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
       default:
         return fallback;
     }
-  }
-
-  bool _isPreviewableImage(UploadFileData file) {
-    return file.path != null &&
-        _previewableImageExtensions.contains(_fileExtension(file.name));
   }
 
   String _friendlyPickerError(Object error, {required bool isCamera}) {
@@ -154,7 +172,7 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
       _error = null;
     });
     try {
-      final picker = ImagePicker();
+      final picker = ref.read(receiptImagePickerProvider);
       final image = await picker.pickImage(
         source: ImageSource.camera,
         imageQuality: 92,
@@ -162,18 +180,17 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
       );
       if (image == null) return;
 
-      final sizeBytes = await File(image.path).length();
+      final sizeBytes = await image.length();
       if (!mounted) return;
 
-      _selected(
+      _selected([
         UploadFileData(
           name: image.name,
           path: image.path,
           sizeBytes: sizeBytes,
           mimeType: _mimeTypeFromFileName(image.name, fallback: 'image/jpeg'),
         ),
-        'camera',
-      );
+      ], 'camera');
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -191,25 +208,28 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
       _error = null;
     });
     try {
-      final picker = ImagePicker();
-      final image = await picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 92,
-      );
-      if (image == null) return;
-
-      final sizeBytes = await File(image.path).length();
-      if (!mounted) return;
-
-      _selected(
-        UploadFileData(
-          name: image.name,
-          path: image.path,
-          sizeBytes: sizeBytes,
-          mimeType: _mimeTypeFromFileName(image.name, fallback: 'image/jpeg'),
-        ),
-        'gallery',
-      );
+      final picker = ref.read(receiptImagePickerProvider);
+      final images = widget.guided
+          ? [
+              await picker.pickImage(
+                source: ImageSource.gallery,
+                imageQuality: 92,
+              ),
+            ].nonNulls.toList()
+          : await picker.pickMultiImage(imageQuality: 92);
+      final files = <UploadFileData>[];
+      for (final image in images) {
+        if (!_sameAccount) return;
+        files.add(
+          UploadFileData(
+            name: image.name,
+            path: image.path,
+            sizeBytes: await image.length(),
+            mimeType: _mimeTypeFromFileName(image.name, fallback: 'image/jpeg'),
+          ),
+        );
+      }
+      _selected(files, 'gallery');
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -232,25 +252,24 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
           const PublicAppConfig();
       final result = await FilePicker.platform.pickFiles(
         withData: kIsWeb,
+        allowMultiple: !widget.guided,
         type: FileType.custom,
         allowedExtensions: appConfig.uploadAllowedExtensions,
       );
 
       if (result == null || result.files.isEmpty) return;
 
-      final file = result.files.first;
-      if (!mounted) return;
-
-      _selected(
-        UploadFileData(
-          name: file.name,
-          path: file.path,
-          bytes: file.path == null ? file.bytes : null,
-          sizeBytes: file.size,
-          mimeType: null,
-        ),
-        'file',
-      );
+      if (!_sameAccount) return;
+      _selected([
+        for (final file in result.files)
+          UploadFileData(
+            name: file.name,
+            path: file.path,
+            bytes: file.path == null ? file.bytes : null,
+            sizeBytes: file.size,
+            mimeType: null,
+          ),
+      ], 'file');
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -262,92 +281,122 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
   }
 
   Future<void> _upload() async {
-    if (_uploading ||
-        _picking ||
-        ref.read(currentUserIdProvider) != widget.userId) {
-      return;
+    if (_uploading || _picking || !_sameAccount || _items.isEmpty) return;
+    final pending = _items.where((item) => item.receipt == null).toList();
+    if (pending.isEmpty) return;
+    if (!_batchFinished) {
+      _isFirstUpload =
+          ref.read(receiptsStreamProvider).asData?.value.isEmpty == true;
     }
-    _isFirstUpload =
-        ref.read(receiptsStreamProvider).asData?.value.isEmpty == true;
-    final elapsed = Stopwatch()..start();
-    int? firstProgressMs;
-    int? fileTransferredMs;
-    final file = _selectedFile;
-    if (file == null) return;
     final appConfig =
         ref.read(publicAppConfigProvider).valueOrNull ??
         const PublicAppConfig();
-
-    final validation = widget.repository.validateFile(
-      file,
-      appConfig: appConfig,
-    );
-    if (!validation.valid) {
-      setState(() => _error = validation.error);
+    final batch = _batch || _items.length > 1;
+    // Validate every file, preserving invalid files alongside successful ones.
+    for (final item in pending) {
+      final validation = widget.repository.validateFile(
+        item.file,
+        appConfig: appConfig,
+      );
+      item.error = validation.valid ? null : validation.error;
+      item.progress = 0;
+    }
+    if (!batch && pending.single.error != null) {
+      setState(() => _error = pending.single.error);
       return;
     }
-
     setState(() {
+      _batch = batch;
+      _batchFinished = false;
       _uploading = true;
       _error = null;
       _progress = 0;
     });
-    ref.read(onboardingAnalyticsProvider).event('native_upload_start', {
-      'guided': widget.guided ? 1 : 0,
+    // Serialize transfers so the existing free-plan count check observes each
+    // accepted receipt. Extraction starts independently as soon as each saves.
+    for (final item in pending) {
+      if (!_sameAccount) break;
+      if (item.error != null) continue;
+      final elapsed = Stopwatch()..start();
+      int? firstProgressMs;
+      int? fileTransferredMs;
+      setState(() => item.uploading = true);
+      ref.read(onboardingAnalyticsProvider).event('native_upload_start', {
+        'guided': widget.guided ? 1 : 0,
+        'batch_size': _items.length,
+      });
+      try {
+        final uploaded = await widget.repository.uploadReceipt(
+          userId: widget.userId,
+          file: item.file,
+          uploadId: item.id,
+          appConfig: appConfig,
+          onProgress: (value) {
+            if (!_sameAccount) return;
+            if (value > 0) firstProgressMs ??= elapsed.elapsedMilliseconds;
+            if (value >= 1) fileTransferredMs ??= elapsed.elapsedMilliseconds;
+            setState(() {
+              item.progress = value.clamp(0, 1).toDouble();
+              _progress = item.progress;
+            });
+          },
+        );
+        if (!_sameAccount) break;
+        final first =
+            _isFirstUpload && !_items.any((entry) => entry.receipt != null);
+        setState(() {
+          item.receipt = uploaded;
+          item.first = first;
+          item.uploading = false;
+        });
+        ref
+            .read(receiptUploadActivityProvider.notifier)
+            .track(uploaded, guided: widget.guided, first: first);
+        ref.read(onboardingAnalyticsProvider).event('native_upload_accepted', {
+          'guided': widget.guided ? 1 : 0,
+          'elapsed_ms': elapsed.elapsedMilliseconds,
+          if (firstProgressMs != null) 'first_progress_ms': firstProgressMs!,
+          if (fileTransferredMs != null)
+            'file_transferred_ms': fileTransferredMs!,
+          'file_kind': uploaded.isPdf ? 'pdf' : 'image',
+        });
+        widget.onUploaded(uploaded);
+      } catch (error) {
+        if (!_sameAccount) break;
+        ref.read(onboardingAnalyticsProvider).event('native_upload_error', {
+          'guided': widget.guided ? 1 : 0,
+        });
+        final message = error.toString().replaceFirst('Exception: ', '');
+        setState(() {
+          item.uploading = false;
+          item.error = message.startsWith('Free plan')
+              ? message
+              : 'Couldn’t save this file. Check your connection and try again.';
+          if (!batch) {
+            _error = error is FirebaseException
+                ? 'We couldn’t save your receipt. Check your connection and try again. Your selected file is still here.'
+                : item.error;
+          }
+        });
+        if (message.startsWith('Free plan')) {
+          // Remaining files cannot pass the same limit. Keep them selected and
+          // avoid an unnecessary server round trip for each one.
+          for (final remaining
+              in pending.skipWhile((entry) => entry != item).skip(1)) {
+            remaining.error ??= message;
+          }
+          break;
+        }
+      }
+    }
+    if (!_sameAccount) return;
+    setState(() {
+      _uploading = false;
+      _batchFinished = batch;
+      if (!batch) _uploaded = _items.single.receipt;
     });
-
-    try {
-      final uploaded = await widget.repository.uploadReceipt(
-        userId: widget.userId,
-        file: file,
-        uploadId: _uploadId,
-        appConfig: appConfig,
-        onProgress: (value) {
-          if (!mounted) return;
-          if (value > 0) firstProgressMs ??= elapsed.elapsedMilliseconds;
-          if (value >= 1) fileTransferredMs ??= elapsed.elapsedMilliseconds;
-          setState(() => _progress = value.clamp(0, 1).toDouble());
-        },
-      );
-
-      if (!mounted) return;
-      if (ref.read(currentUserIdProvider) != widget.userId) return;
-      ref
-          .read(receiptUploadActivityProvider.notifier)
-          .track(uploaded, guided: widget.guided, first: _isFirstUpload);
-      ref.read(onboardingAnalyticsProvider).event('native_upload_accepted', {
-        'guided': widget.guided ? 1 : 0,
-        'elapsed_ms': elapsed.elapsedMilliseconds,
-        if (firstProgressMs != null) 'first_progress_ms': firstProgressMs!,
-        if (fileTransferredMs != null)
-          'file_transferred_ms': fileTransferredMs!,
-        'file_kind': uploaded.isPdf ? 'pdf' : 'image',
-      });
-      widget.onUploaded(uploaded);
-      if (!mounted) return;
-      if (widget.guided) {
-        Navigator.of(context).pop();
-      } else {
-        setState(() => _uploaded = uploaded);
-      }
-    } catch (e) {
-      if (!mounted || ref.read(currentUserIdProvider) != widget.userId) return;
-      ref.read(onboardingAnalyticsProvider).event('native_upload_error', {
-        'guided': widget.guided ? 1 : 0,
-      });
-      if (!mounted) return;
-      setState(() {
-        final message = e.toString().replaceFirst('Exception: ', '');
-        _error = e is FirebaseException
-            ? 'We couldn’t save your receipt. Check your connection and try again. Your selected file is still here.'
-            : message.startsWith('Free plan')
-            ? message
-            : 'We couldn’t upload this receipt. Please try again or choose another file.';
-      });
-    } finally {
-      if (mounted) {
-        setState(() => _uploading = false);
-      }
+    if (mounted && widget.guided && _uploaded != null) {
+      Navigator.of(context).pop();
     }
   }
 
@@ -459,258 +508,237 @@ class _UploadReceiptSheetState extends ConsumerState<UploadReceiptSheet> {
         receiptId: _uploaded!.id,
         seed: _uploaded,
         file: _selectedFile,
-        onAnother: () => setState(() {
-          _uploaded = null;
-          _selectedFile = null;
-          _error = null;
-          _progress = 0;
-          _uploadId = const Uuid().v4();
+        onAnother: _reset,
+      );
+    }
+    if (_batch && (_uploading || _batchFinished)) {
+      return ReceiptUploadBatch(
+        userId: widget.userId,
+        items: _items,
+        uploading: _uploading,
+        onRetry: _upload,
+        onAnother: _reset,
+        onRemove: (item) => setState(() {
+          _items.remove(item);
+          if (_items.isEmpty) {
+            _batch = false;
+            _batchFinished = false;
+          }
         }),
       );
     }
     if (_uploading) return _uploadProgress();
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final selected = _selectedFile;
-
-    return PopScope(
-      canPop: !_uploading,
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        selected == null ? 'Add your receipt' : 'Looking good?',
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _uploading
-                          ? null
-                          : () => Navigator.of(context).pop(),
-                      tooltip: 'Close upload',
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  selected == null
-                      ? 'Take a photo, or choose a receipt you already have.'
-                      : 'Make sure the whole receipt is visible and the text is readable.',
-                  style: TextStyle(color: cs.onSurfaceVariant, height: 1.5),
-                ),
-                const SizedBox(height: 16),
-                if (selected == null || !widget.guided)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _SourceButton(
-                          icon: Icons.camera_alt_outlined,
-                          label: 'Camera',
-                          onTap: _uploading || _picking
-                              ? null
-                              : _pickFromCamera,
-                          cs: cs,
-                          isDark: isDark,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _SourceButton(
-                          icon: Icons.photo_library_outlined,
-                          label: 'Gallery',
-                          onTap: _uploading || _picking
-                              ? null
-                              : _pickFromGallery,
-                          cs: cs,
-                          isDark: isDark,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _SourceButton(
-                          icon: Icons.description_outlined,
-                          label: 'Files',
-                          onTap: _uploading || _picking ? null : _pickDocument,
-                          cs: cs,
-                          isDark: isDark,
-                        ),
-                      ),
-                    ],
-                  ),
-                if (selected == null && !widget.guided)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: TextButton.icon(
-                      onPressed: _uploading || _picking
-                          ? null
-                          : () {
-                              final router = GoRouter.of(context);
-                              Navigator.of(context).pop();
-                              router.push('/app/forward-email');
-                            },
-                      icon: const Icon(Icons.mail_outline_rounded, size: 19),
-                      label: const Text('Forward an email'),
-                    ),
-                  ),
-                const SizedBox(height: 16),
-                if (selected != null)
-                  Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: cs.primary.withValues(alpha: 0.15),
-                      ),
-                    ),
+    final single = _items.length == 1;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Flexible(
+              child: CustomScrollView(
+                shrinkWrap: true,
+                slivers: [
+                  SliverToBoxAdapter(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        if (_isPreviewableImage(selected))
-                          ClipRRect(
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(15),
-                            ),
-                            child: Image.file(
-                              File(selected.path!),
-                              height: 180,
-                              width: double.infinity,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, error, stack) => const SizedBox(
-                                height: 100,
-                                child: Center(
-                                  child: Icon(
-                                    Icons.description_outlined,
-                                    size: 36,
-                                  ),
-                                ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                widget.guided
+                                    ? selected == null
+                                          ? 'Add your receipt'
+                                          : 'Looking good?'
+                                    : 'Add receipts',
+                                style: Theme.of(context).textTheme.headlineSmall
+                                    ?.copyWith(fontWeight: FontWeight.w600),
                               ),
                             ),
-                          )
-                        else
-                          Container(
-                            height: 80,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: cs.primary.withValues(alpha: 0.06),
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(15),
-                              ),
+                            IconButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              tooltip: 'Close upload',
+                              icon: const Icon(Icons.close_rounded),
                             ),
-                            child: Icon(
-                              Icons.insert_drive_file_outlined,
-                              size: 36,
-                              color: cs.primary.withValues(alpha: 0.4),
-                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          widget.guided
+                              ? selected == null
+                                    ? 'Take a photo, or choose a receipt you already have.'
+                                    : 'Make sure the whole receipt is visible and the text is readable.'
+                              : _items.isEmpty
+                              ? 'One or several. Choose what you have.'
+                              : single
+                              ? '1 file selected'
+                              : '${_items.length} files selected',
+                          style: TextStyle(
+                            color: cs.onSurfaceVariant,
+                            height: 1.5,
                           ),
-                        Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Row(
+                        ),
+                        const SizedBox(height: 20),
+                        if (selected == null || !widget.guided)
+                          Row(
                             children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      selected.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${(selected.sizeBytes / 1024).toStringAsFixed(1)} KB',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: cs.onSurface.withValues(
-                                          alpha: 0.5,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (!_uploading)
-                                IconButton(
-                                  onPressed: () =>
-                                      setState(() => _selectedFile = null),
-                                  icon: Icon(
-                                    Icons.close_rounded,
-                                    size: 20,
-                                    color: cs.onSurface.withValues(alpha: 0.4),
+                              for (final source in ReceiptSource.values) ...[
+                                if (source != ReceiptSource.camera)
+                                  const SizedBox(width: 10),
+                                Expanded(
+                                  child: _SourceButton(
+                                    icon: switch (source) {
+                                      ReceiptSource.camera =>
+                                        Icons.camera_alt_outlined,
+                                      ReceiptSource.gallery =>
+                                        Icons.photo_library_outlined,
+                                      ReceiptSource.file =>
+                                        Icons.description_outlined,
+                                    },
+                                    label: switch (source) {
+                                      ReceiptSource.camera => 'Camera',
+                                      ReceiptSource.gallery => 'Gallery',
+                                      ReceiptSource.file => 'Files',
+                                    },
+                                    hint: widget.guided
+                                        ? null
+                                        : source == ReceiptSource.camera
+                                        ? 'Take a photo'
+                                        : 'One or more',
+                                    onTap: _picking
+                                        ? null
+                                        : switch (source) {
+                                            ReceiptSource.camera =>
+                                              _pickFromCamera,
+                                            ReceiptSource.gallery =>
+                                              _pickFromGallery,
+                                            ReceiptSource.file => _pickDocument,
+                                          },
+                                    cs: cs,
+                                    isDark:
+                                        Theme.of(context).brightness ==
+                                        Brightness.dark,
                                   ),
                                 ),
+                              ],
                             ],
                           ),
-                        ),
+                        if (_picking)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 12),
+                            child: LinearProgressIndicator(minHeight: 2),
+                          ),
+                        if (selected != null) const SizedBox(height: 20),
+                        if (single)
+                          Stack(
+                            children: [
+                              ReceiptUploadPreview(file: selected, height: 150),
+                              Positioned(
+                                right: 0,
+                                top: 0,
+                                child: IconButton(
+                                  tooltip:
+                                      'Remove ${receiptFileLabel(selected!.name)}',
+                                  onPressed: _picking
+                                      ? null
+                                      : () => setState(() {
+                                          _items.clear();
+                                          _error = null;
+                                        }),
+                                  icon: const Icon(
+                                    Icons.close_rounded,
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                   ),
-                if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  OnboardingMessage(message: _error!, error: true),
-                ],
-                if (_uploading) ...[
-                  const SizedBox(height: 16),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: LinearProgressIndicator(
-                      value: _progress == 0 ? null : _progress,
-                      minHeight: 6,
+                  if (_items.length > 1)
+                    SliverList.builder(
+                      itemCount: _items.length,
+                      itemBuilder: (context, index) {
+                        final item = _items[index];
+                        return ReceiptSelectionTile(
+                          file: item.file,
+                          receiptNumber: index + 1,
+                          onRemove: _picking
+                              ? null
+                              : () => setState(() {
+                                  _items.remove(item);
+                                  _error = null;
+                                }),
+                        );
+                      },
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _progress >= 1
-                        ? 'Saving your receipt…'
-                        : 'Uploading ${(100 * _progress).toStringAsFixed(0)}%',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: cs.onSurface.withValues(alpha: 0.6),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: _uploading || _picking || selected == null
-                      ? null
-                      : _upload,
-                  child: _uploading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+                  SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        if (widget.guided && selected != null)
+                          TextButton(
+                            onPressed: _picking ? null : _reset,
+                            child: const Text('Choose another receipt'),
                           ),
-                        )
-                      : Text(
-                          _error != null && selected != null
-                              ? 'Try upload again'
-                              : 'Upload receipt',
-                        ),
-                ),
-                if (selected != null && !_uploading)
-                  TextButton(
-                    onPressed: () => setState(() {
-                      _selectedFile = null;
-                      _error = null;
-                    }),
-                    child: const Text('Choose another receipt'),
+                        if (!widget.guided)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: TextButton.icon(
+                              onPressed: _picking
+                                  ? null
+                                  : () {
+                                      final router = GoRouter.of(context);
+                                      Navigator.of(context).pop();
+                                      router.push('/app/forward-email');
+                                    },
+                              icon: const Icon(
+                                Icons.mail_outline_rounded,
+                                size: 19,
+                              ),
+                              label: const Text('Forward an email'),
+                            ),
+                          ),
+                        if (_error != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12, bottom: 8),
+                            child: OnboardingMessage(
+                              message: _error!,
+                              error: true,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-              ],
+                ],
+              ),
             ),
-          ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: _picking || selected == null ? null : _upload,
+              child: Text(
+                _error != null && selected != null
+                    ? 'Try upload again'
+                    : _items.length > 1
+                    ? 'Upload ${_items.length} files'
+                    : selected == null && !widget.guided
+                    ? 'Upload receipts'
+                    : 'Upload receipt',
+              ),
+            ),
+            if (!widget.guided && selected != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                'We’ll organize the details.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -724,10 +752,12 @@ class _SourceButton extends StatelessWidget {
     required this.onTap,
     required this.cs,
     required this.isDark,
+    this.hint,
   });
 
   final IconData icon;
   final String label;
+  final String? hint;
   final VoidCallback? onTap;
   final ColorScheme cs;
   final bool isDark;
@@ -761,6 +791,14 @@ class _SourceButton extends StatelessWidget {
                   color: cs.onSurface.withValues(alpha: 0.7),
                 ),
               ),
+              if (hint != null) ...[
+                const SizedBox(height: 5),
+                Text(
+                  hint!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                ),
+              ],
             ],
           ),
         ),

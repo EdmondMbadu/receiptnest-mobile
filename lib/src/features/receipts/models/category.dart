@@ -28,6 +28,7 @@ const defaultCategories = <ExpenseCategory>[
   ExpenseCategory(id: 'gifts_donations', name: 'Gifts & Donations', icon: '🎁'),
   ExpenseCategory(id: 'pets', name: 'Pets', icon: '🐾'),
   ExpenseCategory(id: 'fitness', name: 'Fitness & Sports', icon: '💪'),
+  ExpenseCategory(id: 'money_transfers', name: 'Money transfers', icon: '💸'),
   ExpenseCategory(id: 'other', name: 'Other', icon: '📦'),
 ];
 
@@ -36,4 +37,30 @@ ExpenseCategory categoryById(String? id) {
     (category) => category.id == id,
     orElse: () => defaultCategories.last,
   );
+}
+
+/// Keep a saved category selectable even when an older app does not know it.
+/// Editing another field must never silently reclassify the receipt as Other.
+List<ExpenseCategory> categoryOptionsIncluding(
+  String? savedId, {
+  String? savedName,
+}) {
+  if (savedId == null ||
+      defaultCategories.any((category) => category.id == savedId)) {
+    return defaultCategories;
+  }
+  final words = savedId.replaceAll(RegExp(r'[_-]+'), ' ').trim();
+  final label = savedName?.trim();
+  return [
+    ...defaultCategories,
+    ExpenseCategory(
+      id: savedId,
+      name: label != null && label.isNotEmpty
+          ? label
+          : words.isEmpty
+          ? 'Uncategorized'
+          : words[0].toUpperCase() + words.substring(1),
+      icon: '📦',
+    ),
+  ];
 }

@@ -1,3 +1,4 @@
+import '../models/receipt_file_label.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -64,7 +65,7 @@ class ReceiptFilePreview extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: Text(
-              receipt.file.originalName,
+              receiptFileLabel(receipt.file.originalName),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -111,7 +112,7 @@ class ReceiptOriginalScreen extends ConsumerWidget {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                     child: Text(
-                      receipt.file.originalName,
+                      receiptFileLabel(receipt.file.originalName),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

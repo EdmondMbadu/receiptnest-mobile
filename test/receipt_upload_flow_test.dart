@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:recieptnest_ai/src/core/config/public_app_config.dart';
 import 'package:recieptnest_ai/src/core/theme/app_theme.dart';
@@ -18,6 +19,7 @@ import 'package:recieptnest_ai/src/features/auth/data/auth_repository.dart';
 import 'package:recieptnest_ai/src/features/auth/models/user_profile.dart';
 import 'package:recieptnest_ai/src/features/getting_started/data/native_onboarding_repository.dart';
 import 'package:recieptnest_ai/src/features/getting_started/data/onboarding_analytics.dart';
+import 'package:recieptnest_ai/src/features/getting_started/presentation/native_onboarding_screen.dart';
 import 'package:recieptnest_ai/src/features/home/presentation/home_screen.dart';
 import 'package:recieptnest_ai/src/features/receipts/data/receipt_repository.dart';
 import 'package:recieptnest_ai/src/features/receipts/data/receipt_upload_activity.dart';
@@ -26,6 +28,7 @@ import 'package:recieptnest_ai/src/features/receipts/presentation/receipt_upload
 import 'package:recieptnest_ai/src/features/receipts/presentation/receipt_upload_result.dart';
 import 'package:recieptnest_ai/src/features/shell/presentation/app_shell_screen.dart';
 import 'support/onboarding_fakes.dart';
+import 'package:recieptnest_ai/src/features/receipts/presentation/upload_receipt_sheet.dart';
 
 final captureKey = GlobalKey();
 
@@ -90,6 +93,10 @@ GoRouter testRouter() => GoRouter(
       ],
     ),
     GoRoute(
+      path: '/app/onboarding',
+      builder: (_, _) => const NativeOnboardingScreen(),
+    ),
+    GoRoute(
       path: '/app/receipt/:id',
       builder: (context, state) => Scaffold(
         appBar: AppBar(title: const Text('Receipt details destination')),
@@ -102,12 +109,15 @@ GoRouter testRouter() => GoRouter(
 Widget app(
   UploadTestRepository repository,
   GoRouter router, {
+  ImagePicker? imagePicker,
   bool dark = true,
   double textScale = 1,
   StateProvider<String?>? userState,
   StateProvider<bool>? connectionDown,
 }) => ProviderScope(
   overrides: [
+    if (imagePicker != null)
+      receiptImagePickerProvider.overrideWithValue(imagePicker),
     currentUserIdProvider.overrideWith(
       (ref) => userState == null ? 'u' : ref.watch(userState),
     ),
@@ -361,7 +371,7 @@ void main() {
       await shot(tester, 'ready-light');
       await tester.tap(find.text('Add another receipt'));
       await tester.pumpAndSettle();
-      expect(find.text('Add your receipt'), findsOneWidget);
+      expect(find.text('Add receipts'), findsOneWidget);
       expect(find.text('Files'), findsOneWidget);
       expect(find.text('Sample café receipt.pdf'), findsNothing);
       expect(tester.takeException(), isNull);
@@ -571,6 +581,101 @@ void main() {
         find.byKey(const ValueKey('receipt-upload-activity')),
         findsNothing,
       );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'a restored guided upload opens its own receipt after onboarding is completed',
+    (tester) async {
+      viewport(tester);
+      SharedPreferences.setMockInitialValues({
+        'receipt_upload_activity_v1:u': jsonEncode([
+          {
+            'id': 'guided-saved',
+            'startedAt': '2026-11-27T10:00:00',
+            'guided': true,
+            'first': true,
+          },
+        ]),
+      });
+      final repository = UploadTestRepository();
+      addTearDown(repository.dispose);
+      repository.publishReceipt(exampleReceipt(id: 'guided-saved'));
+      final router = testRouter();
+      addTearDown(router.dispose);
+      await tester.pumpWidget(app(repository, router));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('receipt-upload-activity')));
+      await tester.pumpAndSettle();
+      expect(find.byType(NativeOnboardingScreen), findsNothing);
+      expect(find.byType(ReceiptUploadOutcome), findsOneWidget);
+      await tester.tap(find.text('View my receipt'));
+      await tester.pumpAndSettle();
+      expect(find.text('Receipt details destination'), findsOneWidget);
+      expect(find.text('guided-saved'), findsOneWidget);
+      expect(find.byType(NativeOnboardingScreen), findsNothing);
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(ReceiptUploadOutcome), findsOneWidget);
+      expect(find.byType(NativeOnboardingScreen), findsNothing);
+      await tester.tap(find.byTooltip('Close receipt result'));
+      await tester.pumpAndSettle();
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(find.byType(NativeOnboardingScreen), findsNothing);
+      expect(repository.uploads, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'choosing a guided receipt from mixed recent uploads preserves the selected identity',
+    (tester) async {
+      viewport(tester);
+      final repository = UploadTestRepository();
+      addTearDown(repository.dispose);
+      final guided = exampleReceipt(
+        id: 'guided-pending',
+        status: ReceiptStatuses.processing,
+      );
+      final other = exampleReceipt(id: 'other-ready');
+      repository.publishReceipt(guided);
+      repository.publishReceipt(other);
+      final router = testRouter();
+      addTearDown(router.dispose);
+      await tester.pumpWidget(app(repository, router));
+      await tester.pumpAndSettle();
+      final scope = ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+      );
+      scope
+          .read(receiptUploadActivityProvider.notifier)
+          .track(guided, guided: true, first: true);
+      scope.read(receiptUploadActivityProvider.notifier).track(other);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('receipt-upload-activity')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Upload saved · Reading details'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byType(ReceiptUploadOutcome), findsOneWidget);
+      expect(find.byType(NativeOnboardingScreen), findsNothing);
+      expect(
+        tester
+            .widget<ReceiptUploadOutcome>(find.byType(ReceiptUploadOutcome))
+            .receiptId,
+        guided.id,
+      );
+      repository.finishProcessing(guided.id);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('View my receipt'));
+      await tester.pumpAndSettle();
+      expect(find.text(guided.id), findsOneWidget);
+      expect(scope.read(receiptUploadActivityProvider).map((task) => task.id), [
+        other.id,
+      ]);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     },
